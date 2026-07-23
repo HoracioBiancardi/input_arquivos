@@ -12,8 +12,13 @@ class Settings(BaseSettings):
     Attributes:
         app_config_db_path: Caminho do arquivo SQLite usado para guardar
             contexts, usuários e o histórico de uploads.
-        storage_secret: Chave usada pelo NiceGUI para assinar o cookie de
-            sessão (`app.storage.user`).
+        session_secret: Chave usada para assinar o cookie de sessão do login.
+        session_max_age_seconds: Tempo de vida (em segundos) do cookie de
+            sessão antes de exigir novo login.
+        max_failed_login_attempts: Quantidade de tentativas de login com senha
+            incorreta permitidas antes de bloquear a conta temporariamente.
+        lockout_duration_seconds: Duração (em segundos) do bloqueio de login
+            após exceder `max_failed_login_attempts`.
         admin_bootstrap_username: Nome do primeiro usuário admin, criado
             automaticamente se a tabela de usuários estiver vazia.
         admin_bootstrap_password: Senha do primeiro usuário admin.
@@ -31,7 +36,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     app_config_db_path: Path = Path("data/app_config.db")
-    storage_secret: str = "change-me-in-production"
+    session_secret: str = "change-me-in-production"
+    session_max_age_seconds: int = 12 * 60 * 60
+    max_failed_login_attempts: int = 5
+    lockout_duration_seconds: int = 15 * 60
     admin_bootstrap_username: str = "admin"
     admin_bootstrap_password: str = "admin123"
     minio_endpoint: str = "localhost:9000"

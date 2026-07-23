@@ -2,13 +2,14 @@
 
 from datetime import date
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from app.auth.dependencies import require_admin
 from app.models.upload_history import UploadStatus
 from app.schemas.upload import UploadHistoryResponse
 from app.services.container import get_container
 
-router = APIRouter(prefix="/api/audit", tags=["audit"])
+router = APIRouter(prefix="/api/audit", tags=["audit"], dependencies=[Depends(require_admin)])
 
 
 @router.get("", response_model=list[UploadHistoryResponse])

@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block title %}Contexts • Ingestão de Arquivos{% endblock %}
+{% block header %}
+<header class="flex items-center justify-between px-6 py-3 bg-white dark:bg-slate-900 border-b border-black/5 dark:border-white/10">
+  <span class="text-lg font-semibold">Contexts</span>
+  <div class="flex items-center gap-3">
+    <a href="/admin" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">← Voltar</a>
+    <button id="dark-mode-toggle" type="button" class="text-sm px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">🌙</button>
+    <button id="logout-button" type="button" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Sair</button>
+  </div>
+</header>
+{% endblock %}
+{% block content %}
+<div class="w-full flex items-center justify-center p-6">
+  <div class="w-full max-w-5xl flex flex-col gap-4">
+
+    <div class="flex justify-between items-center">
+      <span class="text-sm text-muted">Contexts cadastrados</span>
+      <button id="new-context-button" type="button" class="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">+ Novo Context</button>
+    </div>
+
+    <div class="surface-card bg-white dark:bg-slate-900 rounded-xl overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs text-muted border-b border-black/5 dark:border-white/10">
+            <th class="px-4 py-2">Nome</th>
+            <th class="px-4 py-2">Destino</th>
+            <th class="px-4 py-2">Tipos aceitos</th>
+            <th class="px-4 py-2">Modo PDF</th>
+            <th class="px-4 py-2 text-center">Ativo</th>
+          </tr>
+        </thead>
+        <tbody id="context-rows"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<div id="context-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 p-6 shadow-lg">
+    <h3 id="context-modal-title" class="text-xl font-semibold mb-3">Novo Context</h3>
+    <form id="context-form" class="flex flex-col gap-3">
+      <input type="hidden" id="context-id">
+
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Nome do contexto</label>
+        <input id="context-name" required class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Tipos de arquivo aceitos</label>
+        <div class="flex gap-4 text-sm">
+          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="excel"> Excel</label>
+          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="csv"> CSV</label>
+          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="pdf"> PDF</label>
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Colunas obrigatórias (opcional)</label>
+        <input id="context-required-columns" placeholder="ex.: cpf, valor_total" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+        <p class="text-xs text-muted mt-1">Nomes de coluna separados por vírgula. Um upload é rejeitado se alguma dessas colunas vier ausente ou vazia.</p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Destino</label>
+        <select id="context-destination" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+          <option value="minio">MinIO</option>
+          <option value="sqlserver">SQL Server</option>
+          <option value="local">Pasta local</option>
+        </select>
+      </div>
+
+      <div id="minio-fields" class="flex flex-col gap-2">
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Bucket MinIO</label>
+          <input id="context-minio-bucket" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+        </div>
+        <button type="button" id="test-minio-button" class="self-start px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-600 text-sm">Testar conexão MinIO</button>
+        <p id="minio-test-result" class="text-sm"></p>
+      </div>
+
+      <div id="db-fields" class="flex flex-col gap-2">
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Connection string (SQLAlchemy)</label>
+          <input id="context-db-connection" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Schema</label>
+          <input id="context-db-schema" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm" value="dbo">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Tabela</label>
+          <input id="context-db-table" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+        </div>
+        <button type="button" id="test-db-button" class="self-start px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-600 text-sm">Testar conexão do banco</button>
+        <p id="db-test-result" class="text-sm"></p>
+      </div>
+
+      <div id="local-fields" class="flex flex-col gap-2">
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Pasta raiz local (opcional)</label>
+          <input id="context-local-path" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+          <p class="text-xs text-muted mt-1">Se deixar em branco, os arquivos são salvos a partir da raiz do projeto.</p>
+        </div>
+        <button type="button" id="test-local-button" class="self-start px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-600 text-sm">Testar/criar pasta local</button>
+        <p id="local-test-result" class="text-sm"></p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Modo de escrita padrão</label>
+        <select id="context-write-mode" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+          <option value="append">Append</option>
+          <option value="create_new">Criar nova tabela</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Modo de tratamento de PDF</label>
+        <select id="context-pdf-mode" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+          <option value="extract_tables">extract_tables</option>
+          <option value="metadata_only">metadata_only</option>
+          <option value="raw_archive">raw_archive</option>
+        </select>
+        <p id="pdf-mode-help" class="text-xs text-muted mt-1"></p>
+      </div>
+
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" id="context-active" checked> Ativo
+      </label>
+
+      <div class="flex justify-end gap-2 mt-2">
+        <button type="button" id="context-cancel-button" class="px-4 py-1.5 rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-600">Cancelar</button>
+        <button type="submit" class="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/admin_contexts.js"></script>
+{% endblock %}

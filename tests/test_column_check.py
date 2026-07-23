@@ -1,13 +1,13 @@
-"""Testes do ColumnMismatchChecker: detecção de divergência de colunas entre uploads."""
+"""Testes do ColumnMismatchChecker e do RequiredColumnChecker."""
 
 import pandas as pd
 
 from app.models.context import Context, DestinationType, PdfMode, WriteMode
-from app.services.column_check import ColumnMismatchChecker
+from app.services.column_check import ColumnMismatchChecker, RequiredColumnChecker
 
 
-def _make_context(expected_columns: str | None) -> Context:
-    """Cria um `Context` em memória com um valor de `expected_columns` para os testes."""
+def _make_context(expected_columns: str | None = None, required_columns: str | None = None) -> Context:
+    """Cria um `Context` em memória com valores de `expected_columns`/`required_columns` para os testes."""
     return Context(
         id=1,
         name="vendas",
@@ -16,6 +16,7 @@ def _make_context(expected_columns: str | None) -> Context:
         default_write_mode=WriteMode.APPEND,
         pdf_mode=PdfMode.METADATA_ONLY,
         expected_columns=expected_columns,
+        required_columns=required_columns,
         active=True,
     )
 
@@ -63,3 +64,51 @@ def test_serialize_excludes_tracking_columns() -> None:
     serialized = ColumnMismatchChecker().serialize(dataframe)
 
     assert serialized == "produto,valor"
+
+
+def test_required_column_check_returns_none_without_rules() -> None:
+    """Sem `required_columns` configurado, nenhuma violação deve ser reportada."""
+    context = _make_context(required_columns=None)
+    dataframe = _tracked_dataframe(["produto", "valor"])
+
+    assert RequiredColumnChecker().check(context, dataframe) is None
+
+
+def test_required_column_check_returns_none_when_filled() -> None:
+    """Colunas obrigatórias presentes e preenchidas não geram violação."""
+    context = _make_context(required_columns="produto,valor")
+    dataframe = _tracked_dataframe(["produto", "valor"])
+
+    assert RequiredColumnChecker().check(context, dataframe) is None
+
+
+def test_required_column_check_detects_missing_column() -> None:
+    """Uma coluna obrigatória ausente do arquivo deve ser reportada."""
+    context = _make_context(required_columns="produto,valor")
+    dataframe = _tracked_dataframe(["produto"])
+
+    violation = RequiredColumnChecker().check(context, dataframe)
+
+    assert violation is not None
+    assert violation.missing_columns == ["valor"]
+    assert violation.empty_columns == []
+
+
+def test_required_column_check_detects_empty_cell() -> None:
+    """Uma coluna obrigatória presente, mas com célula vazia/nula, deve ser reportada."""
+    context = _make_context(required_columns="produto,valor")
+    dataframe = pd.DataFrame(
+        {
+            "data_envio": ["x", "x"],
+            "contexto": ["vendas", "vendas"],
+            "enviado_por": ["maria", "maria"],
+            "produto": ["caneta", ""],
+            "valor": [10, None],
+        }
+    )
+
+    violation = RequiredColumnChecker().check(context, dataframe)
+
+    assert violation is not None
+    assert violation.missing_columns == []
+    assert sorted(violation.empty_columns) == ["produto", "valor"]

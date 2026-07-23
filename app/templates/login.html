@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Login • Ingestão de Arquivos{% endblock %}
+{% block header %}{% endblock %}
+{% block content %}
+<div class="login-page w-full flex flex-col items-center justify-center gap-4 p-4">
+  <div class="w-full max-w-sm p-8 rounded-2xl shadow-lg surface-card bg-white dark:bg-slate-900 flex flex-col gap-1">
+    <div class="icon-badge self-center mb-1">☁️</div>
+    <h1 class="text-xl font-bold text-center">Ingestão de Arquivos</h1>
+    <p class="text-sm text-muted text-center mb-3">Entre com sua conta para continuar</p>
+
+    <form id="login-form" class="flex flex-col gap-3">
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1" for="username">Usuário</label>
+        <input id="username" name="username" type="text" autocomplete="username" required
+          class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1" for="password">Senha</label>
+        <input id="password" name="password" type="password" autocomplete="current-password" required
+          class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary">
+      </div>
+      <p id="error-label" class="text-sm text-negative min-h-[1.25rem]"></p>
+      <button type="submit" class="w-full mt-1 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">
+        Entrar
+      </button>
+    </form>
+  </div>
+  <p class="text-xs text-muted">Sistema de ingestão de arquivos • Excel, CSV e PDF</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/login.js"></script>
+{% endblock %}

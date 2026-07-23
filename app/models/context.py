@@ -57,6 +57,10 @@ class Context(Base):
             (separadas por vírgula, sem contar `data_envio`/`contexto`/`enviado_por`).
             Usado para avisar o usuário quando um novo arquivo tem colunas
             diferentes das anteriores, antes de confirmar o envio.
+        required_columns: Colunas que não podem ficar vazias num upload aceito
+            para este contexto (separadas por vírgula). Vazio/`None` equivale a
+            não exigir nenhuma coluna específica. Diferente de `expected_columns`:
+            uma violação aqui rejeita o upload direto, sem opção de confirmar.
         active: Indica se o contexto aparece como opção na tela de upload.
         created_at: Data de criação do registro.
         updated_at: Data da última atualização do registro.
@@ -76,6 +80,7 @@ class Context(Base):
     pdf_mode: Mapped[PdfMode] = mapped_column(SqlEnum(PdfMode), default=PdfMode.METADATA_ONLY)
     allowed_file_types: Mapped[str] = mapped_column(String(50), default="excel,csv,pdf")
     expected_columns: Mapped[str | None] = mapped_column(Text, default=None)
+    required_columns: Mapped[str | None] = mapped_column(Text, default=None)
     active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Área Administrativa • Ingestão de Arquivos{% endblock %}
+{% block header %}
+<header class="flex items-center justify-between px-6 py-3 bg-white dark:bg-slate-900 border-b border-black/5 dark:border-white/10">
+  <div class="flex items-center gap-2">
+    <span class="text-primary text-xl">🛠️</span>
+    <span class="text-lg font-semibold">Área Administrativa</span>
+  </div>
+  <div class="flex items-center gap-3">
+    <a href="/" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">← Voltar ao upload</a>
+    <button id="dark-mode-toggle" type="button" class="text-sm px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">🌙</button>
+    <button id="logout-button" type="button" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Sair</button>
+  </div>
+</header>
+{% endblock %}
+{% block content %}
+<div class="w-full flex items-center justify-center p-6">
+  <div class="w-full max-w-4xl flex flex-col gap-4">
+    <p class="text-sm text-muted mb-1">O que você quer gerenciar?</p>
+    <div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));">
+      <a href="/admin/contexts" class="surface-card hover-lift bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-5 flex flex-col gap-1">
+        <div class="icon-badge mb-1">🔗</div>
+        <span class="text-base font-semibold">Contexts</span>
+        <span class="text-sm text-muted">Mapeamento de contextos para buckets/tabelas de destino</span>
+      </a>
+      <a href="/admin/users" class="surface-card hover-lift bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-5 flex flex-col gap-1">
+        <div class="icon-badge mb-1">👥</div>
+        <span class="text-base font-semibold">Usuários</span>
+        <span class="text-sm text-muted">Cadastro de contas de acesso ao sistema</span>
+      </a>
+      <a href="/admin/audit" class="surface-card hover-lift bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-5 flex flex-col gap-1">
+        <div class="icon-badge mb-1">🕒</div>
+        <span class="text-base font-semibold">Audit Log</span>
+        <span class="text-sm text-muted">Histórico completo de uploads processados</span>
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

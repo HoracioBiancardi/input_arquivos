@@ -9,7 +9,12 @@ from app.destinations.registry import DestinationWriterRegistry
 from app.ingestion.pipeline import IngestionPipeline, IngestResult
 from app.models.context import Context, WriteMode
 from app.models.upload_history import UploadHistory, UploadStatus
-from app.services.column_check import ColumnMismatch, ColumnMismatchChecker
+from app.services.column_check import (
+    ColumnMismatch,
+    ColumnMismatchChecker,
+    RequiredColumnChecker,
+    RequiredColumnViolation,
+)
 from app.services.context_service import ContextService
 
 
@@ -40,6 +45,7 @@ class UploadService:
         self._pipeline = pipeline
         self._writer_registry = writer_registry
         self._column_checker = ColumnMismatchChecker()
+        self._required_column_checker = RequiredColumnChecker()
 
     def resolve_context(self, context_name: str) -> Context:
         """Busca um contexto ativo pelo nome.
@@ -91,6 +97,23 @@ class UploadService:
         if artifact.dataframe is None:
             return None
         return self._column_checker.check(context, artifact.dataframe)
+
+    def check_required_columns(self, context: Context, artifact: IngestResult) -> RequiredColumnViolation | None:
+        """Verifica se as colunas obrigatórias do contexto vieram preenchidas no artefato.
+
+        Args:
+            context: Contexto selecionado pelo usuário.
+            artifact: Artefato produzido por `build_artifact`.
+
+        Returns:
+            Um `RequiredColumnViolation` se alguma coluna obrigatória estiver
+            ausente ou vazia, ou `None` se o contexto não tiver colunas
+            obrigatórias configuradas, todas estiverem preenchidas, ou o
+            artefato não tiver um DataFrame associado (ex.: PDF em modo raw_archive).
+        """
+        if artifact.dataframe is None:
+            return None
+        return self._required_column_checker.check(context, artifact.dataframe)
 
     def finalize(
         self,

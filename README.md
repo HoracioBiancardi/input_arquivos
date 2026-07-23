@@ -21,7 +21,7 @@ usuários do sistema e o audit log de uploads.
 ```bash
 uv sync
 cp .env.example .env
-# edite o .env: STORAGE_SECRET, credenciais do admin bootstrap e do MinIO
+# edite o .env: SESSION_SECRET, credenciais do admin bootstrap e do MinIO
 ```
 
 ## Executar
@@ -90,7 +90,7 @@ validar a integração real com MinIO/SQL Server:
 
 ```
 app/
-├── main.py              # cria o FastAPI, inclui a API e monta a UI NiceGUI
+├── main.py              # cria o FastAPI, monta os arquivos estáticos e inclui as rotas
 ├── config.py            # configurações (variáveis de ambiente/.env)
 ├── db/                  # engine/sessão SQLAlchemy + bootstrap do banco local
 ├── models/               # modelos ORM: Context, UploadHistory, User
@@ -98,21 +98,26 @@ app/
 ├── ingestion/            # leitores de arquivo, conversão Parquet e orquestração do pipeline
 ├── destinations/         # writers de destino (MinIO, SQL Server) + registry
 ├── services/             # camada de serviços (contexts, usuários, upload, auth) + container de DI
-├── api/                  # rotas REST (/api/contexts, /api/upload, /api/audit)
-├── auth/                 # guard de autenticação das páginas NiceGUI
-└── ui/
-    ├── pages/             # login e upload (uso geral)
-    └── admin/             # dashboard, contexts, usuários e audit log (admin)
+├── api/                  # rotas REST (/api/auth, /api/contexts, /api/users, /api/upload(s), /api/audit)
+├── auth/                 # sessão via cookie assinado (session.py) + dependencies do FastAPI
+├── web/                  # rotas de página (renderizam os templates Jinja2)
+├── templates/             # templates Jinja2 (login, upload, admin/*) + base.html (layout Tailwind)
+└── static/
+    ├── css/               # estilos que não são triviais de expressar só com Tailwind
+    └── js/                # interatividade de cada página (fetch para a API REST)
 tests/                    # testes automatizados (pytest)
 data/                     # SQLite local de configuração (gitignored)
 ```
 
 ## Notas de arquitetura
 
+- **Front-end**: HTML/CSS/JS servidos pelo próprio FastAPI (templates Jinja2 + Tailwind via CDN),
+  sem build step nem framework de front-end — a interatividade de cada página é JavaScript puro
+  chamando a API REST (`/api/*`).
 - **MinIO**: endpoint e credenciais são globais (`.env`), compartilhados por todos os contexts —
   cada context define apenas o bucket a usar nesse mesmo servidor.
 - **SQL Server**: cada context tem sua própria connection string, podendo apontar para bancos ou
   servidores diferentes.
-- **Autenticação**: usa a sessão nativa do NiceGUI (`app.storage.user`, cookie assinado por
-  `STORAGE_SECRET`) em vez de JWT — a UI é inteiramente NiceGUI, então isso é mais simples de manter
-  com o mesmo nível de segurança. A API REST (`/api/*`) não exige autenticação nesta versão.
+- **Autenticação**: sessão via cookie assinado (`SESSION_SECRET`, ver `app/auth/session.py`), tanto
+  para as páginas quanto para a API REST — toda rota sob `/api/*` (exceto `/api/auth/login`) exige
+  login, e as rotas administrativas exigem papel `admin`.

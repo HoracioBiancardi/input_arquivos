@@ -1,1 +1,1 @@
-"""Autenticação e controle de acesso (login geral + guard de sessão do NiceGUI)."""
+"""Autenticação e controle de acesso: sessão via cookie assinado e dependencies de login/admin."""

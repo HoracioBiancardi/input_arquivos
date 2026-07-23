@@ -1,0 +1,110 @@
+/* Estilos compartilhados que não são triviais de expressar só com utilitários do Tailwind. */
+
+body {
+  background: #eef1f6;
+}
+:root[data-theme="dark"] body,
+html.dark body {
+  background: #0f172a;
+}
+
+.surface-card {
+  border: 1px solid rgba(0, 0, 0, 0.07);
+}
+:root[data-theme="dark"] .surface-card,
+html.dark .surface-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.text-muted {
+  color: rgba(0, 0, 0, 0.55);
+}
+:root[data-theme="dark"] .text-muted,
+html.dark .text-muted {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.icon-badge {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(79, 70, 229, 0.12);
+  color: #4f46e5;
+}
+
+.hover-lift {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+}
+
+.login-page {
+  min-height: 100vh;
+  background: radial-gradient(circle at 20% 20%, #eef2ff 0%, #f8fafc 45%, #f1f5f9 100%);
+}
+html.dark .login-page {
+  background: radial-gradient(circle at 20% 20%, #1e1b4b 0%, #0f172a 45%, #0f172a 100%);
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 0.125rem 0.625rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.status-badge--success {
+  background: rgba(22, 163, 74, 0.12);
+  color: #16a34a;
+}
+.status-badge--error {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+.status-badge--muted {
+  background: rgba(100, 116, 139, 0.15);
+  color: #64748b;
+}
+
+.toast {
+  min-width: 18rem;
+  max-width: 24rem;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  font-size: 0.875rem;
+  border-left: 4px solid;
+}
+.toast--positive {
+  background: #f0fdf4;
+  border-color: #16a34a;
+  color: #14532d;
+}
+.toast--negative {
+  background: #fef2f2;
+  border-color: #dc2626;
+  color: #7f1d1d;
+}
+.toast--warning {
+  background: #fffbeb;
+  border-color: #d97706;
+  color: #78350f;
+}
+html.dark .toast--positive {
+  background: #052e16;
+  color: #bbf7d0;
+}
+html.dark .toast--negative {
+  background: #450a0a;
+  color: #fecaca;
+}
+html.dark .toast--warning {
+  background: #451a03;
+  color: #fde68a;
+}

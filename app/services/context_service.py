@@ -11,6 +11,10 @@ from app.db.session import DatabaseSessionFactory
 from app.models.context import Context, DestinationType, PdfMode, WriteMode
 
 
+class DuplicateNameError(ValueError):
+    """Erro levantado ao tentar criar um context com um nome já cadastrado."""
+
+
 @dataclass
 class ConnectionTestResult:
     """Resultado de um teste de conectividade com um destino (MinIO ou banco de dados).
@@ -93,6 +97,7 @@ class ContextService:
         db_table: str | None = None,
         local_path: str | None = None,
         allowed_file_types: str = "excel,csv,pdf",
+        required_columns: str = "",
     ) -> Context:
         """Cria um novo context.
 
@@ -108,10 +113,18 @@ class ContextService:
             local_path: Pasta no disco local, quando `destination_type` é LOCAL.
             allowed_file_types: Tipos de arquivo aceitos (valores de `FileType`
                 separados por vírgula, ex. "excel,csv").
+            required_columns: Colunas que não podem ficar vazias num upload
+                aceito para este contexto, separadas por vírgula.
 
         Returns:
             O context recém-criado.
+
+        Raises:
+            DuplicateNameError: Se já existir um context com esse nome.
         """
+        if self.get_by_name(name) is not None:
+            raise DuplicateNameError(f"Já existe um context com o nome '{name}'.")
+
         context = Context(
             name=name,
             destination_type=destination_type,
@@ -123,6 +136,7 @@ class ContextService:
             db_table=db_table,
             local_path=local_path,
             allowed_file_types=allowed_file_types,
+            required_columns=required_columns or None,
         )
         with self._session_factory.session() as db_session:
             db_session.add(context)
@@ -140,7 +154,17 @@ class ContextService:
 
         Returns:
             O context atualizado, ou `None` se não existir.
+
+        Raises:
+            DuplicateNameError: Se `name` estiver entre os campos e já
+                pertencer a outro context.
         """
+        new_name = fields.get("name")
+        if new_name is not None:
+            existing = self.get_by_name(str(new_name))
+            if existing is not None and existing.id != context_id:
+                raise DuplicateNameError(f"Já existe um context com o nome '{new_name}'.")
+
         with self._session_factory.session() as db_session:
             context = db_session.get(Context, context_id)
             if context is None:

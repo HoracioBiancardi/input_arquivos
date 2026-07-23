@@ -7,6 +7,10 @@ from app.models.user import User, UserRole
 from app.services.auth_service import AuthService
 
 
+class DuplicateUsernameError(ValueError):
+    """Erro levantado ao tentar criar um usuário com um nome de usuário já cadastrado."""
+
+
 class UserService:
     """Gerencia o CRUD de usuários usados no login geral do sistema."""
 
@@ -63,7 +67,13 @@ class UserService:
 
         Returns:
             O usuário recém-criado.
+
+        Raises:
+            DuplicateUsernameError: Se já existir um usuário com esse nome.
         """
+        if self.get_by_username(username) is not None:
+            raise DuplicateUsernameError(f"Já existe um usuário com o nome '{username}'.")
+
         user = User(
             username=username,
             password_hash=self._auth_service.hash_password(plain_password),

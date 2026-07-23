@@ -30,6 +30,11 @@ class User(Base):
         last_context_name: Nome do último context usado por este usuário na tela
             de upload, pré-selecionado automaticamente na próxima visita.
         created_at: Data de criação da conta.
+        failed_login_attempts: Quantidade de tentativas de login com senha
+            incorreta desde o último login bem-sucedido (ou desde o último
+            desbloqueio). Zerado a cada autenticação bem-sucedida.
+        locked_until: Se preenchido e no futuro, a conta está temporariamente
+            bloqueada para login (mesmo com a senha correta) até essa data/hora.
     """
 
     __tablename__ = "users"
@@ -41,3 +46,5 @@ class User(Base):
     active: Mapped[bool] = mapped_column(default=True)
     last_context_name: Mapped[str | None] = mapped_column(String(100), default=None)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
+    failed_login_attempts: Mapped[int] = mapped_column(default=0)
+    locked_until: Mapped[datetime | None] = mapped_column(default=None)

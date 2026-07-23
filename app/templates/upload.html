@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Ingestão de Arquivos{% endblock %}
+{% block content %}
+<div class="w-full flex flex-col items-center gap-6 p-6">
+  <div class="w-full sm:w-4/5 flex flex-col gap-6">
+
+    <div class="surface-card bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-6">
+      <div class="flex items-center gap-3 mb-1">
+        <div class="icon-badge">☁️</div>
+        <div>
+          <p class="text-lg font-semibold">Enviar arquivo</p>
+          <p class="text-sm text-muted">Excel, CSV ou PDF — escolha o contexto de destino abaixo</p>
+        </div>
+      </div>
+
+      <div id="no-contexts-message" class="hidden items-center gap-2 mt-3 text-muted">
+        <span>ℹ️</span>
+        <span id="no-contexts-text"></span>
+      </div>
+
+      <form id="upload-form" class="hidden flex-col gap-3 mt-2">
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Contexto</label>
+          <select id="context-select" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm"></select>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <span id="destination-icon">❓</span>
+          <span id="destination-label" class="text-sm text-muted">Selecione um contexto</span>
+        </div>
+
+        <div id="write-mode-field" class="hidden flex gap-4 text-sm">
+          <label class="flex items-center gap-1"><input type="radio" name="write_mode" value="append" checked> Append (adicionar à tabela existente)</label>
+          <label class="flex items-center gap-1"><input type="radio" name="write_mode" value="create_new"> Criar nova tabela</label>
+        </div>
+
+        <hr class="my-2 border-black/5 dark:border-white/10">
+
+        <input id="file-input" type="file" accept=".xlsx,.xls,.csv,.pdf"
+          class="w-full text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 file:mr-3 file:rounded-md file:border-0 file:bg-primary file:text-white file:px-3 file:py-1.5 file:text-sm">
+
+        <button type="submit" id="upload-submit" class="self-start px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">
+          Enviar
+        </button>
+      </form>
+    </div>
+
+    <div class="surface-card bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-6">
+      <div class="flex items-center gap-3 mb-2">
+        <div class="icon-badge">🕒</div>
+        <p class="text-lg font-semibold">Últimos envios</p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-xs text-muted border-b border-black/5 dark:border-white/10">
+              <th class="px-4 py-2">Arquivo</th>
+              <th class="px-4 py-2">Contexto</th>
+              <th class="px-4 py-2">Destino</th>
+              <th class="px-4 py-2 text-center">Status</th>
+              <th class="px-4 py-2">Enviado por</th>
+              <th class="px-4 py-2">Data de envio</th>
+            </tr>
+          </thead>
+          <tbody id="history-rows"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/upload.js"></script>
+{% endblock %}

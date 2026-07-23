@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Usuários • Ingestão de Arquivos{% endblock %}
+{% block header %}
+<header class="flex items-center justify-between px-6 py-3 bg-white dark:bg-slate-900 border-b border-black/5 dark:border-white/10">
+  <span class="text-lg font-semibold">Usuários</span>
+  <div class="flex items-center gap-3">
+    <a href="/admin" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">← Voltar</a>
+    <button id="dark-mode-toggle" type="button" class="text-sm px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">🌙</button>
+    <button id="logout-button" type="button" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Sair</button>
+  </div>
+</header>
+{% endblock %}
+{% block content %}
+<div class="w-full flex items-center justify-center p-6">
+  <div class="w-full max-w-4xl flex flex-col gap-4">
+
+    <div class="flex justify-between items-center">
+      <span class="text-sm text-muted">Usuários cadastrados</span>
+      <button id="new-user-button" type="button" class="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">+ Novo Usuário</button>
+    </div>
+
+    <div class="surface-card bg-white dark:bg-slate-900 rounded-xl overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs text-muted border-b border-black/5 dark:border-white/10">
+            <th class="px-4 py-2">Usuário</th>
+            <th class="px-4 py-2">Papel</th>
+            <th class="px-4 py-2 text-center">Ativo</th>
+          </tr>
+        </thead>
+        <tbody id="user-rows"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<div id="create-user-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-800 p-6 shadow-lg">
+    <h3 class="text-xl font-semibold mb-3">Novo Usuário</h3>
+    <form id="create-user-form" class="flex flex-col gap-3">
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Usuário</label>
+        <input id="create-username" required class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Senha</label>
+        <input id="create-password" type="password" required class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Papel</label>
+        <select id="create-role" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+          <option value="user">Usuário comum</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="flex justify-end gap-2 mt-2">
+        <button type="button" id="create-user-cancel" class="px-4 py-1.5 rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-600">Cancelar</button>
+        <button type="submit" class="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">Criar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="manage-user-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 p-6 shadow-lg">
+    <h3 id="manage-user-title" class="text-xl font-semibold mb-3">Gerenciar usuário</h3>
+    <form id="manage-user-form" class="flex flex-col gap-3">
+      <input type="hidden" id="manage-user-id">
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Papel</label>
+        <select id="manage-role" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+          <option value="user">Usuário comum</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" id="manage-active"> Ativo
+      </label>
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Nova senha (deixe em branco para não alterar)</label>
+        <input id="manage-new_password" type="password" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+      </div>
+      <div id="manage-contexts-field">
+        <label class="block text-xs font-medium text-muted mb-1">Contexts permitidos</label>
+        <div id="manage-contexts-checkboxes" class="flex flex-col gap-1 text-sm max-h-40 overflow-y-auto"></div>
+        <p class="text-xs text-muted mt-1">Só se aplica a usuários comuns — admins acessam todos os contexts.</p>
+      </div>
+      <div class="flex justify-end gap-2 mt-2">
+        <button type="button" id="manage-user-cancel" class="px-4 py-1.5 rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-600">Cancelar</button>
+        <button type="submit" class="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/admin_users.js"></script>
+{% endblock %}

@@ -6,8 +6,9 @@ requires-python = ">=3.12"
 dependencies = [
     "bcrypt<4.1",
     "fastapi>=0.139.2",
+    "itsdangerous>=2.2.0",
+    "jinja2>=3.1.6",
     "minio>=7.2.20",
-    "nicegui>=3.14.0",
     "openpyxl>=3.1.5",
     "pandas>=3.0.3",
     "passlib[bcrypt]>=1.7.4",

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Audit Log • Ingestão de Arquivos{% endblock %}
+{% block header %}
+<header class="flex items-center justify-between px-6 py-3 bg-white dark:bg-slate-900 border-b border-black/5 dark:border-white/10">
+  <span class="text-lg font-semibold">Audit Log</span>
+  <div class="flex items-center gap-3">
+    <a href="/admin" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">← Voltar</a>
+    <button id="dark-mode-toggle" type="button" class="text-sm px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">🌙</button>
+    <button id="logout-button" type="button" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Sair</button>
+  </div>
+</header>
+{% endblock %}
+{% block content %}
+<div class="w-full flex items-center justify-center p-6">
+  <div class="w-full max-w-6xl flex flex-col gap-4">
+
+    <div class="surface-card bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-4">
+      <div class="flex flex-wrap gap-3 items-end">
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Contexto</label>
+          <select id="filter-context" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-1.5 text-sm w-48"></select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Status</label>
+          <select id="filter-status" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-1.5 text-sm w-36">
+            <option value="">Todos</option>
+            <option value="success">Sucesso</option>
+            <option value="error">Erro</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Data inicial</label>
+          <input id="filter-start-date" type="date" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-1.5 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-muted mb-1">Data final</label>
+          <input id="filter-end-date" type="date" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-1.5 text-sm">
+        </div>
+        <button id="filter-button" type="button" class="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">Filtrar</button>
+      </div>
+    </div>
+
+    <div class="surface-card bg-white dark:bg-slate-900 rounded-xl overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs text-muted border-b border-black/5 dark:border-white/10">
+            <th class="px-4 py-2">Arquivo</th>
+            <th class="px-4 py-2">Contexto</th>
+            <th class="px-4 py-2">Destino</th>
+            <th class="px-4 py-2">Modo</th>
+            <th class="px-4 py-2 text-center">Status</th>
+            <th class="px-4 py-2 text-right">Linhas</th>
+            <th class="px-4 py-2">Enviado por</th>
+            <th class="px-4 py-2">Data de envio</th>
+            <th class="px-4 py-2">Erro</th>
+          </tr>
+        </thead>
+        <tbody id="audit-rows"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/admin_audit.js"></script>
+{% endblock %}

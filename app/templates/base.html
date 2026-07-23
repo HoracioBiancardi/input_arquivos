@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Ingestão de Arquivos{% endblock %}</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          fontFamily: { sans: ["Inter", "system-ui", "sans-serif"] },
+          colors: {
+            primary: "#4f46e5",
+            secondary: "#64748b",
+            positive: "#16a34a",
+            negative: "#dc2626",
+            warning: "#d97706",
+            info: "#0284c7",
+          },
+        },
+      },
+    };
+  </script>
+  <link rel="stylesheet" href="/static/css/app.css">
+  {% block head %}{% endblock %}
+</head>
+<body class="font-sans text-slate-900 dark:text-slate-100 min-h-screen">
+  {% block header %}
+  {% if current_user %}
+  <header class="flex items-center justify-between px-6 py-3 bg-white dark:bg-slate-900 border-b border-black/5 dark:border-white/10">
+    <div class="flex items-center gap-2">
+      <span class="text-primary text-xl">☁️</span>
+      <span class="text-lg font-semibold">Ingestão de Arquivos</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="text-sm text-muted">Olá, {{ current_user.username }}</span>
+      {% if current_user.role == "admin" %}
+      <a href="/admin" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Admin</a>
+      {% endif %}
+      <button id="dark-mode-toggle" type="button" class="text-sm px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">🌙</button>
+      <button id="logout-button" type="button" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Sair</button>
+    </div>
+  </header>
+  {% endif %}
+  {% endblock %}
+
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+
+  <div id="toast-root" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
+  <script src="/static/js/common.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

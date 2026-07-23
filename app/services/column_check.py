@@ -73,3 +73,70 @@ class ColumnMismatchChecker:
             Lista de colunas (excluindo as de rastreabilidade) separadas por vírgula.
         """
         return ",".join(name for name in dataframe.columns if name not in _TRACKING_COLUMNS)
+
+
+@dataclass
+class RequiredColumnViolation:
+    """Descreve por que um upload não atende às colunas obrigatórias configuradas para o contexto.
+
+    Attributes:
+        missing_columns: Colunas obrigatórias que não vieram no arquivo.
+        empty_columns: Colunas obrigatórias presentes no arquivo, mas com
+            alguma célula vazia (nula ou string em branco).
+    """
+
+    missing_columns: list[str]
+    empty_columns: list[str]
+
+
+class RequiredColumnChecker:
+    """Verifica se as colunas obrigatórias de um contexto vieram preenchidas num novo upload."""
+
+    def check(self, context: Context, dataframe: pd.DataFrame) -> RequiredColumnViolation | None:
+        """Compara as colunas obrigatórias do contexto contra o DataFrame recebido.
+
+        Diferente de `ColumnMismatchChecker`, esta checagem não é sobre
+        divergência em relação a um upload anterior: é uma regra de qualidade
+        de dado fixa do contexto, então uma violação deve ser rejeitada
+        diretamente, sem oferecer a opção de confirmar mesmo assim.
+
+        Args:
+            context: Contexto selecionado para o upload.
+            dataframe: DataFrame já com as colunas de rastreabilidade injetadas.
+
+        Returns:
+            Um `RequiredColumnViolation` descrevendo o problema, ou `None` se
+            o contexto não tiver colunas obrigatórias configuradas ou se todas
+            estiverem presentes e preenchidas.
+        """
+        if not context.required_columns:
+            return None
+
+        required = [name for name in context.required_columns.split(",") if name]
+        if not required:
+            return None
+
+        missing_columns = [name for name in required if name not in dataframe.columns]
+        empty_columns = [
+            name for name in required if name in dataframe.columns and self._has_empty_cell(dataframe[name])
+        ]
+
+        if not missing_columns and not empty_columns:
+            return None
+        return RequiredColumnViolation(missing_columns=missing_columns, empty_columns=empty_columns)
+
+    def _has_empty_cell(self, column: pd.Series) -> bool:
+        """Verifica se uma coluna tem alguma célula nula ou com string em branco.
+
+        Args:
+            column: Coluna do DataFrame a verificar.
+
+        Returns:
+            `True` se houver ao menos uma célula nula ou uma string vazia/só espaços.
+        """
+        if column.isna().any():
+            return True
+        non_null = column.dropna()
+        if non_null.empty:
+            return False
+        return bool(non_null.astype(str).str.strip().eq("").any())
