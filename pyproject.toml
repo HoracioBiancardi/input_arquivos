@@ -1,0 +1,30 @@
+[project]
+name = "file-ingestion-system"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "bcrypt<4.1",
+    "fastapi>=0.139.2",
+    "minio>=7.2.20",
+    "nicegui>=3.14.0",
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.3",
+    "passlib[bcrypt]>=1.7.4",
+    "pdfplumber>=0.11.10",
+    "pyarrow>=25.0.0",
+    "pydantic-settings>=2.14.2",
+    "pyodbc>=5.3.0",
+    "python-dotenv>=1.2.2",
+    "python-multipart>=0.0.32",
+    "sqlalchemy>=2.0",
+    "uvicorn[standard]>=0.51.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.15.22",
+]
