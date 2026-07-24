@@ -1,5 +1,7 @@
 """Rotas da API REST para consulta, criação, edição e teste de conectividade de contexts."""
 
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import require_admin, require_login
@@ -9,6 +11,7 @@ from app.models.context import Context, DestinationType
 from app.schemas.context import (
     AccessibleContextResponse,
     AccessibleContextsResponse,
+    ColumnRule,
     ConnectionTestResponse,
     ContextCreateRequest,
     ContextResponse,
@@ -21,6 +24,20 @@ from app.services.container import get_container
 from app.services.context_service import DuplicateNameError
 
 router = APIRouter(prefix="/api/contexts", tags=["contexts"])
+
+
+def _serialize_column_rules(rules: list[ColumnRule]) -> str | None:
+    """Serializa a lista de regras de validação para o JSON salvo em `context.column_rules`.
+
+    Args:
+        rules: Regras informadas no payload da requisição.
+
+    Returns:
+        JSON serializado, ou `None` se a lista estiver vazia.
+    """
+    if not rules:
+        return None
+    return json.dumps([rule.model_dump(mode="json") for rule in rules])
 
 
 def _describe_destination(context: Context) -> str:
@@ -155,13 +172,14 @@ def create_context(payload: ContextCreateRequest) -> ContextResponse:
             destination_type=payload.destination_type,
             default_write_mode=payload.default_write_mode,
             pdf_mode=payload.pdf_mode,
+            image_mode=payload.image_mode,
             minio_bucket=payload.minio_bucket,
             db_connection_string=payload.db_connection_string,
             db_schema_name=payload.db_schema_name,
             db_table=payload.db_table,
             local_path=payload.local_path,
             allowed_file_types=payload.allowed_file_types,
-            required_columns=payload.required_columns,
+            column_rules=_serialize_column_rules(payload.column_rules),
         )
     except DuplicateNameError as error:
         raise HTTPException(
@@ -192,13 +210,14 @@ def update_context(context_id: int, payload: ContextUpdateRequest) -> ContextRes
             destination_type=payload.destination_type,
             default_write_mode=payload.default_write_mode,
             pdf_mode=payload.pdf_mode,
+            image_mode=payload.image_mode,
             minio_bucket=payload.minio_bucket,
             db_connection_string=payload.db_connection_string,
             db_schema_name=payload.db_schema_name,
             db_table=payload.db_table,
             local_path=payload.local_path,
             allowed_file_types=payload.allowed_file_types,
-            required_columns=payload.required_columns or None,
+            column_rules=_serialize_column_rules(payload.column_rules),
             active=payload.active,
         )
     except DuplicateNameError as error:

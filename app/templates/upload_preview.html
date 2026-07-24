@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Visualizar tabela • Ingestão de Arquivos{% endblock %}
+{% block content %}
+<div id="preview-root" data-upload-id="{{ upload_id }}" class="w-full flex flex-col items-center gap-6 p-6">
+  <div class="w-full sm:w-4/5 flex flex-col gap-4">
+
+    <div class="flex items-center justify-between">
+      <a href="/" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">← Voltar</a>
+    </div>
+
+    <div class="surface-card bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-6">
+      <div class="flex items-center gap-3 mb-1">
+        <div class="icon-badge">📊</div>
+        <div>
+          <p id="preview-filename" class="text-lg font-semibold">Carregando…</p>
+          <p id="preview-context" class="text-sm text-muted"></p>
+        </div>
+      </div>
+      <p id="preview-truncated-note" class="hidden text-xs text-muted mt-2"></p>
+    </div>
+
+    <div id="preview-empty-state" class="hidden surface-card bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-6 text-center text-muted">
+      <span class="text-2xl">ℹ️</span>
+      <p id="preview-empty-message" class="mt-2 text-sm"></p>
+    </div>
+
+    <div id="preview-table-card" class="surface-card bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-6 overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr id="preview-table-head" class="text-left text-xs text-muted border-b border-black/5 dark:border-white/10"></tr>
+        </thead>
+        <tbody id="preview-table-body"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/upload_preview.js"></script>
+{% endblock %}

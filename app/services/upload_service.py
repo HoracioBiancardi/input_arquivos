@@ -10,10 +10,10 @@ from app.ingestion.pipeline import IngestionPipeline, IngestResult
 from app.models.context import Context, WriteMode
 from app.models.upload_history import UploadHistory, UploadStatus
 from app.services.column_check import (
+    ColumnDataValidator,
+    ColumnDataViolation,
     ColumnMismatch,
     ColumnMismatchChecker,
-    RequiredColumnChecker,
-    RequiredColumnViolation,
 )
 from app.services.context_service import ContextService
 
@@ -45,7 +45,7 @@ class UploadService:
         self._pipeline = pipeline
         self._writer_registry = writer_registry
         self._column_checker = ColumnMismatchChecker()
-        self._required_column_checker = RequiredColumnChecker()
+        self._column_data_validator = ColumnDataValidator()
 
     def resolve_context(self, context_name: str) -> Context:
         """Busca um contexto ativo pelo nome.
@@ -98,22 +98,42 @@ class UploadService:
             return None
         return self._column_checker.check(context, artifact.dataframe)
 
-    def check_required_columns(self, context: Context, artifact: IngestResult) -> RequiredColumnViolation | None:
-        """Verifica se as colunas obrigatórias do contexto vieram preenchidas no artefato.
+    def check_column_data(self, context: Context, artifact: IngestResult) -> ColumnDataViolation | None:
+        """Verifica se os dados de cada coluna do artefato respeitam as regras de validação do contexto.
 
         Args:
             context: Contexto selecionado pelo usuário.
             artifact: Artefato produzido por `build_artifact`.
 
         Returns:
-            Um `RequiredColumnViolation` se alguma coluna obrigatória estiver
-            ausente ou vazia, ou `None` se o contexto não tiver colunas
-            obrigatórias configuradas, todas estiverem preenchidas, ou o
+            Um `ColumnDataViolation` se alguma célula violar uma regra de tipo
+            ou obrigatoriedade configurada em `context.column_rules`, ou
+            `None` se o contexto não tiver regras, tudo passar, ou o
             artefato não tiver um DataFrame associado (ex.: PDF em modo raw_archive).
         """
         if artifact.dataframe is None:
             return None
-        return self._required_column_checker.check(context, artifact.dataframe)
+        return self._column_data_validator.check(context, artifact.dataframe)
+
+    def describe_column_data_violation(self, violation: ColumnDataViolation) -> str:
+        """Monta um resumo textual das violações de dados encontradas, para o audit log.
+
+        Args:
+            violation: Violação retornada por `check_column_data`.
+
+        Returns:
+            Mensagem legível descrevendo cada coluna e motivo de rejeição.
+        """
+        reason_labels = {
+            "coluna_ausente": "coluna ausente",
+            "obrigatoria": "célula obrigatória vazia",
+            "tipo_invalido": "tipo inválido",
+        }
+        parts = [
+            f"{detail.column} ({reason_labels.get(detail.reason, detail.reason)}, {detail.bad_row_count} linha(s))"
+            for detail in violation.details
+        ]
+        return "Dados inválidos: " + "; ".join(parts)
 
     def finalize(
         self,
@@ -149,6 +169,7 @@ class UploadService:
                 destination_detail=result.destination_detail,
                 write_mode=write_mode,
                 status=UploadStatus.SUCCESS,
+                artifact_kind=artifact.artifact_kind,
                 row_count=result.row_count,
                 error_message=None,
                 uploaded_by=uploaded_by,
@@ -206,6 +227,12 @@ class UploadService:
             artifact = self.build_artifact(file_bytes, filename, context, uploaded_by)
         except Exception as error:  # noqa: BLE001 - qualquer falha vira um registro de auditoria com erro
             return self.record_error(context, filename, write_mode, uploaded_by, str(error))
+
+        violation = self.check_column_data(context, artifact)
+        if violation is not None:
+            return self.record_error(
+                context, filename, write_mode, uploaded_by, self.describe_column_data_violation(violation)
+            )
 
         return self.finalize(artifact, context, write_mode, filename, uploaded_by)
 

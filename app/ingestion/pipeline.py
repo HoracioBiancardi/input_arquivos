@@ -8,8 +8,19 @@ import pandas as pd
 
 from app.ingestion.file_types import FileType, FileTypeRegistry
 from app.ingestion.parquet import ParquetConverter
-from app.ingestion.readers import CsvReader, ExcelReader, PdfMetadataReader, PdfTableReader
-from app.models.context import Context, PdfMode
+from app.ingestion.readers import (
+    CsvReader,
+    ExcelReader,
+    HtmlReader,
+    ImageTableReader,
+    JsonReader,
+    OdsReader,
+    PdfMetadataReader,
+    PdfTableReader,
+    XmlReader,
+    YamlReader,
+)
+from app.models.context import Context, ImageMode, PdfMode
 
 
 @dataclass
@@ -17,8 +28,8 @@ class IngestResult:
     """Artefato produzido pelo pipeline de ingestão, pronto para um destination writer.
 
     Attributes:
-        artifact_bytes: Conteúdo binário final (Parquet, ou PDF bruto em modo raw_archive).
-        artifact_kind: Tipo do artefato ("parquet" ou "raw_pdf").
+        artifact_bytes: Conteúdo binário final (Parquet, ou PDF/imagem bruta em modo raw_archive).
+        artifact_kind: Tipo do artefato ("parquet", "raw_pdf" ou "raw_image").
         dataframe: DataFrame gerado, quando `artifact_kind` é "parquet"
             (usado pelos writers de banco de dados). `None` em modo raw_archive.
         row_count: Quantidade de linhas do DataFrame, quando aplicável.
@@ -51,6 +62,12 @@ class IngestionPipeline:
         self._csv_reader = CsvReader()
         self._pdf_table_reader = PdfTableReader()
         self._pdf_metadata_reader = PdfMetadataReader()
+        self._image_table_reader = ImageTableReader()
+        self._json_reader = JsonReader()
+        self._xml_reader = XmlReader()
+        self._yaml_reader = YamlReader()
+        self._ods_reader = OdsReader()
+        self._html_reader = HtmlReader()
         self._parquet_converter = ParquetConverter()
         self._file_types = FileTypeRegistry()
 
@@ -62,7 +79,8 @@ class IngestionPipeline:
             filename: Nome original do arquivo.
             context: Contexto selecionado pelo usuário, que determina os tipos de
                 arquivo aceitos (`context.allowed_file_types`), o comportamento de
-                PDFs (`context.pdf_mode`) e o destino final.
+                PDFs (`context.pdf_mode`) e imagens (`context.image_mode`), e o
+                destino final.
             uploaded_by: Nome do usuário autenticado que realizou o upload.
 
         Returns:
@@ -96,6 +114,16 @@ class IngestionPipeline:
                 suggested_filename=filename,
             )
 
+        if file_type == FileType.IMAGE and (context.image_mode or ImageMode.RAW_ARCHIVE) == ImageMode.RAW_ARCHIVE:
+            return IngestResult(
+                artifact_bytes=file_bytes,
+                artifact_kind="raw_image",
+                dataframe=None,
+                row_count=None,
+                page_count=None,
+                suggested_filename=filename,
+            )
+
         dataframe = self._read(file_bytes, filename, file_type, context)
         dataframe = self._inject_tracking_columns(dataframe, context.name, uploaded_by)
         parquet_bytes = self._parquet_converter.to_bytes(dataframe)
@@ -117,15 +145,28 @@ class IngestionPipeline:
             file_bytes: Conteúdo bruto do arquivo enviado.
             filename: Nome original do arquivo.
             file_type: Tipo lógico do arquivo, já validado contra o contexto.
-            context: Contexto selecionado, usado para decidir o modo de leitura de PDFs.
+            context: Contexto selecionado, usado para decidir o modo de leitura de PDFs e imagens.
 
         Returns:
             DataFrame com os dados extraídos do arquivo.
         """
         if file_type == FileType.EXCEL:
             return self._excel_reader.read(file_bytes)
-        if file_type == FileType.CSV:
+        if file_type in (FileType.CSV, FileType.TXT):
             return self._csv_reader.read(file_bytes)
+        if file_type == FileType.IMAGE:
+            borderless = context.image_mode == ImageMode.TABLE_BORDERLESS
+            return self._image_table_reader.read(file_bytes, borderless=borderless)
+        if file_type == FileType.JSON:
+            return self._json_reader.read(file_bytes)
+        if file_type == FileType.XML:
+            return self._xml_reader.read(file_bytes)
+        if file_type == FileType.YAML:
+            return self._yaml_reader.read(file_bytes)
+        if file_type == FileType.ODS:
+            return self._ods_reader.read(file_bytes)
+        if file_type == FileType.HTML:
+            return self._html_reader.read(file_bytes)
         if context.pdf_mode == PdfMode.EXTRACT_TABLES:
             return self._pdf_table_reader.read(file_bytes)
         return self._pdf_metadata_reader.read(file_bytes, filename)

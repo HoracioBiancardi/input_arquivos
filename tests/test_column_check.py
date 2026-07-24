@@ -1,13 +1,19 @@
-"""Testes do ColumnMismatchChecker e do RequiredColumnChecker."""
+"""Testes do ColumnMismatchChecker e do ColumnDataValidator."""
 
+import json
+
+import numpy as np
 import pandas as pd
 
 from app.models.context import Context, DestinationType, PdfMode, WriteMode
-from app.services.column_check import ColumnMismatchChecker, RequiredColumnChecker
+from app.services.column_check import ColumnDataValidator, ColumnMismatchChecker
 
 
-def _make_context(expected_columns: str | None = None, required_columns: str | None = None) -> Context:
-    """Cria um `Context` em memória com valores de `expected_columns`/`required_columns` para os testes."""
+def _make_context(
+    expected_columns: str | None = None,
+    column_rules: str | list[dict] | None = None,
+) -> Context:
+    """Cria um `Context` em memória com valores de `expected_columns`/`column_rules` para os testes."""
     return Context(
         id=1,
         name="vendas",
@@ -16,7 +22,7 @@ def _make_context(expected_columns: str | None = None, required_columns: str | N
         default_write_mode=WriteMode.APPEND,
         pdf_mode=PdfMode.METADATA_ONLY,
         expected_columns=expected_columns,
-        required_columns=required_columns,
+        column_rules=json.dumps(column_rules) if isinstance(column_rules, list) else column_rules,
         active=True,
     )
 
@@ -66,49 +72,196 @@ def test_serialize_excludes_tracking_columns() -> None:
     assert serialized == "produto,valor"
 
 
-def test_required_column_check_returns_none_without_rules() -> None:
-    """Sem `required_columns` configurado, nenhuma violação deve ser reportada."""
-    context = _make_context(required_columns=None)
+def test_column_data_validator_returns_none_without_rules() -> None:
+    """Sem `column_rules` configurado, nenhuma violação deve ser reportada."""
+    context = _make_context(column_rules=None)
     dataframe = _tracked_dataframe(["produto", "valor"])
 
-    assert RequiredColumnChecker().check(context, dataframe) is None
+    assert ColumnDataValidator().check(context, dataframe) is None
 
 
-def test_required_column_check_returns_none_when_filled() -> None:
-    """Colunas obrigatórias presentes e preenchidas não geram violação."""
-    context = _make_context(required_columns="produto,valor")
-    dataframe = _tracked_dataframe(["produto", "valor"])
+def test_column_data_validator_returns_none_when_all_valid() -> None:
+    """Dados que respeitam todas as regras não geram violação."""
+    context = _make_context(
+        column_rules=[
+            {"column": "valor", "type": "decimal", "required": True},
+            {"column": "produto", "type": "text", "required": False},
+        ]
+    )
+    dataframe = pd.DataFrame(
+        {
+            "data_envio": ["x", "x"],
+            "contexto": ["vendas", "vendas"],
+            "enviado_por": ["maria", "maria"],
+            "produto": ["caneta", "lapis"],
+            "valor": [10.5, 20],
+        }
+    )
 
-    assert RequiredColumnChecker().check(context, dataframe) is None
+    assert ColumnDataValidator().check(context, dataframe) is None
 
 
-def test_required_column_check_detects_missing_column() -> None:
-    """Uma coluna obrigatória ausente do arquivo deve ser reportada."""
-    context = _make_context(required_columns="produto,valor")
-    dataframe = _tracked_dataframe(["produto"])
+def test_column_data_validator_detects_type_mismatch() -> None:
+    """Uma célula que não converte para o tipo declarado deve ser reportada."""
+    context = _make_context(column_rules=[{"column": "valor", "type": "decimal", "required": False}])
+    dataframe = pd.DataFrame(
+        {
+            "data_envio": ["x", "x"],
+            "contexto": ["vendas", "vendas"],
+            "enviado_por": ["maria", "maria"],
+            "valor": ["abc", 10],
+        }
+    )
 
-    violation = RequiredColumnChecker().check(context, dataframe)
+    violation = ColumnDataValidator().check(context, dataframe)
 
     assert violation is not None
-    assert violation.missing_columns == ["valor"]
-    assert violation.empty_columns == []
+    assert len(violation.details) == 1
+    detail = violation.details[0]
+    assert detail.column == "valor"
+    assert detail.reason == "tipo_invalido"
+    assert detail.bad_row_count == 1
+    assert detail.sample[0].row_number == 2  # primeira linha de dados = índice 0 + 2
+    assert detail.sample[0].value == "abc"
 
 
-def test_required_column_check_detects_empty_cell() -> None:
-    """Uma coluna obrigatória presente, mas com célula vazia/nula, deve ser reportada."""
-    context = _make_context(required_columns="produto,valor")
+def test_column_data_validator_detects_required_violation_on_present_column() -> None:
+    """Uma célula vazia numa regra obrigatória deve ser reportada, mesmo com a coluna presente."""
+    context = _make_context(column_rules=[{"column": "produto", "type": "text", "required": True}])
     dataframe = pd.DataFrame(
         {
             "data_envio": ["x", "x"],
             "contexto": ["vendas", "vendas"],
             "enviado_por": ["maria", "maria"],
             "produto": ["caneta", ""],
-            "valor": [10, None],
         }
     )
 
-    violation = RequiredColumnChecker().check(context, dataframe)
+    violation = ColumnDataValidator().check(context, dataframe)
 
     assert violation is not None
-    assert violation.missing_columns == []
-    assert sorted(violation.empty_columns) == ["produto", "valor"]
+    assert len(violation.details) == 1
+    assert violation.details[0].reason == "obrigatoria"
+    assert violation.details[0].bad_row_count == 1
+
+
+def test_column_data_validator_skips_missing_optional_column() -> None:
+    """Uma regra opcional (`required=False`) para uma coluna ausente do arquivo simplesmente não se aplica."""
+    context = _make_context(column_rules=[{"column": "inexistente", "type": "text", "required": False}])
+    dataframe = _tracked_dataframe(["produto"])
+
+    assert ColumnDataValidator().check(context, dataframe) is None
+
+
+def test_column_data_validator_detects_missing_required_column() -> None:
+    """Uma regra obrigatória (`required=True`) para uma coluna ausente do arquivo deve ser reportada."""
+    context = _make_context(column_rules=[{"column": "inexistente", "type": "text", "required": True}])
+    dataframe = _tracked_dataframe(["produto"])
+
+    violation = ColumnDataValidator().check(context, dataframe)
+
+    assert violation is not None
+    assert len(violation.details) == 1
+    detail = violation.details[0]
+    assert detail.column == "inexistente"
+    assert detail.reason == "coluna_ausente"
+    assert detail.bad_row_count == len(dataframe)
+    assert detail.sample == []
+
+
+def test_column_data_validator_accepts_whole_float_as_integer() -> None:
+    """Um float 'inteiro' vindo do Excel (10.0) deve passar numa regra `integer`; 10.5 não."""
+    context = _make_context(column_rules=[{"column": "quantidade", "type": "integer", "required": False}])
+    dataframe = pd.DataFrame(
+        {
+            "data_envio": ["x", "x"],
+            "contexto": ["vendas", "vendas"],
+            "enviado_por": ["maria", "maria"],
+            "quantidade": [10.0, 10.5],
+        }
+    )
+
+    violation = ColumnDataValidator().check(context, dataframe)
+
+    assert violation is not None
+    assert violation.details[0].bad_row_count == 1
+    assert violation.details[0].sample[0].value == "10.5"
+
+
+def test_column_data_validator_accepts_boolean_tokens() -> None:
+    """Tokens textuais (sim/não) e booleanos nativos (incluindo numpy.bool_) devem ser aceitos."""
+    context = _make_context(column_rules=[{"column": "ativo", "type": "boolean", "required": False}])
+    dataframe = pd.DataFrame(
+        {
+            "data_envio": ["x", "x", "x"],
+            "contexto": ["vendas", "vendas", "vendas"],
+            "enviado_por": ["maria", "maria", "maria"],
+            "ativo": ["sim", "não", np.bool_(True)],
+        }
+    )
+
+    assert ColumnDataValidator().check(context, dataframe) is None
+
+
+def test_column_data_validator_rejects_non_boolean_token() -> None:
+    """Um valor que não é um token booleano reconhecido deve ser reportado."""
+    context = _make_context(column_rules=[{"column": "ativo", "type": "boolean", "required": False}])
+    dataframe = pd.DataFrame(
+        {
+            "data_envio": ["x"],
+            "contexto": ["vendas"],
+            "enviado_por": ["maria"],
+            "ativo": ["talvez"],
+        }
+    )
+
+    violation = ColumnDataValidator().check(context, dataframe)
+
+    assert violation is not None
+    assert violation.details[0].bad_row_count == 1
+
+
+def test_column_data_validator_parses_dayfirst_dates() -> None:
+    """Datas no formato brasileiro (DD/MM/AAAA) devem ser aceitas por uma regra `date`."""
+    context = _make_context(column_rules=[{"column": "data_venda", "type": "date", "required": False}])
+    dataframe = pd.DataFrame(
+        {
+            "data_envio": ["x", "x"],
+            "contexto": ["vendas", "vendas"],
+            "enviado_por": ["maria", "maria"],
+            "data_venda": ["01/02/2026", "não é uma data"],
+        }
+    )
+
+    violation = ColumnDataValidator().check(context, dataframe)
+
+    assert violation is not None
+    assert violation.details[0].bad_row_count == 1
+    assert violation.details[0].sample[0].value == "não é uma data"
+
+
+def test_column_data_validator_caps_sample_at_five_rows() -> None:
+    """A amostra de linhas com problema deve ser limitada a 5, mesmo com mais violações."""
+    context = _make_context(column_rules=[{"column": "valor", "type": "decimal", "required": False}])
+    dataframe = pd.DataFrame(
+        {
+            "data_envio": ["x"] * 7,
+            "contexto": ["vendas"] * 7,
+            "enviado_por": ["maria"] * 7,
+            "valor": ["abc"] * 7,
+        }
+    )
+
+    violation = ColumnDataValidator().check(context, dataframe)
+
+    assert violation is not None
+    assert violation.details[0].bad_row_count == 7
+    assert len(violation.details[0].sample) == 5
+
+
+def test_column_data_validator_ignores_malformed_json() -> None:
+    """JSON inválido em `column_rules` não deve quebrar a validação, apenas desabilitá-la."""
+    context = _make_context(column_rules="{not valid json")
+    dataframe = _tracked_dataframe(["produto"])
+
+    assert ColumnDataValidator().check(context, dataframe) is None

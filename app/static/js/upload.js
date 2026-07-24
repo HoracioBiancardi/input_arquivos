@@ -75,6 +75,13 @@ function formatDate(isoString) {
   return date.toLocaleDateString("pt-BR") + " " + date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
 
+function viewTableAction(item) {
+  if (item.status === "success" && item.artifact_kind === "parquet") {
+    return `<a href="/uploads/${item.id}/preview" class="text-primary hover:underline">Visualizar</a>`;
+  }
+  return "—";
+}
+
 async function loadHistory() {
   const history = await apiFetch("/api/uploads/recent?limit=20");
   const rows = document.getElementById("history-rows");
@@ -88,6 +95,7 @@ async function loadHistory() {
         <td class="px-4 py-2 text-center">${statusBadge(item.status)}</td>
         <td class="px-4 py-2">${item.uploaded_by}</td>
         <td class="px-4 py-2">${formatDate(item.created_at)}</td>
+        <td class="px-4 py-2">${viewTableAction(item)}</td>
       </tr>`
     )
     .join("");
@@ -129,11 +137,18 @@ async function handleSubmit(event) {
     } catch (error) {
       if (error.status === 422) {
         const violation = error.data.detail;
-        const parts = [];
-        if (violation.missing_columns.length) parts.push(`ausentes: ${violation.missing_columns.join(", ")}`);
-        if (violation.empty_columns.length) parts.push(`vazias: ${violation.empty_columns.join(", ")}`);
-        showToast(`Arquivo rejeitado — colunas obrigatórias ${parts.join("; ")}.`, "negative");
+        const reasonLabels = {
+          coluna_ausente: "coluna ausente no arquivo",
+          obrigatoria: "célula(s) vazia(s)",
+          tipo_invalido: "valor(es) fora do tipo esperado",
+        };
+        const parts = violation.violations.map((item) => {
+          const kind = reasonLabels[item.reason] || item.reason;
+          return item.reason === "coluna_ausente" ? `${item.column}: ${kind}` : `${item.column}: ${item.bad_row_count} linha(s) com ${kind}`;
+        });
+        showToast(`Arquivo rejeitado — dados inválidos: ${parts.join("; ")}.`, "negative");
         fileInput.value = "";
+        await loadHistory();
         return;
       }
       if (error.status === 409) {
@@ -162,10 +177,18 @@ async function handleSubmit(event) {
       }
     }
 
+    const viewLastUploadLink = document.getElementById("view-last-upload-link");
     if (result.status === "success") {
       showToast(`Arquivo enviado com sucesso para ${result.destination_detail}.`, "positive");
+      if (result.artifact_kind === "parquet") {
+        viewLastUploadLink.href = `/uploads/${result.id}/preview`;
+        viewLastUploadLink.classList.remove("hidden");
+      } else {
+        viewLastUploadLink.classList.add("hidden");
+      }
     } else {
       showToast(`Falha no envio: ${result.error_message}`, "negative");
+      viewLastUploadLink.classList.add("hidden");
     }
     fileInput.value = "";
     await loadHistory();

@@ -27,7 +27,9 @@
             <th class="px-4 py-2">Destino</th>
             <th class="px-4 py-2">Tipos aceitos</th>
             <th class="px-4 py-2">Modo PDF</th>
+            <th class="px-4 py-2">Modo Imagem</th>
             <th class="px-4 py-2 text-center">Ativo</th>
+            <th class="px-4 py-2"></th>
           </tr>
         </thead>
         <tbody id="context-rows"></tbody>
@@ -50,17 +52,18 @@
 
       <div>
         <label class="block text-xs font-medium text-muted mb-1">Tipos de arquivo aceitos</label>
-        <div class="flex gap-4 text-sm">
+        <div class="flex flex-wrap gap-4 text-sm">
           <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="excel"> Excel</label>
           <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="csv"> CSV</label>
           <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="pdf"> PDF</label>
+          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="image"> Imagem</label>
+          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="json"> JSON</label>
+          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="xml"> XML</label>
+          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="txt"> TXT</label>
+          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="yaml"> YAML</label>
+          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="ods"> ODS</label>
+          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="html"> HTML</label>
         </div>
-      </div>
-
-      <div>
-        <label class="block text-xs font-medium text-muted mb-1">Colunas obrigatórias (opcional)</label>
-        <input id="context-required-columns" placeholder="ex.: cpf, valor_total" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
-        <p class="text-xs text-muted mt-1">Nomes de coluna separados por vírgula. Um upload é rejeitado se alguma dessas colunas vier ausente ou vazia.</p>
       </div>
 
       <div>
@@ -119,11 +122,21 @@
       <div>
         <label class="block text-xs font-medium text-muted mb-1">Modo de tratamento de PDF</label>
         <select id="context-pdf-mode" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
-          <option value="extract_tables">extract_tables</option>
-          <option value="metadata_only">metadata_only</option>
-          <option value="raw_archive">raw_archive</option>
+          <option value="extract_tables">Extrair tabelas</option>
+          <option value="metadata_only">Somente metadados</option>
+          <option value="raw_archive">Arquivar original</option>
         </select>
         <p id="pdf-mode-help" class="text-xs text-muted mt-1"></p>
+      </div>
+
+      <div>
+        <label class="block text-xs font-medium text-muted mb-1">Modo de tratamento de imagem</label>
+        <select id="context-image-mode" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+          <option value="raw_archive">Arquivar original</option>
+          <option value="table_grid">Tabela com grade</option>
+          <option value="table_borderless">Tabela sem grade</option>
+        </select>
+        <p id="image-mode-help" class="text-xs text-muted mt-1"></p>
       </div>
 
       <label class="flex items-center gap-2 text-sm">
@@ -135,6 +148,39 @@
         <button type="submit" class="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">Salvar</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div id="rules-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/40 p-4">
+  <div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 p-6 shadow-lg">
+    <h3 class="text-xl font-semibold mb-1">Regras de validação de dados</h3>
+    <p id="rules-modal-context-name" class="text-sm text-muted mb-3"></p>
+    <input type="hidden" id="rules-context-id">
+
+    <table class="w-full text-xs mb-2">
+      <thead>
+        <tr class="text-left text-muted">
+          <th class="py-1 pr-2">Coluna</th>
+          <th class="py-1 pr-2">Tipo</th>
+          <th class="py-1 pr-2 text-center">Obrigatória</th>
+          <th class="py-1"></th>
+        </tr>
+      </thead>
+      <tbody id="context-rules-rows"></tbody>
+    </table>
+    <datalist id="rules-column-options"></datalist>
+    <button type="button" id="context-add-rule-button" class="text-xs px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600">+ Adicionar regra</button>
+    <p class="text-xs text-muted mt-2">
+      Um upload é rejeitado (arquivo inteiro) se alguma célula não corresponder ao tipo declarado.
+      Marcar "Obrigatória" faz a coluna precisar estar presente no arquivo e sem células vazias.
+      As sugestões de coluna vêm do último arquivo aceito para este contexto — se ainda não houve
+      nenhum upload, digite o nome livremente.
+    </p>
+
+    <div class="flex justify-end gap-2 mt-4">
+      <button type="button" id="rules-cancel-button" class="px-4 py-1.5 rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-600">Cancelar</button>
+      <button type="button" id="rules-save-button" class="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">Salvar regras</button>
+    </div>
   </div>
 </div>
 {% endblock %}

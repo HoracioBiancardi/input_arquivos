@@ -33,6 +33,24 @@ class PdfMode(str, enum.Enum):
     RAW_ARCHIVE = "raw_archive"
 
 
+class ImageMode(str, enum.Enum):
+    """Modo de tratamento de imagens (foto/scan/screenshot de tabela) configurado por contexto."""
+
+    RAW_ARCHIVE = "raw_archive"
+    TABLE_GRID = "table_grid"
+    TABLE_BORDERLESS = "table_borderless"
+
+
+class ColumnRuleType(str, enum.Enum):
+    """Tipo de dado esperado para uma coluna, usado em `Context.column_rules`."""
+
+    TEXT = "text"
+    INTEGER = "integer"
+    DECIMAL = "decimal"
+    DATE = "date"
+    BOOLEAN = "boolean"
+
+
 class Context(Base):
     """Contexto de negócio (ex.: "vendas") e o destino para o qual seus uploads são roteados.
 
@@ -50,6 +68,7 @@ class Context(Base):
             sem depender de um MinIO/SQL Server externo.
         default_write_mode: Modo de escrita pré-selecionado na tela de upload.
         pdf_mode: Modo de tratamento de PDFs enviados sob este contexto.
+        image_mode: Modo de tratamento de imagens enviadas sob este contexto.
         allowed_file_types: Tipos de arquivo que este contexto aceita (valores de
             `FileType` separados por vírgula, ex. "excel,csv"). Uploads de um tipo
             fora dessa lista são rejeitados. Vazio/`None` equivale a aceitar todos.
@@ -57,10 +76,12 @@ class Context(Base):
             (separadas por vírgula, sem contar `data_envio`/`contexto`/`enviado_por`).
             Usado para avisar o usuário quando um novo arquivo tem colunas
             diferentes das anteriores, antes de confirmar o envio.
-        required_columns: Colunas que não podem ficar vazias num upload aceito
-            para este contexto (separadas por vírgula). Vazio/`None` equivale a
-            não exigir nenhuma coluna específica. Diferente de `expected_columns`:
-            uma violação aqui rejeita o upload direto, sem opção de confirmar.
+        column_rules: Regras de validação de tipo/obrigatoriedade por coluna,
+            serializadas como JSON (lista de objetos `{"column", "type",
+            "required"}`). Diferente de `expected_columns`: uma violação aqui
+            rejeita o upload direto, sem opção de confirmar. Uma regra com
+            `required=True` cobre tanto a ausência da coluna no arquivo
+            quanto células vazias nela quando presente.
         active: Indica se o contexto aparece como opção na tela de upload.
         created_at: Data de criação do registro.
         updated_at: Data da última atualização do registro.
@@ -78,9 +99,10 @@ class Context(Base):
     local_path: Mapped[str | None] = mapped_column(String(500), default=None)
     default_write_mode: Mapped[WriteMode] = mapped_column(SqlEnum(WriteMode), default=WriteMode.APPEND)
     pdf_mode: Mapped[PdfMode] = mapped_column(SqlEnum(PdfMode), default=PdfMode.METADATA_ONLY)
+    image_mode: Mapped[ImageMode] = mapped_column(SqlEnum(ImageMode), default=ImageMode.RAW_ARCHIVE)
     allowed_file_types: Mapped[str] = mapped_column(String(50), default="excel,csv,pdf")
     expected_columns: Mapped[str | None] = mapped_column(Text, default=None)
-    required_columns: Mapped[str | None] = mapped_column(Text, default=None)
+    column_rules: Mapped[str | None] = mapped_column(Text, default=None)
     active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(

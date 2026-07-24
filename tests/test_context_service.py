@@ -112,6 +112,45 @@ def test_update_to_duplicate_name_raises(session_factory: DatabaseSessionFactory
         service.update(estoque.id, name="vendas")
 
 
+def test_create_stores_column_rules_json(session_factory: DatabaseSessionFactory) -> None:
+    """As regras de validação de dados devem ser persistidas como a string JSON informada."""
+    service = ContextService(session_factory)
+    rules_json = '[{"column": "valor", "type": "decimal", "required": true}]'
+
+    service.create(
+        name="vendas",
+        destination_type=DestinationType.MINIO,
+        default_write_mode=WriteMode.APPEND,
+        pdf_mode=PdfMode.METADATA_ONLY,
+        minio_bucket="vendas",
+        column_rules=rules_json,
+    )
+
+    stored = service.get_by_name("vendas")
+    assert stored is not None
+    assert stored.column_rules == rules_json
+
+
+def test_update_changes_column_rules(session_factory: DatabaseSessionFactory) -> None:
+    """Atualizar `column_rules` deve refletir o novo valor ao buscar novamente."""
+    service = ContextService(session_factory)
+    context = service.create(
+        name="vendas",
+        destination_type=DestinationType.MINIO,
+        default_write_mode=WriteMode.APPEND,
+        pdf_mode=PdfMode.METADATA_ONLY,
+        minio_bucket="vendas",
+    )
+    assert context.column_rules is None
+
+    new_rules = '[{"column": "produto", "type": "text", "required": false}]'
+    service.update(context.id, column_rules=new_rules)
+
+    updated = service.get_by_id(context.id)
+    assert updated is not None
+    assert updated.column_rules == new_rules
+
+
 def test_update_keeping_same_name_does_not_raise(session_factory: DatabaseSessionFactory) -> None:
     """Atualizar um context sem trocar o nome não deve ser tratado como duplicidade."""
     service = ContextService(session_factory)

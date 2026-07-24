@@ -5,19 +5,25 @@ description = "Add your description here"
 requires-python = ">=3.12"
 dependencies = [
     "bcrypt<4.1",
+    "beautifulsoup4>=4.15.0",
     "fastapi>=0.139.2",
+    "html5lib>=1.1",
+    "img2table[rapidocr]>=1.4.5",
     "itsdangerous>=2.2.0",
     "jinja2>=3.1.6",
     "minio>=7.2.20",
+    "odfpy>=1.4.1",
     "openpyxl>=3.1.5",
     "pandas>=3.0.3",
     "passlib[bcrypt]>=1.7.4",
     "pdfplumber>=0.11.10",
+    "pillow>=11.0.0",
     "pyarrow>=25.0.0",
     "pydantic-settings>=2.14.2",
     "pyodbc>=5.3.0",
     "python-dotenv>=1.2.2",
     "python-multipart>=0.0.32",
+    "pyyaml>=6.0",
     "sqlalchemy>=2.0",
     "uvicorn[standard]>=0.51.0",
 ]
@@ -29,3 +35,9 @@ dev = [
     "pytest-cov>=7.1.0",
     "ruff>=0.15.22",
 ]
+
+[tool.uv]
+# O extra "rapidocr" do img2table traz opencv-python como dependência, que colide com o
+# opencv-contrib-python que o img2table já usa para detecção de linhas de tabela (cv2.ximgproc) —
+# as duas distribuições fornecem o mesmo pacote `cv2` e não podem coexistir no mesmo venv.
+override-dependencies = ["opencv-python; sys_platform == 'never'"]

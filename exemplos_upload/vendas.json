@@ -1,0 +1,22 @@
+[
+  {
+    "produto": "Notebook Prata",
+    "quantidade": 3,
+    "valor_unitario": 4500.0
+  },
+  {
+    "produto": "Mouse Sem Fio",
+    "quantidade": 10,
+    "valor_unitario": 80.5
+  },
+  {
+    "produto": "Teclado Mecanico",
+    "quantidade": 5,
+    "valor_unitario": 350.0
+  },
+  {
+    "produto": "Monitor 27 Polegadas",
+    "quantidade": 2,
+    "valor_unitario": 1200.0
+  }
+]

@@ -9,12 +9,26 @@ class FileType(str, enum.Enum):
     EXCEL = "excel"
     CSV = "csv"
     PDF = "pdf"
+    IMAGE = "image"
+    JSON = "json"
+    XML = "xml"
+    TXT = "txt"
+    YAML = "yaml"
+    ODS = "ods"
+    HTML = "html"
 
 
 _EXTENSIONS_BY_TYPE: dict[FileType, tuple[str, ...]] = {
     FileType.EXCEL: (".xlsx", ".xls"),
     FileType.CSV: (".csv",),
     FileType.PDF: (".pdf",),
+    FileType.IMAGE: (".png", ".jpg", ".jpeg"),
+    FileType.JSON: (".json",),
+    FileType.XML: (".xml",),
+    FileType.TXT: (".txt",),
+    FileType.YAML: (".yaml", ".yml"),
+    FileType.ODS: (".ods",),
+    FileType.HTML: (".html", ".htm"),
 }
 
 

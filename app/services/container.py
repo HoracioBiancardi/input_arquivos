@@ -5,6 +5,7 @@ from app.destinations.registry import DestinationWriterRegistry
 from app.ingestion.pipeline import IngestionPipeline
 from app.services.auth_service import AuthService
 from app.services.context_service import ContextService
+from app.services.preview_service import PreviewService
 from app.services.upload_service import UploadService
 from app.services.user_context_service import UserContextService
 from app.services.user_service import UserService
@@ -30,6 +31,7 @@ class ServiceContainer:
             pipeline=IngestionPipeline(),
             writer_registry=DestinationWriterRegistry(),
         )
+        self.preview_service = PreviewService(session_factory=session_factory, context_service=self.context_service)
 
 
 _container: ServiceContainer | None = None

@@ -1,10 +1,14 @@
 """Leitores de arquivo: convertem os bytes de um upload em um DataFrame pandas."""
 
 import io
+import json
 from typing import Protocol
 
 import pandas as pd
 import pdfplumber
+import yaml
+from img2table.document import Image as Img2TableImage
+from img2table.ocr import RapidOCR
 
 
 class FileReader(Protocol):
@@ -109,3 +113,202 @@ class PdfMetadataReader:
         return pd.DataFrame(
             [{"filename": filename, "page_count": page_count, "text_content": "\n\n".join(page_texts)}]
         )
+
+
+class ImageTableReader:
+    """Extrai tabelas de uma imagem (foto/scan/screenshot) via OCR local e retorna como DataFrame."""
+
+    def read(self, file_bytes: bytes, borderless: bool) -> pd.DataFrame:
+        """Detecta e extrai tabelas de uma imagem, concatenando-as em um único DataFrame.
+
+        Args:
+            file_bytes: Conteúdo bruto do arquivo de imagem (.png/.jpg/.jpeg).
+            borderless: Quando `True`, usa a heurística de tabelas sem grade visível
+                (agrupamento por espaçamento/posição). Quando `False`, assume que a
+                tabela tem linhas de grade detectáveis.
+
+        Returns:
+            DataFrame com as linhas de todas as tabelas encontradas na imagem, com a
+            primeira linha de cada tabela promovida a cabeçalho de colunas.
+
+        Raises:
+            ValueError: Se nenhuma tabela puder ser extraída da imagem, ou se as
+                dependências opcionais de OCR não estiverem instaladas.
+        """
+        # O construtor do `RapidOCR` carrega os modelos ONNX de detecção/reconhecimento
+        # e levanta `ModuleNotFoundError` se o extra `img2table[rapidocr]` não estiver
+        # instalado — por isso só é instanciado aqui, dentro de `read()`, e não no
+        # pipeline, que cria todos os readers eagerly: instanciar isto de olhos fechados
+        # no __init__ quebraria a ingestão de Excel/CSV/PDF também em ambientes sem essa
+        # dependência opcional instalada.
+        try:
+            ocr = RapidOCR(params={"Rec.lang_type": "pt", "Det.lang_type": "pt"})
+            document = Img2TableImage(src=file_bytes)
+            extracted_tables = document.extract_tables(
+                ocr=ocr,
+                implicit_rows=borderless,
+                borderless_tables=borderless,
+                min_confidence=50,
+            )
+        except ModuleNotFoundError as error:
+            raise ValueError(
+                "OCR indisponível: verifique se as dependências 'img2table[rapidocr]' estão instaladas."
+            ) from error
+
+        frames: list[pd.DataFrame] = []
+        for table in extracted_tables:
+            raw = table.df
+            if len(raw) < 2:
+                continue
+            header, *rows = raw.values.tolist()
+            frames.append(pd.DataFrame(rows, columns=header))
+        if not frames:
+            raise ValueError("Nenhuma tabela foi encontrada nesta imagem.")
+        return pd.concat(frames, ignore_index=True)
+
+
+def _records_to_dataframe(data: object, formato: str) -> pd.DataFrame:
+    """Converte uma lista de objetos (já decodificada de JSON/YAML) em DataFrame.
+
+    Args:
+        data: Estrutura de dados já decodificada (esperado: lista de objetos).
+        formato: Nome do formato de origem, usado na mensagem de erro ("JSON"/"YAML").
+
+    Returns:
+        DataFrame com uma linha por objeto da lista, achatando um nível de aninhamento.
+
+    Raises:
+        ValueError: Se `data` não for uma lista de objetos.
+    """
+    if not isinstance(data, list) or not data or not all(isinstance(item, dict) for item in data):
+        raise ValueError(f"O {formato} precisa ser uma lista de objetos (registros) na raiz.")
+    return pd.json_normalize(data)
+
+
+class JsonReader:
+    """Lê arquivos JSON (lista de objetos na raiz) e retorna seu conteúdo como DataFrame."""
+
+    def read(self, file_bytes: bytes) -> pd.DataFrame:
+        """Decodifica um JSON e converte a lista de objetos da raiz em DataFrame.
+
+        Args:
+            file_bytes: Conteúdo bruto do arquivo .json.
+
+        Returns:
+            DataFrame com uma linha por objeto da lista.
+
+        Raises:
+            ValueError: Se o conteúdo não for um JSON válido, ou não for uma lista
+                de objetos na raiz.
+        """
+        try:
+            data = json.loads(file_bytes)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"JSON inválido: {error}") from error
+        return _records_to_dataframe(data, "JSON")
+
+
+class YamlReader:
+    """Lê arquivos YAML (lista de objetos na raiz) e retorna seu conteúdo como DataFrame."""
+
+    def read(self, file_bytes: bytes) -> pd.DataFrame:
+        """Decodifica um YAML e converte a lista de objetos da raiz em DataFrame.
+
+        Args:
+            file_bytes: Conteúdo bruto do arquivo .yaml/.yml.
+
+        Returns:
+            DataFrame com uma linha por objeto da lista.
+
+        Raises:
+            ValueError: Se o conteúdo não for um YAML válido, ou não for uma lista
+                de objetos na raiz.
+        """
+        try:
+            data = yaml.safe_load(file_bytes)
+        except yaml.YAMLError as error:
+            raise ValueError(f"YAML inválido: {error}") from error
+        return _records_to_dataframe(data, "YAML")
+
+
+class XmlReader:
+    """Lê arquivos XML tabulares simples (elementos repetidos como linhas) e retorna como DataFrame."""
+
+    def read(self, file_bytes: bytes) -> pd.DataFrame:
+        """Extrai os elementos filhos da raiz do XML como linhas de um DataFrame.
+
+        Args:
+            file_bytes: Conteúdo bruto do arquivo .xml.
+
+        Returns:
+            DataFrame com uma linha por elemento filho da raiz do XML.
+
+        Raises:
+            ValueError: Se o XML não puder ser interpretado como uma tabela simples.
+        """
+        try:
+            return pd.read_xml(io.BytesIO(file_bytes), parser="etree")
+        except Exception as error:  # noqa: BLE001 - qualquer falha de parse deve virar erro amigável
+            raise ValueError(f"Não foi possível interpretar este XML como uma tabela: {error}") from error
+
+
+class OdsReader:
+    """Lê planilhas OpenDocument (.ods, LibreOffice/OpenOffice Calc) e retorna como DataFrame."""
+
+    def read(self, file_bytes: bytes) -> pd.DataFrame:
+        """Lê a primeira planilha de um arquivo .ods.
+
+        Args:
+            file_bytes: Conteúdo bruto do arquivo .ods.
+
+        Returns:
+            DataFrame com os dados da primeira planilha do arquivo.
+
+        Raises:
+            ValueError: Se o pacote `odfpy` não estiver instalado no servidor.
+        """
+        try:
+            return pd.read_excel(io.BytesIO(file_bytes), engine="odf")
+        except ImportError as error:
+            raise ValueError(
+                "Leitura de .ods indisponível: verifique se o pacote 'odfpy' está instalado no servidor."
+            ) from error
+
+
+class HtmlReader:
+    """Extrai tabelas (<table>) de uma página HTML e retorna como DataFrame."""
+
+    def read(self, file_bytes: bytes) -> pd.DataFrame:
+        """Extrai todas as tabelas encontradas em um HTML e as concatena em um único DataFrame.
+
+        Cada tabela extraída ganha uma coluna `tabela` indicando de qual `<table>`
+        da página ela veio, o que ajuda a rastrear a origem dos dados quando o
+        HTML contém múltiplas tabelas.
+
+        Args:
+            file_bytes: Conteúdo bruto do arquivo .html/.htm.
+
+        Returns:
+            DataFrame com as linhas de todas as tabelas encontradas no HTML.
+
+        Raises:
+            ValueError: Se nenhuma tabela puder ser extraída do HTML, ou se as
+                dependências de parsing (`beautifulsoup4`/`html5lib`) não
+                estiverem instaladas no servidor.
+        """
+        try:
+            tables = pd.read_html(io.BytesIO(file_bytes), flavor="bs4")
+        except ImportError as error:
+            raise ValueError(
+                "Leitura de HTML indisponível: verifique se 'beautifulsoup4' e "
+                "'html5lib' estão instalados no servidor."
+            ) from error
+        except ValueError as error:
+            raise ValueError(f"Nenhuma tabela foi encontrada neste HTML: {error}") from error
+
+        frames: list[pd.DataFrame] = []
+        for table_index, frame in enumerate(tables, start=1):
+            frame = frame.copy()
+            frame["tabela"] = table_index
+            frames.append(frame)
+        return pd.concat(frames, ignore_index=True)

@@ -5,8 +5,9 @@ from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from app.auth.dependencies import require_login
 from app.auth.session import SessionUser
 from app.models.context import WriteMode
-from app.schemas.upload import UploadHistoryResponse
+from app.schemas.upload import UploadHistoryResponse, UploadPreviewResponse
 from app.services.container import get_container
+from app.services.preview_service import PreviewNotAvailableError, UploadNotFoundError
 from app.services.upload_service import ContextNotFoundError
 
 router = APIRouter(prefix="/api", tags=["upload"], dependencies=[Depends(require_login)])
@@ -81,9 +82,12 @@ async def upload_interactive(
         O registro de audit log criado para este upload.
 
     Raises:
-        HTTPException: 404 se o context não existir/estiver inativo, 422 se
-            faltar alguma coluna obrigatória configurada para o context, ou
-            409 se houver divergência de colunas ainda não confirmada pelo usuário.
+        HTTPException: 404 se o context não existir/estiver inativo; 422 se
+            algum dado violar uma regra de validação de `column_rules`
+            (inclui coluna obrigatória ausente — nesse caso, também é
+            registrado um `UploadHistory` de erro antes de levantar a
+            exceção); ou 409 se houver divergência de colunas ainda não
+            confirmada pelo usuário.
     """
     container = get_container()
     try:
@@ -112,14 +116,29 @@ async def upload_interactive(
         history = container.upload_service.record_error(context, filename, write_mode, username, str(error))
         return UploadHistoryResponse.model_validate(history)
 
-    required_violation = container.upload_service.check_required_columns(context, artifact)
-    if required_violation is not None:
+    column_data_violation = container.upload_service.check_column_data(context, artifact)
+    if column_data_violation is not None:
+        container.upload_service.record_error(
+            context,
+            filename,
+            write_mode,
+            username,
+            container.upload_service.describe_column_data_violation(column_data_violation),
+        )
         raise HTTPException(
             status_code=422,
             detail={
-                "message": "Este arquivo não atende às colunas obrigatórias configuradas para este contexto.",
-                "missing_columns": required_violation.missing_columns,
-                "empty_columns": required_violation.empty_columns,
+                "message": "Este arquivo tem dados que não respeitam as regras de validação configuradas para este contexto.",
+                "violations": [
+                    {
+                        "column": detail.column,
+                        "rule_type": detail.rule_type,
+                        "reason": detail.reason,
+                        "bad_row_count": detail.bad_row_count,
+                        "sample": [{"row": sample.row_number, "value": sample.value} for sample in detail.sample],
+                    }
+                    for detail in column_data_violation.details
+                ],
             },
         )
 
@@ -153,3 +172,35 @@ def list_recent_uploads(limit: int = 20) -> list[UploadHistoryResponse]:
     """
     history = get_container().upload_service.list_recent(limit=limit)
     return [UploadHistoryResponse.model_validate(item) for item in history]
+
+
+@router.get("/uploads/{upload_id}/preview", response_model=UploadPreviewResponse)
+def get_upload_preview(upload_id: int, limit: int = 200) -> UploadPreviewResponse:
+    """Retorna um recorte da tabela gerada por um upload, para a tela de visualização.
+
+    Args:
+        upload_id: Identificador do upload.
+        limit: Quantidade máxima de linhas a retornar.
+
+    Returns:
+        Recorte da tabela gerada por este upload.
+
+    Raises:
+        HTTPException: 404 se o upload não existir; 409 se o upload não tiver
+            gerado uma tabela para visualizar (falhou, ou foi arquivado sem
+            processar em modo raw_archive).
+    """
+    try:
+        preview = get_container().preview_service.get_preview(upload_id, limit=limit)
+    except UploadNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except PreviewNotAvailableError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return UploadPreviewResponse(
+        filename=preview.filename,
+        context_name=preview.context_name,
+        columns=preview.columns,
+        rows=preview.rows,
+        total_row_count=preview.total_row_count,
+        truncated=preview.truncated,
+    )

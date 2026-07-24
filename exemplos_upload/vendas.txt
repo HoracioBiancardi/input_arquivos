@@ -1,0 +1,5 @@
+produto;quantidade;valor_unitario
+Notebook Prata;3;4500.0
+Mouse Sem Fio;10;80.5
+Teclado Mecanico;5;350.0
+Monitor 27 Polegadas;2;1200.0

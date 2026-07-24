@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, select, text
 
 from app.config import get_settings
 from app.db.session import DatabaseSessionFactory
-from app.models.context import Context, DestinationType, PdfMode, WriteMode
+from app.models.context import Context, DestinationType, ImageMode, PdfMode, WriteMode
 
 
 class DuplicateNameError(ValueError):
@@ -91,13 +91,14 @@ class ContextService:
         destination_type: DestinationType,
         default_write_mode: WriteMode,
         pdf_mode: PdfMode,
+        image_mode: ImageMode = ImageMode.RAW_ARCHIVE,
         minio_bucket: str | None = None,
         db_connection_string: str | None = None,
         db_schema_name: str = "dbo",
         db_table: str | None = None,
         local_path: str | None = None,
         allowed_file_types: str = "excel,csv,pdf",
-        required_columns: str = "",
+        column_rules: str | None = None,
     ) -> Context:
         """Cria um novo context.
 
@@ -106,6 +107,7 @@ class ContextService:
             destination_type: Tipo de destino (MinIO, SQL Server ou pasta local).
             default_write_mode: Modo de escrita pré-selecionado na tela de upload.
             pdf_mode: Modo de tratamento de PDFs para este context.
+            image_mode: Modo de tratamento de imagens para este context.
             minio_bucket: Nome do bucket, quando `destination_type` é MINIO.
             db_connection_string: URL de conexão do banco, quando `destination_type` é SQLSERVER.
             db_schema_name: Schema da tabela de destino.
@@ -113,8 +115,8 @@ class ContextService:
             local_path: Pasta no disco local, quando `destination_type` é LOCAL.
             allowed_file_types: Tipos de arquivo aceitos (valores de `FileType`
                 separados por vírgula, ex. "excel,csv").
-            required_columns: Colunas que não podem ficar vazias num upload
-                aceito para este contexto, separadas por vírgula.
+            column_rules: Regras de validação de tipo/obrigatoriedade por
+                coluna, já serializadas como JSON.
 
         Returns:
             O context recém-criado.
@@ -130,13 +132,14 @@ class ContextService:
             destination_type=destination_type,
             default_write_mode=default_write_mode,
             pdf_mode=pdf_mode,
+            image_mode=image_mode,
             minio_bucket=minio_bucket,
             db_connection_string=db_connection_string,
             db_schema_name=db_schema_name,
             db_table=db_table,
             local_path=local_path,
             allowed_file_types=allowed_file_types,
-            required_columns=required_columns or None,
+            column_rules=column_rules,
         )
         with self._session_factory.session() as db_session:
             db_session.add(context)

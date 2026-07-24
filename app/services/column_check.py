@@ -1,5 +1,6 @@
 """Comparação entre as colunas de um novo upload e as colunas esperadas de um contexto."""
 
+import json
 from dataclasses import dataclass
 
 import pandas as pd
@@ -7,6 +8,10 @@ import pandas as pd
 from app.models.context import Context
 
 _TRACKING_COLUMNS = {"data_envio", "contexto", "enviado_por"}
+_VALID_RULE_TYPES = {"text", "integer", "decimal", "date", "boolean"}
+_BOOLEAN_TRUE_TOKENS = {"sim", "s", "true", "verdadeiro", "1", "yes", "y"}
+_BOOLEAN_FALSE_TOKENS = {"não", "nao", "n", "false", "falso", "0", "no"}
+_SAMPLE_LIMIT = 5
 
 
 @dataclass
@@ -75,68 +80,204 @@ class ColumnMismatchChecker:
         return ",".join(name for name in dataframe.columns if name not in _TRACKING_COLUMNS)
 
 
+@dataclass(frozen=True)
+class _ParsedColumnRule:
+    """Representação interna de uma regra de `Context.column_rules`, já validada."""
+
+    column: str
+    rule_type: str
+    required: bool
+
+
+def _parse_column_rules(raw: str) -> list[_ParsedColumnRule]:
+    """Faz o parse defensivo do JSON salvo em `context.column_rules`.
+
+    Ignora silenciosamente entradas malformadas (JSON inválido, tipo
+    desconhecido, campo `column` ausente) em vez de propagar exceção — um
+    upload não deve quebrar por causa de uma configuração inconsistente de
+    contexto.
+
+    Args:
+        raw: Conteúdo bruto de `context.column_rules`.
+
+    Returns:
+        Lista de regras válidas encontradas no JSON.
+    """
+    try:
+        items = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return []
+    if not isinstance(items, list):
+        return []
+
+    parsed: list[_ParsedColumnRule] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        column = item.get("column")
+        rule_type = item.get("type")
+        if not column or rule_type not in _VALID_RULE_TYPES:
+            continue
+        parsed.append(_ParsedColumnRule(column=column, rule_type=rule_type, required=bool(item.get("required"))))
+    return parsed
+
+
 @dataclass
-class RequiredColumnViolation:
-    """Descreve por que um upload não atende às colunas obrigatórias configuradas para o contexto.
+class ColumnRuleSample:
+    """Uma amostra de célula que violou uma regra de validação de dados.
 
     Attributes:
-        missing_columns: Colunas obrigatórias que não vieram no arquivo.
-        empty_columns: Colunas obrigatórias presentes no arquivo, mas com
-            alguma célula vazia (nula ou string em branco).
+        row_number: Número da linha no arquivo original (1-based, contando o
+            cabeçalho como linha 1 — a primeira linha de dados é a 2). Em
+            uploads de PDF com `pdf_mode=extract_tables`, esse número não
+            corresponde a nada visível no PDF original, já que as tabelas de
+            várias páginas são concatenadas num único DataFrame.
+        value: Valor original da célula, convertido para string (célula
+            vazia/nula vira string vazia).
     """
 
-    missing_columns: list[str]
-    empty_columns: list[str]
+    row_number: int
+    value: str
 
 
-class RequiredColumnChecker:
-    """Verifica se as colunas obrigatórias de um contexto vieram preenchidas num novo upload."""
+@dataclass
+class ColumnRuleViolation:
+    """Descreve a violação de uma regra de validação de dados numa coluna.
 
-    def check(self, context: Context, dataframe: pd.DataFrame) -> RequiredColumnViolation | None:
-        """Compara as colunas obrigatórias do contexto contra o DataFrame recebido.
+    Attributes:
+        column: Nome da coluna com problema.
+        rule_type: Tipo de dado declarado na regra (`text`, `integer`,
+            `decimal`, `date` ou `boolean`).
+        reason: `"coluna_ausente"` (coluna obrigatória não veio no arquivo),
+            `"obrigatoria"` (célula vazia numa regra obrigatória) ou
+            `"tipo_invalido"` (célula não converte para o tipo declarado).
+        bad_row_count: Quantidade total de linhas com esse problema nesta coluna.
+        sample: Até `_SAMPLE_LIMIT` amostras das primeiras linhas com problema.
+    """
 
-        Diferente de `ColumnMismatchChecker`, esta checagem não é sobre
-        divergência em relação a um upload anterior: é uma regra de qualidade
-        de dado fixa do contexto, então uma violação deve ser rejeitada
-        diretamente, sem oferecer a opção de confirmar mesmo assim.
+    column: str
+    rule_type: str
+    reason: str
+    bad_row_count: int
+    sample: list[ColumnRuleSample]
+
+
+@dataclass
+class ColumnDataViolation:
+    """Agrega todas as violações de regras de dados encontradas num upload.
+
+    Attributes:
+        details: Uma entrada por combinação (coluna, motivo) com problema.
+    """
+
+    details: list[ColumnRuleViolation]
+
+
+class ColumnDataValidator:
+    """Valida se os dados de cada coluna de um upload respeitam as regras de tipo/obrigatoriedade do contexto."""
+
+    def check(self, context: Context, dataframe: pd.DataFrame) -> ColumnDataViolation | None:
+        """Verifica cada regra de `context.column_rules` contra o DataFrame recebido.
+
+        Uma regra marcada como `required=True` cuja coluna nem veio no
+        arquivo também é uma violação (reason `"coluna_ausente"`) — isso
+        cobre tanto a presença quanto o preenchimento da coluna com uma única
+        configuração. Uma regra opcional (`required=False`) cuja coluna não
+        veio no arquivo simplesmente não se aplica a este upload.
 
         Args:
             context: Contexto selecionado para o upload.
             dataframe: DataFrame já com as colunas de rastreabilidade injetadas.
 
         Returns:
-            Um `RequiredColumnViolation` descrevendo o problema, ou `None` se
-            o contexto não tiver colunas obrigatórias configuradas ou se todas
-            estiverem presentes e preenchidas.
+            Um `ColumnDataViolation` se alguma coluna obrigatória estiver
+            ausente ou alguma célula violar uma regra de tipo/obrigatoriedade,
+            ou `None` se o contexto não tiver regras configuradas ou tudo passar.
         """
-        if not context.required_columns:
+        if not context.column_rules:
+            return None
+        rules = _parse_column_rules(context.column_rules)
+        if not rules:
             return None
 
-        required = [name for name in context.required_columns.split(",") if name]
-        if not required:
-            return None
+        details: list[ColumnRuleViolation] = []
+        for rule in rules:
+            if rule.column not in dataframe.columns:
+                if rule.required:
+                    details.append(
+                        ColumnRuleViolation(
+                            column=rule.column,
+                            rule_type=rule.rule_type,
+                            reason="coluna_ausente",
+                            bad_row_count=len(dataframe),
+                            sample=[],
+                        )
+                    )
+                continue
+            details.extend(self._check_rule(dataframe[rule.column], rule))
+        return ColumnDataViolation(details=details) if details else None
 
-        missing_columns = [name for name in required if name not in dataframe.columns]
-        empty_columns = [
-            name for name in required if name in dataframe.columns and self._has_empty_cell(dataframe[name])
-        ]
+    def _check_rule(self, column: pd.Series, rule: _ParsedColumnRule) -> list[ColumnRuleViolation]:
+        """Aplica uma única regra a uma coluna do DataFrame, retornando as violações encontradas."""
+        violations: list[ColumnRuleViolation] = []
+        empty_mask = self._empty_mask(column)
 
-        if not missing_columns and not empty_columns:
-            return None
-        return RequiredColumnViolation(missing_columns=missing_columns, empty_columns=empty_columns)
+        if rule.required and empty_mask.any():
+            violations.append(self._build_violation(column, rule, empty_mask, "obrigatoria"))
 
-    def _has_empty_cell(self, column: pd.Series) -> bool:
-        """Verifica se uma coluna tem alguma célula nula ou com string em branco.
+        non_empty = column[~empty_mask]
+        if not non_empty.empty:
+            valid_mask = self._coerces(non_empty, rule.rule_type)
+            invalid = ~valid_mask
+            if invalid.any():
+                full_mask = pd.Series(False, index=column.index)
+                full_mask.loc[non_empty.index[invalid.to_numpy()]] = True
+                violations.append(self._build_violation(column, rule, full_mask, "tipo_invalido"))
+        return violations
 
-        Args:
-            column: Coluna do DataFrame a verificar.
+    def _empty_mask(self, column: pd.Series) -> pd.Series:
+        """Máscara booleana elemento-a-elemento de células nulas ou em branco (mesma semântica de `_has_empty_cell`)."""
+        is_na = column.isna()
+        is_blank = column.astype(str).str.strip().eq("") & ~is_na
+        return is_na | is_blank
 
-        Returns:
-            `True` se houver ao menos uma célula nula ou uma string vazia/só espaços.
-        """
-        if column.isna().any():
+    def _coerces(self, values: pd.Series, rule_type: str) -> pd.Series:
+        """Retorna uma máscara booleana: `True` onde o valor é compatível com `rule_type`."""
+        if rule_type == "text":
+            return pd.Series(True, index=values.index)
+        if rule_type in ("integer", "decimal"):
+            numeric = pd.to_numeric(values, errors="coerce")
+            ok = numeric.notna()
+            if rule_type == "integer":
+                ok = ok & numeric.apply(lambda v: bool(pd.notna(v)) and float(v).is_integer())
+            return ok
+        if rule_type == "date":
+            parsed = pd.to_datetime(values, errors="coerce", dayfirst=True)
+            return parsed.notna()
+        if rule_type == "boolean":
+            return values.apply(self._is_boolean_like)
+        return pd.Series(False, index=values.index)  # inalcançável: rule_type já validado em _parse_column_rules
+
+    def _is_boolean_like(self, value: object) -> bool:
+        """Verifica se um valor é um booleano nativo ou um token textual reconhecido como sim/não."""
+        if pd.api.types.is_bool(value):
             return True
-        non_null = column.dropna()
-        if non_null.empty:
-            return False
-        return bool(non_null.astype(str).str.strip().eq("").any())
+        text = str(value).strip().lower()
+        return text in _BOOLEAN_TRUE_TOKENS or text in _BOOLEAN_FALSE_TOKENS
+
+    def _build_violation(
+        self, column: pd.Series, rule: _ParsedColumnRule, mask: pd.Series, reason: str
+    ) -> ColumnRuleViolation:
+        """Monta um `ColumnRuleViolation` a partir de uma máscara de linhas com problema."""
+        bad_positions = list(column.index[mask])
+        sample = [
+            ColumnRuleSample(row_number=int(pos) + 2, value="" if pd.isna(column.loc[pos]) else str(column.loc[pos]))
+            for pos in bad_positions[:_SAMPLE_LIMIT]
+        ]
+        return ColumnRuleViolation(
+            column=rule.column,
+            rule_type=rule.rule_type,
+            reason=reason,
+            bad_row_count=len(bad_positions),
+            sample=sample,
+        )

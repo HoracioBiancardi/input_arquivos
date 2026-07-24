@@ -31,6 +31,9 @@ class UploadHistory(Base):
             MinIO, ou "schema.tabela" no SQL Server).
         write_mode: Modo de escrita usado (apenas relevante para destinos de banco).
         status: Resultado do processamento (sucesso ou erro).
+        artifact_kind: Tipo do artefato gerado ("parquet", "raw_pdf" ou
+            "raw_image"), usado para saber se há uma tabela para visualizar.
+            `None` quando o upload falhou antes de gerar um artefato.
         row_count: Quantidade de linhas geradas, quando aplicável.
         error_message: Mensagem de erro amigável, quando `status` é ERROR.
         uploaded_by: Nome de usuário de quem realizou o upload (sempre
@@ -47,6 +50,7 @@ class UploadHistory(Base):
     destination_detail: Mapped[str] = mapped_column(String(1000))
     write_mode: Mapped[WriteMode | None] = mapped_column(SqlEnum(WriteMode), default=None)
     status: Mapped[UploadStatus] = mapped_column(SqlEnum(UploadStatus))
+    artifact_kind: Mapped[str | None] = mapped_column(String(20), default=None)
     row_count: Mapped[int | None] = mapped_column(default=None)
     error_message: Mapped[str | None] = mapped_column(Text, default=None)
     uploaded_by: Mapped[str] = mapped_column(String(150), index=True)

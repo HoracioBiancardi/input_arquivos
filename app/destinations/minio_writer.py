@@ -4,9 +4,9 @@ import io
 
 from minio import Minio
 
-from app.config import get_settings
 from app.destinations.base import DestinationWriter, WriteResult
 from app.destinations.key_builder import PartitionedKeyBuilder
+from app.destinations.minio_client import build_minio_client
 from app.ingestion.pipeline import IngestResult
 from app.models.context import Context, WriteMode
 
@@ -22,16 +22,7 @@ class MinioWriter(DestinationWriter):
                 partir das configurações globais da aplicação (endpoint e
                 credenciais são compartilhados por todos os contexts).
         """
-        if client is not None:
-            self._client = client
-        else:
-            settings = get_settings()
-            self._client = Minio(
-                settings.minio_endpoint,
-                access_key=settings.minio_access_key,
-                secret_key=settings.minio_secret_key,
-                secure=settings.minio_secure,
-            )
+        self._client = client if client is not None else build_minio_client()
         self._key_builder = PartitionedKeyBuilder()
 
     def write(self, artifact: IngestResult, context: Context, write_mode: WriteMode | None) -> WriteResult:

@@ -11,13 +11,22 @@ def test_type_for_extension_resolves_known_extensions() -> None:
     assert registry.type_for_extension(".xls") == FileType.EXCEL
     assert registry.type_for_extension(".csv") == FileType.CSV
     assert registry.type_for_extension(".pdf") == FileType.PDF
+    assert registry.type_for_extension(".png") == FileType.IMAGE
+    assert registry.type_for_extension(".json") == FileType.JSON
+    assert registry.type_for_extension(".xml") == FileType.XML
+    assert registry.type_for_extension(".txt") == FileType.TXT
+    assert registry.type_for_extension(".yaml") == FileType.YAML
+    assert registry.type_for_extension(".yml") == FileType.YAML
+    assert registry.type_for_extension(".ods") == FileType.ODS
+    assert registry.type_for_extension(".html") == FileType.HTML
+    assert registry.type_for_extension(".htm") == FileType.HTML
 
 
 def test_type_for_extension_returns_none_for_unknown_extension() -> None:
     """Uma extensão desconhecida deve retornar `None`, não levantar erro."""
     registry = FileTypeRegistry()
 
-    assert registry.type_for_extension(".txt") is None
+    assert registry.type_for_extension(".docx") is None
 
 
 def test_deserialize_defaults_to_all_types_when_empty() -> None:

@@ -40,6 +40,27 @@ def upload_page(request: Request, user: SessionUser | RedirectResponse = Depends
     return templates.TemplateResponse(request, "upload.html", {"current_user": user})
 
 
+@router.get("/uploads/{upload_id}/preview", response_class=HTMLResponse)
+def upload_preview_page(
+    request: Request, upload_id: int, user: SessionUser | RedirectResponse = Depends(require_login_page)
+):
+    """Renderiza a tela de visualização da tabela gerada por um upload.
+
+    Args:
+        request: Requisição HTTP recebida.
+        upload_id: Identificador do upload a visualizar.
+        user: Usuário autenticado, ou um redirect para `/login` se não houver sessão.
+
+    Returns:
+        Página de visualização renderizada, ou o redirect resolvido pela dependency.
+    """
+    if isinstance(user, RedirectResponse):
+        return user
+    return templates.TemplateResponse(
+        request, "upload_preview.html", {"current_user": user, "upload_id": upload_id}
+    )
+
+
 @router.get("/admin", response_class=HTMLResponse)
 def admin_dashboard_page(request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)):
     """Renderiza o painel inicial da área administrativa.

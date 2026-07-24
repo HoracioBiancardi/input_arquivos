@@ -1,10 +1,13 @@
 # Sistema de Ingestão de Arquivos
 
-Upload de arquivos (Excel, CSV, PDF) com conversão automática para **Parquet** e envio para
+Upload de arquivos (Excel, CSV, PDF, imagem, JSON, XML, TXT, YAML, ODS, HTML) com conversão
+automática para **Parquet** e envio para
 **MinIO** (bucket) ou **SQL Server** (tabela), de acordo com um **contexto de negócio** (ex.:
 "vendas"). Cada envio grava `data_envio`, `contexto` e `enviado_por` como as três primeiras colunas
-do resultado. Uma área administrativa (`/admin`, protegida por login) gerencia os contexts, os
-usuários do sistema e o audit log de uploads.
+do resultado. Cada contexto pode ter **regras de validação de dados por coluna** (tipo esperado e
+obrigatoriedade), que rejeitam o arquivo inteiro se alguma célula estiver fora do esperado — ver
+seção [Validação de dados por coluna](#validação-de-dados-por-coluna) abaixo. Uma área administrativa
+(`/admin`, protegida por login) gerencia os contexts, os usuários do sistema e o audit log de uploads.
 
 ## Requisitos
 
@@ -12,9 +15,13 @@ usuários do sistema e o audit log de uploads.
 - [uv](https://docs.astral.sh/uv/) como gerenciador de pacotes
 - Um servidor **MinIO** acessível (para contexts do tipo MinIO)
 - Um servidor **SQL Server** acessível (para contexts do tipo SQL Server)
-- **Driver ODBC 17 ou 18 da Microsoft** instalado no sistema operacional — é a única dependência
-  não-Python do projeto, exigida pelo `pyodbc` para conectar no SQL Server. No Linux (Debian/Ubuntu),
-  siga o guia oficial da Microsoft para instalar `msodbcsql18` + `unixodbc`.
+- **Driver ODBC 17 ou 18 da Microsoft** instalado no sistema operacional — exigido pelo `pyodbc`
+  para conectar no SQL Server. No Linux (Debian/Ubuntu), siga o guia oficial da Microsoft para
+  instalar `msodbcsql18` + `unixodbc`.
+
+O OCR local usado para extrair tabelas de imagens (contexts com `image_mode` diferente de
+`raw_archive`) é feito com `RapidOCR` (via `img2table[rapidocr]`), um motor 100% Python/ONNX — não
+exige nenhum binário de sistema nem instalação manual, só o `uv sync` normal.
 
 ## Instalação
 
@@ -53,6 +60,23 @@ lógica de append/create-versionado do writer de SQL Server (esta última valida
 temporário, já que a lógica de branching é agnóstica de dialeto SQL — particularidades reais do
 SQL Server/`pyodbc` devem ser conferidas manualmente, ver seção abaixo).
 
+## Validação de dados por coluna
+
+Um context pode ter regras de validação do **conteúdo** de cada coluna. Na listagem de
+`/admin/contexts`, cada context tem um botão "Regras" que abre um modal dedicado (separado do
+formulário de criação/edição do context) com a tabela de regras: para cada coluna, escolha o tipo
+esperado (Texto, Número inteiro, Número decimal, Data ou Sim/Não) e marque "Obrigatória" se a coluna
+deve estar sempre presente no arquivo e sem células vazias. O campo "Coluna" sugere, num dropdown,
+os nomes vindos do último arquivo aceito para aquele context (`expected_columns`); se ainda não houve
+nenhum upload, digite o nome livremente.
+
+Quando um upload chega, cada célula das colunas com regra é conferida contra o tipo declarado (datas
+são interpretadas no formato brasileiro DD/MM/AAAA; números decimais aceitam ponto como separador), e
+uma regra obrigatória cuja coluna nem veio no arquivo também é rejeitada. Se qualquer célula (ou
+coluna) não bater, **o arquivo inteiro é rejeitado** (nada é gravado no destino) e a tela de upload
+mostra quais colunas e quantas linhas tiveram problema; a rejeição também fica registrada em
+`/admin/audit`.
+
 ## Testando sem MinIO/SQL Server (destino "Pasta local")
 
 Além de MinIO e SQL Server, um context pode usar `destination_type = local`: em vez de subir para
@@ -84,7 +108,11 @@ validar a integração real com MinIO/SQL Server:
    `data_envio`/`contexto`/`enviado_por` corretos) e o registro correspondente em `/admin/audit`.
 6. Teste um caso de erro proposital (ex.: append com colunas incompatíveis) e confirme que o
    audit log mostra uma mensagem de erro clara, sem stack trace vazando para a UI.
-7. Confirme que o usuário comum não consegue acessar `/admin` diretamente pela URL.
+7. Configure uma regra de validação de dados numa coluna (ex.: tipo "Número decimal") e envie um
+   arquivo com uma célula inválida nessa coluna — confirme que o upload é rejeitado (nada gravado no
+   destino), que a mensagem indica a coluna e a quantidade de linhas com problema, e que a rejeição
+   aparece em `/admin/audit`.
+8. Confirme que o usuário comum não consegue acessar `/admin` diretamente pela URL.
 
 ## Estrutura de pastas
 

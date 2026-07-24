@@ -1,11 +1,54 @@
 """Schemas Pydantic para as rotas da API de contexts."""
 
+import json
 from datetime import datetime
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-from app.models.context import DestinationType, PdfMode, WriteMode
+from app.models.context import ColumnRuleType, DestinationType, ImageMode, PdfMode, WriteMode
+
+
+class ColumnRule(BaseModel):
+    """Regra de validação de dados para uma coluna de um context.
+
+    Attributes:
+        column: Nome da coluna à qual esta regra se aplica.
+        type: Tipo de dado esperado para a coluna.
+        required: Se `True`, a coluna deve estar presente no arquivo e não
+            pode ter células vazias/nulas. Se `False`, a coluna é opcional
+            (só é validada quando presente).
+    """
+
+    column: str
+    type: ColumnRuleType
+    required: bool = False
+
+    @field_validator("column")
+    @classmethod
+    def _strip_column(cls, value: str) -> str:
+        """Remove espaços nas pontas e garante que o nome da coluna não ficou vazio."""
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Nome de coluna não pode ser vazio.")
+        return stripped
+
+
+def _validate_unique_rule_columns(column_rules: list[ColumnRule]) -> None:
+    """Garante que não há duas regras para a mesma coluna (comparação case-insensitive).
+
+    Args:
+        column_rules: Lista de regras a validar.
+
+    Raises:
+        ValueError: Se houver mais de uma regra para a mesma coluna.
+    """
+    seen: set[str] = set()
+    for rule in column_rules:
+        key = rule.column.lower()
+        if key in seen:
+            raise ValueError(f"Regra duplicada para a coluna '{rule.column}'.")
+        seen.add(key)
 
 
 def _validate_db_connection_string(destination_type: DestinationType, db_connection_string: str | None) -> None:
@@ -33,6 +76,7 @@ class ContextCreateRequest(BaseModel):
         destination_type: Tipo de destino (MinIO ou SQL Server).
         default_write_mode: Modo de escrita pré-selecionado na tela de upload.
         pdf_mode: Modo de tratamento de PDFs para este context.
+        image_mode: Modo de tratamento de imagens para este context.
         minio_bucket: Nome do bucket, quando `destination_type` é MINIO.
         db_connection_string: URL de conexão do banco, quando `destination_type` é SQLSERVER.
         db_schema_name: Schema da tabela de destino.
@@ -40,27 +84,33 @@ class ContextCreateRequest(BaseModel):
         local_path: Pasta no disco local, quando `destination_type` é LOCAL.
         allowed_file_types: Tipos de arquivo aceitos, separados por vírgula
             (ex. "excel,csv"). Vazio equivale a aceitar todos os tipos.
-        required_columns: Colunas que não podem ficar vazias num upload aceito
-            para este contexto, separadas por vírgula. Vazio equivale a não
-            exigir nenhuma coluna específica.
+        column_rules: Regras de validação de tipo/obrigatoriedade por coluna.
+            Vazio equivale a não validar o conteúdo de nenhuma coluna.
     """
 
     name: str
     destination_type: DestinationType
     default_write_mode: WriteMode = WriteMode.APPEND
     pdf_mode: PdfMode = PdfMode.METADATA_ONLY
+    image_mode: ImageMode = ImageMode.RAW_ARCHIVE
     minio_bucket: str | None = None
     db_connection_string: str | None = None
     db_schema_name: str = "dbo"
     db_table: str | None = None
     local_path: str | None = None
     allowed_file_types: str = "excel,csv,pdf"
-    required_columns: str = ""
+    column_rules: list[ColumnRule] = []
 
     @model_validator(mode="after")
     def _validate_destination_fields(self) -> Self:
         """Garante que os campos exigidos pelo `destination_type` escolhido foram informados."""
         _validate_db_connection_string(self.destination_type, self.db_connection_string)
+        return self
+
+    @model_validator(mode="after")
+    def _validate_column_rules(self) -> Self:
+        """Garante que não há regras duplicadas para a mesma coluna."""
+        _validate_unique_rule_columns(self.column_rules)
         return self
 
 
@@ -72,6 +122,7 @@ class ContextUpdateRequest(BaseModel):
         destination_type: Tipo de destino (MinIO, SQL Server ou pasta local).
         default_write_mode: Modo de escrita pré-selecionado na tela de upload.
         pdf_mode: Modo de tratamento de PDFs para este context.
+        image_mode: Modo de tratamento de imagens para este context.
         minio_bucket: Nome do bucket, quando `destination_type` é MINIO.
         db_connection_string: URL de conexão do banco, quando `destination_type` é SQLSERVER.
         db_schema_name: Schema da tabela de destino.
@@ -79,9 +130,8 @@ class ContextUpdateRequest(BaseModel):
         local_path: Pasta no disco local, quando `destination_type` é LOCAL.
         allowed_file_types: Tipos de arquivo aceitos, separados por vírgula
             (ex. "excel,csv"). Vazio equivale a aceitar todos os tipos.
-        required_columns: Colunas que não podem ficar vazias num upload aceito
-            para este contexto, separadas por vírgula. Vazio equivale a não
-            exigir nenhuma coluna específica.
+        column_rules: Regras de validação de tipo/obrigatoriedade por coluna.
+            Vazio equivale a não validar o conteúdo de nenhuma coluna.
         active: Se o context deve ficar ativo (visível na tela de upload).
     """
 
@@ -89,19 +139,26 @@ class ContextUpdateRequest(BaseModel):
     destination_type: DestinationType
     default_write_mode: WriteMode = WriteMode.APPEND
     pdf_mode: PdfMode = PdfMode.METADATA_ONLY
+    image_mode: ImageMode = ImageMode.RAW_ARCHIVE
     minio_bucket: str | None = None
     db_connection_string: str | None = None
     db_schema_name: str = "dbo"
     db_table: str | None = None
     local_path: str | None = None
     allowed_file_types: str = "excel,csv,pdf"
-    required_columns: str = ""
+    column_rules: list[ColumnRule] = []
     active: bool = True
 
     @model_validator(mode="after")
     def _validate_destination_fields(self) -> Self:
         """Garante que os campos exigidos pelo `destination_type` escolhido foram informados."""
         _validate_db_connection_string(self.destination_type, self.db_connection_string)
+        return self
+
+    @model_validator(mode="after")
+    def _validate_column_rules(self) -> Self:
+        """Garante que não há regras duplicadas para a mesma coluna."""
+        _validate_unique_rule_columns(self.column_rules)
         return self
 
 
@@ -160,9 +217,14 @@ class ContextResponse(BaseModel):
         db_table: Tabela de destino, se aplicável.
         local_path: Pasta local configurada, se aplicável.
         allowed_file_types: Tipos de arquivo aceitos, separados por vírgula.
-        required_columns: Colunas obrigatórias configuradas, separadas por vírgula.
+        expected_columns: Colunas do último arquivo aceito para este context,
+            separadas por vírgula (ou `None` se ainda não houve upload aceito).
+            Usado pela UI para sugerir nomes de coluna ao configurar regras.
+        column_rules: Regras de validação de tipo/obrigatoriedade por coluna,
+            já convertidas de JSON (armazenado no banco) para uma lista.
         default_write_mode: Modo de escrita pré-selecionado.
         pdf_mode: Modo de tratamento de PDFs configurado.
+        image_mode: Modo de tratamento de imagens configurado.
         active: Se o context está ativo.
         created_at: Data de criação do context.
         destination_summary: Descrição curta e pronta para exibição do destino
@@ -181,12 +243,37 @@ class ContextResponse(BaseModel):
     db_table: str | None
     local_path: str | None
     allowed_file_types: str
-    required_columns: str | None = None
+    expected_columns: str | None = None
+    column_rules: list[ColumnRule] = []
     default_write_mode: WriteMode
     pdf_mode: PdfMode
+    image_mode: ImageMode
     active: bool
     created_at: datetime
     destination_summary: str = ""
+
+    @field_validator("image_mode", mode="before")
+    @classmethod
+    def _default_image_mode(cls, value: object) -> object:
+        """Trata `image_mode` nulo (contexts criados antes deste campo existir) como `RAW_ARCHIVE`."""
+        return value or ImageMode.RAW_ARCHIVE
+
+    @field_validator("column_rules", mode="before")
+    @classmethod
+    def _parse_column_rules(cls, value: object) -> object:
+        """Converte a string JSON armazenada em `Context.column_rules` para uma lista.
+
+        Retorna lista vazia para valores ausentes/vazios ou JSON inválido
+        (config inconsistente não deve impedir a leitura do context).
+        """
+        if value is None or value == "":
+            return []
+        if isinstance(value, str):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                return []
+        return value
 
 
 class AccessibleContextResponse(BaseModel):
