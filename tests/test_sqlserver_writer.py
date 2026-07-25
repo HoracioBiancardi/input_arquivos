@@ -14,9 +14,9 @@ import pandas as pd
 import pytest
 from sqlalchemy import create_engine, inspect
 
-from app.destinations.sqlserver_writer import SchemaMismatchError, SqlServerWriter
-from app.ingestion.pipeline import IngestResult
-from app.models.context import Context, DestinationType, PdfMode, WriteMode
+from app.backend.destinations.sqlserver_writer import SchemaMismatchError, SqlServerWriter
+from app.backend.ingestion.pipeline import IngestResult
+from app.backend.models.context import Context, DestinationType, PdfMode, WriteMode
 
 
 def _make_context(connection_string: str, table: str = "pedidos") -> Context:

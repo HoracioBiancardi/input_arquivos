@@ -5,12 +5,12 @@ from pathlib import Path
 
 import pytest
 
-from app.db.session import DatabaseSessionFactory
-from app.models.base import Base
-from app.models.context import Context  # noqa: F401 - garante o registro do modelo no metadata
-from app.models.upload_history import UploadHistory  # noqa: F401 - garante o registro do modelo no metadata
-from app.models.user import User  # noqa: F401 - garante o registro do modelo no metadata
-from app.models.user_context_access import user_context_access  # noqa: F401 - garante o registro no metadata
+from app.backend.db.session import DatabaseSessionFactory
+from app.backend.models.base import Base
+from app.backend.models.context import Context  # noqa: F401 - garante o registro do modelo no metadata
+from app.backend.models.upload_history import UploadHistory  # noqa: F401 - garante o registro do modelo no metadata
+from app.backend.models.user import User  # noqa: F401 - garante o registro do modelo no metadata
+from app.backend.models.user_context_access import user_context_access  # noqa: F401 - garante o registro no metadata
 
 
 @pytest.fixture

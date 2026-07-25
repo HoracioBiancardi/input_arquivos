@@ -5,15 +5,15 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import IntegrityError
 
-from app.api.routes_audit import router as audit_router
-from app.api.routes_auth import router as auth_router
-from app.api.routes_contexts import router as contexts_router
-from app.api.routes_upload import router as upload_router
-from app.api.routes_users import router as users_router
-from app.db.bootstrap import DatabaseBootstrapper
-from app.db.session import get_session_factory
-from app.services.container import get_container
-from app.web.routes_pages import router as pages_router
+from app.backend.api.routes_audit import router as audit_router
+from app.backend.api.routes_auth import router as auth_router
+from app.backend.api.routes_contexts import router as contexts_router
+from app.backend.api.routes_upload import router as upload_router
+from app.backend.api.routes_users import router as users_router
+from app.backend.db.bootstrap import DatabaseBootstrapper
+from app.backend.db.session import get_session_factory
+from app.backend.services.container import get_container
+from app.frontend.web.routes_pages import router as pages_router
 
 
 def create_app() -> FastAPI:
@@ -23,7 +23,7 @@ def create_app() -> FastAPI:
         Instância do FastAPI pronta para ser servida pelo Uvicorn.
     """
     fastapi_app = FastAPI(title="Sistema de Ingestão de Arquivos")
-    fastapi_app.mount("/static", StaticFiles(directory="app/static"), name="static")
+    fastapi_app.mount("/static", StaticFiles(directory="app/frontend/static"), name="static")
 
     @fastapi_app.exception_handler(IntegrityError)
     def _handle_integrity_error(_request: Request, _error: IntegrityError) -> JSONResponse:

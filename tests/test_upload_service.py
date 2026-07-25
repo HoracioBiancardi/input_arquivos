@@ -10,12 +10,12 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from app.db.session import DatabaseSessionFactory
-from app.destinations.registry import DestinationWriterRegistry
-from app.ingestion.pipeline import IngestionPipeline
-from app.models.context import DestinationType, ImageMode, PdfMode, WriteMode
-from app.services.context_service import ContextService
-from app.services.upload_service import UploadService
+from app.backend.db.session import DatabaseSessionFactory
+from app.backend.destinations.registry import DestinationWriterRegistry
+from app.backend.ingestion.pipeline import IngestionPipeline
+from app.backend.models.context import DestinationType, ImageMode, PdfMode, WriteMode
+from app.backend.services.context_service import ContextService
+from app.backend.services.upload_service import UploadService
 
 
 @pytest.fixture

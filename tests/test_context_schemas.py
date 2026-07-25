@@ -6,8 +6,8 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from app.models.context import DestinationType, ImageMode, PdfMode, WriteMode
-from app.schemas.context import ColumnRule, ContextCreateRequest, ContextResponse
+from app.backend.models.context import DestinationType, ImageMode, PdfMode, WriteMode
+from app.backend.schemas.context import ColumnRule, ContextCreateRequest, ContextResponse
 
 
 def _base_create_kwargs() -> dict:

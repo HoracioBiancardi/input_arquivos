@@ -118,24 +118,30 @@ validar a integração real com MinIO/SQL Server:
 
 ```
 app/
-├── main.py              # cria o FastAPI, monta os arquivos estáticos e inclui as rotas
-├── config.py            # configurações (variáveis de ambiente/.env)
-├── db/                  # engine/sessão SQLAlchemy + bootstrap do banco local
-├── models/               # modelos ORM: Context, UploadHistory, User
-├── schemas/              # schemas Pydantic da API REST
-├── ingestion/            # leitores de arquivo, conversão Parquet e orquestração do pipeline
-├── destinations/         # writers de destino (MinIO, SQL Server) + registry
-├── services/             # camada de serviços (contexts, usuários, upload, auth) + container de DI
-├── api/                  # rotas REST (/api/auth, /api/contexts, /api/users, /api/upload(s), /api/audit)
-├── auth/                 # sessão via cookie assinado (session.py) + dependencies do FastAPI
-├── web/                  # rotas de página (renderizam os templates Jinja2)
-├── templates/             # templates Jinja2 (login, upload, admin/*) + base.html (layout Tailwind)
-└── static/
-    ├── css/               # estilos que não são triviais de expressar só com Tailwind
-    └── js/                # interatividade de cada página (fetch para a API REST)
+├── main.py                # cria o FastAPI, monta os arquivos estáticos e inclui as rotas
+├── backend/                # tudo que não depende de HTML: API, regras de negócio, persistência
+│   ├── config.py            # configurações (variáveis de ambiente/.env)
+│   ├── db/                  # engine/sessão SQLAlchemy + bootstrap do banco local
+│   ├── models/               # modelos ORM: Context, UploadHistory, User
+│   ├── schemas/               # schemas Pydantic da API REST
+│   ├── ingestion/             # leitores de arquivo, conversão Parquet e orquestração do pipeline
+│   ├── destinations/          # writers de destino (MinIO, SQL Server) + registry
+│   ├── services/               # camada de serviços (contexts, usuários, upload, auth) + container de DI
+│   ├── api/                    # rotas REST (/api/auth, /api/contexts, /api/users, /api/upload(s), /api/audit)
+│   └── auth/                    # sessão via cookie assinado (session.py) + dependencies do FastAPI
+└── frontend/                # tudo que é servido para o navegador
+    ├── web/                    # rotas de página (renderizam os templates Jinja2, sem lógica de negócio)
+    ├── templates/               # templates Jinja2 (login, upload, admin/*) + base.html (layout Tailwind)
+    └── static/
+        ├── css/                   # estilos que não são triviais de expressar só com Tailwind
+        └── js/                    # interatividade de cada página (fetch para a API REST)
 tests/                    # testes automatizados (pytest)
 data/                     # SQLite local de configuração (gitignored)
 ```
+
+O `frontend/` só conversa com o `backend/` através da API REST (`/api/*`, chamada via `fetch` pelo
+JS de cada página) — as rotas de página em `frontend/web/` apenas renderizam o HTML esqueleto e não
+acessam serviços/banco diretamente.
 
 ## Notas de arquitetura
 
@@ -146,6 +152,6 @@ data/                     # SQLite local de configuração (gitignored)
   cada context define apenas o bucket a usar nesse mesmo servidor.
 - **SQL Server**: cada context tem sua própria connection string, podendo apontar para bancos ou
   servidores diferentes.
-- **Autenticação**: sessão via cookie assinado (`SESSION_SECRET`, ver `app/auth/session.py`), tanto
+- **Autenticação**: sessão via cookie assinado (`SESSION_SECRET`, ver `app/backend/auth/session.py`), tanto
   para as páginas quanto para a API REST — toda rota sob `/api/*` (exceto `/api/auth/login`) exige
   login, e as rotas administrativas exigem papel `admin`.

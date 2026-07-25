@@ -5,9 +5,9 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from app.destinations.local_writer import LocalFileWriter
-from app.ingestion.pipeline import IngestResult
-from app.models.context import Context, DestinationType, PdfMode, WriteMode
+from app.backend.destinations.local_writer import LocalFileWriter
+from app.backend.ingestion.pipeline import IngestResult
+from app.backend.models.context import Context, DestinationType, PdfMode, WriteMode
 
 
 def _make_context(local_path: str | None) -> Context:
