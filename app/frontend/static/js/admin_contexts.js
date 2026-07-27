@@ -68,6 +68,7 @@ const PDF_MODE_LABELS = {
   extract_tables: "Extrair tabelas",
   metadata_only: "Somente metadados",
   raw_archive: "Arquivar original",
+  ocr_stock_lots: "OCR: estoque com lotes",
 };
 
 const IMAGE_MODE_LABELS = {
@@ -80,6 +81,7 @@ const PDF_MODE_HELP = {
   extract_tables: "Tenta extrair tabelas estruturadas do PDF (funciona melhor em PDFs com tabelas bem definidas).",
   metadata_only: "Gera uma linha com nome do arquivo, quantidade de páginas e o texto extraído, sem tentar estruturar tabelas.",
   raw_archive: "Não converte para Parquet: arquiva o PDF original diretamente no bucket MinIO ou na pasta local do contexto.",
+  ocr_stock_lots: "Modo específico para relatórios \"Relação de Estoque\" (produto + lotes) cujo texto foi vetorizado pelo gerador do PDF: rasteriza a página e usa OCR local em posições de coluna fixas, calibradas para esse layout — não funciona para outros formatos de PDF.",
 };
 
 const IMAGE_MODE_HELP = {

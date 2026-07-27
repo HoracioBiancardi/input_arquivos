@@ -17,6 +17,7 @@ from app.backend.ingestion.readers import (
     OdsReader,
     PdfMetadataReader,
     PdfTableReader,
+    StockLotsOcrReader,
     XmlReader,
     YamlReader,
 )
@@ -62,6 +63,7 @@ class IngestionPipeline:
         self._csv_reader = CsvReader()
         self._pdf_table_reader = PdfTableReader()
         self._pdf_metadata_reader = PdfMetadataReader()
+        self._stock_lots_ocr_reader = StockLotsOcrReader()
         self._image_table_reader = ImageTableReader()
         self._json_reader = JsonReader()
         self._xml_reader = XmlReader()
@@ -167,6 +169,8 @@ class IngestionPipeline:
             return self._ods_reader.read(file_bytes)
         if file_type == FileType.HTML:
             return self._html_reader.read(file_bytes)
+        if context.pdf_mode == PdfMode.OCR_STOCK_LOTS:
+            return self._stock_lots_ocr_reader.read(file_bytes)
         if context.pdf_mode == PdfMode.EXTRACT_TABLES:
             return self._pdf_table_reader.read(file_bytes)
         return self._pdf_metadata_reader.read(file_bytes, filename)

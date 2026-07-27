@@ -31,6 +31,7 @@ class PdfMode(str, enum.Enum):
     EXTRACT_TABLES = "extract_tables"
     METADATA_ONLY = "metadata_only"
     RAW_ARCHIVE = "raw_archive"
+    OCR_STOCK_LOTS = "ocr_stock_lots"
 
 
 class ImageMode(str, enum.Enum):

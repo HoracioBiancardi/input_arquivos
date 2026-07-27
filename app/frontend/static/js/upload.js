@@ -129,7 +129,9 @@ async function handleSubmit(event) {
   };
 
   const submitButton = document.getElementById("upload-submit");
+  const submitButtonLabel = document.getElementById("upload-submit-label");
   submitButton.disabled = true;
+  submitButtonLabel.innerHTML = `<span class="inline-flex items-center gap-2"><span class="h-3.5 w-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin"></span>Enviando…</span>`;
   try {
     let result;
     try {
@@ -196,6 +198,7 @@ async function handleSubmit(event) {
     showToast(`Falha ao processar o arquivo: ${error.message}`, "negative");
   } finally {
     submitButton.disabled = false;
+    submitButtonLabel.textContent = "Enviar";
   }
 }
 

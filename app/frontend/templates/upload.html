@@ -39,8 +39,8 @@
         <input id="file-input" type="file" accept=".xlsx,.xls,.csv,.pdf"
           class="w-full text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 file:mr-3 file:rounded-md file:border-0 file:bg-primary file:text-white file:px-3 file:py-1.5 file:text-sm">
 
-        <button type="submit" id="upload-submit" class="self-start px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">
-          Enviar
+        <button type="submit" id="upload-submit" class="self-start px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed">
+          <span id="upload-submit-label">Enviar</span>
         </button>
       </form>
 

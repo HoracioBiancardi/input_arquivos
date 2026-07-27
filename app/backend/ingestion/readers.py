@@ -2,8 +2,10 @@
 
 import io
 import json
+import re
 from typing import Protocol
 
+import numpy as np
 import pandas as pd
 import pdfplumber
 import yaml
@@ -92,6 +94,179 @@ class PdfTableReader:
         if not frames:
             raise ValueError("Nenhuma tabela foi encontrada neste PDF.")
         return pd.concat(frames, ignore_index=True)
+
+
+_STOCK_MASTER_RE = re.compile(r"^(\d+)\s+(.*\S)\s+PA\d+$")
+_STOCK_EAN_UN_RE = re.compile(r"^(\d+)\s+(\w+)$")
+_STOCK_NLOTE_MARKERS = ("Nº lote", "N° lote")
+_STOCK_FILIAL_X = (340, 430)
+_STOCK_EAN_X = (1150, 1400)
+_STOCK_AVARIA_X = (1400, 1495)
+_STOCK_QT_UNIT_X = (1495, 1560)
+_STOCK_EST_ATUAL_X = (1580, 1750)
+_STOCK_LOTE_X = (40, 170)
+_STOCK_VALIDADE_X = (200, 370)
+_STOCK_QTD_X = (360, 570)
+_STOCK_OCR_RESOLUTION = 216
+
+
+class StockLotsOcrReader:
+    """Extrai, via OCR, relatórios de "Relação de Estoque" com produto mestre + sub-linhas
+    de lote/validade/quantidade disponível, expandindo para uma linha por lote.
+
+    Feito para PDFs cujo texto foi vetorizado pelo gerador do relatório (0 caracteres e 0
+    imagens extraíveis por `pdfplumber` — nem `PdfTableReader` nem `PdfMetadataReader`
+    conseguem ler nada deles), o que exige rasterizar cada página e usar OCR (`RapidOCR`)
+    mesmo se tratando de um PDF "nativo" em vez de um scan.
+
+    As faixas de coluna (`_STOCK_*_X`) foram calibradas manualmente a partir de um único
+    relatório de exemplo ("1130 - Relação de Estoque - versão: 36.02.01") renderizado a
+    `_STOCK_OCR_RESOLUTION` DPI — um layout de relatório diferente (outra versão, outro
+    conjunto de colunas) exige recalibrar essas constantes.
+    """
+
+    def read(self, file_bytes: bytes) -> pd.DataFrame:
+        """Extrai todas as linhas produto+lote encontradas no PDF e as concatena em um DataFrame.
+
+        Args:
+            file_bytes: Conteúdo bruto do arquivo PDF.
+
+        Returns:
+            DataFrame com uma linha por lote, colunas `codigo`, `descricao`, `ean`, `un`,
+            `avaria`, `qt_unit`, `filial`, `est_atual`, `lote`, `validade`, `qtd_disponivel`.
+
+        Raises:
+            ValueError: Se nenhuma linha de produto com lote puder ser extraída do PDF,
+                ou se as dependências opcionais de OCR não estiverem instaladas.
+        """
+        try:
+            from rapidocr import RapidOCR as RawRapidOcrEngine
+        except ModuleNotFoundError as error:
+            raise ValueError(
+                "OCR indisponível: verifique se as dependências 'img2table[rapidocr]' estão instaladas."
+            ) from error
+        ocr = RawRapidOcrEngine(params={"Rec.lang_type": "pt", "Det.lang_type": "pt"})
+
+        records: list[dict] = []
+        with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            for page in pdf.pages:
+                image = page.to_image(resolution=_STOCK_OCR_RESOLUTION).original
+                rows = self._ocr_rows(ocr, image)
+                records.extend(self._parse_rows(rows))
+
+        if not records:
+            raise ValueError("Nenhum produto com lote foi encontrado neste PDF.")
+        return pd.DataFrame(
+            records,
+            columns=[
+                "codigo",
+                "descricao",
+                "ean",
+                "un",
+                "avaria",
+                "qt_unit",
+                "filial",
+                "est_atual",
+                "lote",
+                "validade",
+                "qtd_disponivel",
+            ],
+        )
+
+    def _ocr_rows(self, ocr, image, row_tolerance: float = 12.0) -> list[list[tuple]]:
+        """Roda o OCR na página rasterizada e agrupa as palavras detectadas em linhas visuais.
+
+        Args:
+            ocr: Instância carregada do motor `rapidocr.RapidOCR` (não o wrapper de
+                `img2table.ocr.RapidOCR`, que não expõe chamada direta por palavra).
+            image: Imagem da página renderizada (PIL).
+            row_tolerance: Distância vertical (em pixels) máxima entre duas palavras
+                para serem consideradas parte da mesma linha.
+
+        Returns:
+            Lista de linhas, cada uma uma lista de tuplas `(y0, x0, x1, texto)`
+            ordenadas por posição horizontal.
+        """
+        result = ocr(np.asarray(image))
+        words = []
+        for box, text, _score in zip(result.boxes, result.txts, result.scores):
+            xs = [point[0] for point in box]
+            ys = [point[1] for point in box]
+            words.append((min(ys), min(xs), max(xs), text))
+        words.sort(key=lambda word: (word[0], word[1]))
+
+        rows: list[list[tuple]] = []
+        for word in words:
+            for row in rows:
+                if abs(row[0][0] - word[0]) <= row_tolerance:
+                    row.append(word)
+                    break
+            else:
+                rows.append([word])
+        rows.sort(key=lambda row: row[0][0])
+        for row in rows:
+            row.sort(key=lambda word: word[1])
+        return rows
+
+    def _word_in_range(self, row: list[tuple], x_range: tuple[float, float]) -> str | None:
+        """Retorna o texto da primeira palavra da linha cujo centro cai dentro de `x_range`."""
+        low, high = x_range
+        for _, x0, x1, text in row:
+            if low <= (x0 + x1) / 2 <= high:
+                return text
+        return None
+
+    def _parse_rows(self, rows: list[list[tuple]]) -> list[dict]:
+        """Converte as linhas OCR em registros produto+lote, seguindo o layout mestre/detalhe.
+
+        Cada linha "mestre" (produto) atualiza os dados correntes; cada linha de
+        detalhe (lote/validade/qtd. disponível) gera um registro combinando os dados
+        do produto atual com os do lote. Linhas de cabeçalho repetido ("Nº lote / Dt.
+        validade / Qtd. disponível") são ignoradas.
+        """
+        records: list[dict] = []
+        current: dict | None = None
+
+        for row in rows:
+            row_text = " ".join(text for *_rest, text in row)
+            if any(marker in row_text for marker in _STOCK_NLOTE_MARKERS):
+                continue
+
+            master_match = None
+            for _, _x0, _x1, text in row:
+                match = _STOCK_MASTER_RE.match(text)
+                if match:
+                    master_match = match
+                    break
+
+            if master_match:
+                codigo, descricao = master_match.groups()
+                ean_un_raw = self._word_in_range(row, _STOCK_EAN_X)
+                ean_un_match = _STOCK_EAN_UN_RE.match(ean_un_raw) if ean_un_raw else None
+                avaria_raw = self._word_in_range(row, _STOCK_AVARIA_X)
+                qt_unit_raw = self._word_in_range(row, _STOCK_QT_UNIT_X)
+                est_atual_raw = self._word_in_range(row, _STOCK_EST_ATUAL_X)
+                current = {
+                    "codigo": codigo,
+                    "descricao": descricao.rstrip(":").strip(),
+                    "ean": ean_un_match.group(1) if ean_un_match else None,
+                    "un": ean_un_match.group(2) if ean_un_match else None,
+                    "avaria": int(avaria_raw) if avaria_raw and avaria_raw.isdigit() else None,
+                    "qt_unit": int(qt_unit_raw) if qt_unit_raw and qt_unit_raw.isdigit() else None,
+                    "filial": self._word_in_range(row, _STOCK_FILIAL_X),
+                    "est_atual": float(est_atual_raw.replace(".", "").replace(",", ".")) if est_atual_raw else None,
+                }
+                continue
+
+            lote = self._word_in_range(row, _STOCK_LOTE_X)
+            validade = self._word_in_range(row, _STOCK_VALIDADE_X)
+            qtd = self._word_in_range(row, _STOCK_QTD_X)
+            if current is not None and lote and validade and qtd and lote.isdigit():
+                records.append(
+                    {**current, "lote": lote, "validade": validade, "qtd_disponivel": int(qtd.replace(".", ""))}
+                )
+
+        return records
 
 
 class PdfMetadataReader:
