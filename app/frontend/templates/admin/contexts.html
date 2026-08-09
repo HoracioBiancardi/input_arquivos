@@ -1,190 +1,202 @@
 {% extends "base.html" %}
-{% block title %}Contexts • Ingestão de Arquivos{% endblock %}
-{% block header %}
-<header class="flex items-center justify-between px-6 py-3 bg-white dark:bg-slate-900 border-b border-black/5 dark:border-white/10">
-  <span class="text-lg font-semibold">Contexts</span>
-  <div class="flex items-center gap-3">
-    <a href="/admin" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">← Voltar</a>
-    <button id="dark-mode-toggle" type="button" class="text-sm px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">🌙</button>
-    <button id="logout-button" type="button" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Sair</button>
-  </div>
-</header>
-{% endblock %}
+{% block title %}Contextos • Ingestão de Arquivos{% endblock %}
+
 {% block content %}
-<div class="w-full flex items-center justify-center p-6">
-  <div class="w-full max-w-5xl flex flex-col gap-4">
+<div class="w-full flex-1 flex flex-col items-center gap-6 p-6">
+  <div class="w-full max-w-6xl flex flex-col gap-4">
 
     <div class="flex justify-between items-center">
-      <span class="text-sm text-muted">Contexts cadastrados</span>
-      <button id="new-context-button" type="button" class="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">+ Novo Context</button>
+      <div>
+        <h1 class="text-xl font-bold" style="color: var(--text);">Contextos de Negócio</h1>
+        <p class="text-xs" style="color: var(--text-muted);">Configure os destinos de ingestão, modos de arquivo e regras de coluna</p>
+      </div>
+      <button id="new-context-button" type="button" class="btn btn-primary">+ Novo Contexto</button>
     </div>
 
-    <div class="surface-card bg-white dark:bg-slate-900 rounded-xl overflow-x-auto">
-      <table class="w-full text-sm">
+    <!-- Tabela de Contextos -->
+    <div class="modal glass surface-card shadow-xl overflow-x-auto" style="max-width:100%; border-radius: var(--r-lg);">
+      <table class="w-full text-xs text-left" style="color: var(--text);">
         <thead>
-          <tr class="text-left text-xs text-muted border-b border-black/5 dark:border-white/10">
-            <th class="px-4 py-2">Nome</th>
-            <th class="px-4 py-2">Destino</th>
-            <th class="px-4 py-2">Tipos aceitos</th>
-            <th class="px-4 py-2">Modo PDF</th>
-            <th class="px-4 py-2">Modo Imagem</th>
-            <th class="px-4 py-2 text-center">Ativo</th>
-            <th class="px-4 py-2"></th>
+          <tr style="background: var(--surface-alt); color: var(--text-muted); border-bottom: 1px solid var(--border);">
+            <th class="px-4 py-3 font-semibold">Nome</th>
+            <th class="px-4 py-3 font-semibold">Destino</th>
+            <th class="px-4 py-3 font-semibold">Tipos aceitos</th>
+            <th class="px-4 py-3 font-semibold">Modo PDF</th>
+            <th class="px-4 py-3 font-semibold">Modo Imagem</th>
+            <th class="px-4 py-3 font-semibold text-center">Ativo</th>
+            <th class="px-4 py-3 font-semibold text-right">Ações</th>
           </tr>
         </thead>
-        <tbody id="context-rows"></tbody>
+        <tbody id="context-rows" class="divide-y divide-slate-700/30"></tbody>
       </table>
     </div>
 
   </div>
 </div>
 
-<div id="context-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/40 p-4">
-  <div class="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 p-6 shadow-lg">
-    <h3 id="context-modal-title" class="text-xl font-semibold mb-3">Novo Context</h3>
-    <form id="context-form" class="flex flex-col gap-3">
+<!-- Modal de Contexto -->
+<div id="context-modal" class="overlay">
+  <div class="modal glass shadow-2xl" style="max-width: 580px; max-height: 90vh; overflow-y: auto;">
+    <div class="modal-header">
+      <h3 id="context-modal-title" class="text-base font-bold">Novo Contexto</h3>
+      <button type="button" class="close-btn" id="context-close-x" onclick="window.closeModal && window.closeModal()">X</button>
+    </div>
+
+    <form id="context-form" class="flex flex-col gap-4">
       <input type="hidden" id="context-id">
 
-      <div>
-        <label class="block text-xs font-medium text-muted mb-1">Nome do contexto</label>
-        <input id="context-name" required class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label" for="context-name">Nome do contexto</label>
+        <input id="context-name" required class="form-input">
       </div>
 
-      <div>
-        <label class="block text-xs font-medium text-muted mb-1">Tipos de arquivo aceitos</label>
-        <div class="flex flex-wrap gap-4 text-sm">
-          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="excel"> Excel</label>
-          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="csv"> CSV</label>
-          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="pdf"> PDF</label>
-          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="image"> Imagem</label>
-          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="json"> JSON</label>
-          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="xml"> XML</label>
-          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="txt"> TXT</label>
-          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="yaml"> YAML</label>
-          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="ods"> ODS</label>
-          <label class="flex items-center gap-1"><input type="checkbox" class="context-file-type" value="html"> HTML</label>
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label">Tipos de arquivo aceitos</label>
+        <div class="flex flex-wrap gap-3 text-xs p-3 rounded-lg" style="background: var(--surface-alt); border: 1px solid var(--border);">
+          <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" class="context-file-type" value="excel"> Excel</label>
+          <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" class="context-file-type" value="csv"> CSV</label>
+          <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" class="context-file-type" value="pdf"> PDF</label>
+          <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" class="context-file-type" value="image"> Imagem</label>
+          <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" class="context-file-type" value="json"> JSON</label>
+          <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" class="context-file-type" value="xml"> XML</label>
+          <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" class="context-file-type" value="txt"> TXT</label>
+          <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" class="context-file-type" value="yaml"> YAML</label>
+          <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" class="context-file-type" value="ods"> ODS</label>
+          <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" class="context-file-type" value="html"> HTML</label>
         </div>
       </div>
 
-      <div>
-        <label class="block text-xs font-medium text-muted mb-1">Destino</label>
-        <select id="context-destination" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label" for="context-destination">Destino</label>
+        <select id="context-destination" class="form-input">
           <option value="minio">MinIO</option>
           <option value="sqlserver">SQL Server</option>
           <option value="local">Pasta local</option>
         </select>
       </div>
 
-      <div id="minio-fields" class="flex flex-col gap-2">
-        <div>
-          <label class="block text-xs font-medium text-muted mb-1">Bucket MinIO</label>
-          <input id="context-minio-bucket" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+      <div id="minio-fields" class="flex flex-col gap-2 p-3 rounded-lg" style="background: var(--surface-alt); border: 1px solid var(--border);">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="context-minio-bucket">Bucket MinIO</label>
+          <input id="context-minio-bucket" class="form-input">
         </div>
-        <button type="button" id="test-minio-button" class="self-start px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-600 text-sm">Testar conexão MinIO</button>
-        <p id="minio-test-result" class="text-sm"></p>
+        <button type="button" id="test-minio-button" class="btn btn-ghost btn-sm self-start">Testar conexão MinIO</button>
+        <p id="minio-test-result" class="text-xs"></p>
       </div>
 
-      <div id="db-fields" class="flex flex-col gap-2">
-        <div>
-          <label class="block text-xs font-medium text-muted mb-1">Connection string (SQLAlchemy)</label>
-          <input id="context-db-connection" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+      <div id="db-fields" class="flex flex-col gap-2 p-3 rounded-lg" style="background: var(--surface-alt); border: 1px solid var(--border);">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="context-db-connection">Connection string (SQLAlchemy)</label>
+          <input id="context-db-connection" class="form-input">
         </div>
-        <div>
-          <label class="block text-xs font-medium text-muted mb-1">Schema</label>
-          <input id="context-db-schema" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm" value="dbo">
+        <div class="grid grid-cols-2 gap-2">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" for="context-db-schema">Schema</label>
+            <input id="context-db-schema" class="form-input" value="dbo">
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" for="context-db-table">Tabela</label>
+            <input id="context-db-table" class="form-input">
+          </div>
         </div>
-        <div>
-          <label class="block text-xs font-medium text-muted mb-1">Tabela</label>
-          <input id="context-db-table" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
-        </div>
-        <button type="button" id="test-db-button" class="self-start px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-600 text-sm">Testar conexão do banco</button>
-        <p id="db-test-result" class="text-sm"></p>
+        <button type="button" id="test-db-button" class="btn btn-ghost btn-sm self-start">Testar conexão do banco</button>
+        <p id="db-test-result" class="text-xs"></p>
       </div>
 
-      <div id="local-fields" class="flex flex-col gap-2">
-        <div>
-          <label class="block text-xs font-medium text-muted mb-1">Pasta raiz local (opcional)</label>
-          <input id="context-local-path" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
-          <p class="text-xs text-muted mt-1">Se deixar em branco, os arquivos são salvos a partir da raiz do projeto.</p>
+      <div id="local-fields" class="flex flex-col gap-2 p-3 rounded-lg" style="background: var(--surface-alt); border: 1px solid var(--border);">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="context-local-path">Pasta raiz local (opcional)</label>
+          <input id="context-local-path" class="form-input">
+          <p class="form-hint">Se deixar em branco, os arquivos são salvos a partir da raiz do projeto.</p>
         </div>
-        <button type="button" id="test-local-button" class="self-start px-3 py-1 rounded-lg border border-slate-300 dark:border-slate-600 text-sm">Testar/criar pasta local</button>
-        <p id="local-test-result" class="text-sm"></p>
+        <button type="button" id="test-local-button" class="btn btn-ghost btn-sm self-start">Testar/criar pasta local</button>
+        <p id="local-test-result" class="text-xs"></p>
       </div>
 
-      <div>
-        <label class="block text-xs font-medium text-muted mb-1">Modo de escrita padrão</label>
-        <select id="context-write-mode" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label" for="context-write-mode">Modo de escrita padrão</label>
+        <select id="context-write-mode" class="form-input">
           <option value="append">Append</option>
           <option value="create_new">Criar nova tabela</option>
         </select>
       </div>
 
-      <div>
-        <label class="block text-xs font-medium text-muted mb-1">Modo de tratamento de PDF</label>
-        <select id="context-pdf-mode" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label" for="context-pdf-mode">Modo de tratamento de PDF</label>
+        <select id="context-pdf-mode" class="form-input">
           <option value="extract_tables">Extrair tabelas</option>
           <option value="metadata_only">Somente metadados</option>
           <option value="raw_archive">Arquivar original</option>
           <option value="ocr_stock_lots">OCR: estoque com lotes</option>
         </select>
-        <p id="pdf-mode-help" class="text-xs text-muted mt-1"></p>
+        <p id="pdf-mode-help" class="form-hint"></p>
       </div>
 
-      <div>
-        <label class="block text-xs font-medium text-muted mb-1">Modo de tratamento de imagem</label>
-        <select id="context-image-mode" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm">
+      <div class="form-group" style="margin-bottom:0">
+        <label class="form-label" for="context-image-mode">Modo de tratamento de imagem</label>
+        <select id="context-image-mode" class="form-input">
           <option value="raw_archive">Arquivar original</option>
           <option value="table_grid">Tabela com grade</option>
           <option value="table_borderless">Tabela sem grade</option>
         </select>
-        <p id="image-mode-help" class="text-xs text-muted mt-1"></p>
+        <p id="image-mode-help" class="form-hint"></p>
       </div>
 
-      <label class="flex items-center gap-2 text-sm">
-        <input type="checkbox" id="context-active" checked> Ativo
+      <label class="flex items-center gap-2 text-xs cursor-pointer" style="color: var(--text);">
+        <input type="checkbox" id="context-active" checked class="accent-indigo-500"> Contexto Ativo
       </label>
 
-      <div class="flex justify-end gap-2 mt-2">
-        <button type="button" id="context-cancel-button" class="px-4 py-1.5 rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-600">Cancelar</button>
-        <button type="submit" class="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">Salvar</button>
+      <div class="modal-footer">
+        <button type="button" id="context-cancel-button" class="btn btn-ghost">Cancelar</button>
+        <button type="submit" class="btn btn-primary">Salvar Contexto</button>
       </div>
     </form>
   </div>
 </div>
 
-<div id="rules-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-black/40 p-4">
-  <div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white dark:bg-slate-800 p-6 shadow-lg">
-    <h3 class="text-xl font-semibold mb-1">Regras de validação de dados</h3>
-    <p id="rules-modal-context-name" class="text-sm text-muted mb-3"></p>
+<!-- Modal de Regras -->
+<div id="rules-modal" class="overlay">
+  <div class="modal glass shadow-2xl" style="max-width: 680px; max-height: 90vh; overflow-y: auto;">
+    <div class="modal-header">
+      <div>
+        <h3 class="text-base font-bold">Regras de Validação de Dados</h3>
+        <p id="rules-modal-context-name" class="text-xs" style="color: var(--text-muted);"></p>
+      </div>
+      <button type="button" class="close-btn" id="rules-close-x" onclick="window.closeRulesModal && window.closeRulesModal()">X</button>
+    </div>
+    
     <input type="hidden" id="rules-context-id">
 
-    <table class="w-full text-xs mb-2">
-      <thead>
-        <tr class="text-left text-muted">
-          <th class="py-1 pr-2">Coluna</th>
-          <th class="py-1 pr-2">Tipo</th>
-          <th class="py-1 pr-2 text-center">Obrigatória</th>
-          <th class="py-1"></th>
-        </tr>
-      </thead>
-      <tbody id="context-rules-rows"></tbody>
-    </table>
+    <div class="overflow-x-auto mb-3">
+      <table class="w-full text-xs text-left">
+        <thead>
+          <tr style="background: var(--surface-alt); color: var(--text-muted);">
+            <th class="py-2 px-3">Coluna</th>
+            <th class="py-2 px-3">Tipo</th>
+            <th class="py-2 px-3 text-center">Obrigatória</th>
+            <th class="py-2 px-3"></th>
+          </tr>
+        </thead>
+        <tbody id="context-rules-rows" class="divide-y divide-slate-700/30"></tbody>
+      </table>
+    </div>
+
     <datalist id="rules-column-options"></datalist>
-    <button type="button" id="context-add-rule-button" class="text-xs px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600">+ Adicionar regra</button>
-    <p class="text-xs text-muted mt-2">
-      Um upload é rejeitado (arquivo inteiro) se alguma célula não corresponder ao tipo declarado.
-      Marcar "Obrigatória" faz a coluna precisar estar presente no arquivo e sem células vazias.
-      As sugestões de coluna vêm do último arquivo aceito para este contexto — se ainda não houve
-      nenhum upload, digite o nome livremente.
+    <button type="button" id="context-add-rule-button" class="btn btn-ghost btn-sm mb-3">+ Adicionar Regra</button>
+    
+    <p class="form-hint">
+      Um upload é rejeitado por inteiro se alguma célula não corresponder ao tipo declarado.
+      Marcar "Obrigatória" exige que a coluna esteja presente no arquivo e sem células vazias.
     </p>
 
-    <div class="flex justify-end gap-2 mt-4">
-      <button type="button" id="rules-cancel-button" class="px-4 py-1.5 rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-600">Cancelar</button>
-      <button type="button" id="rules-save-button" class="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">Salvar regras</button>
+    <div class="modal-footer">
+      <button type="button" id="rules-cancel-button" class="btn btn-ghost">Cancelar</button>
+      <button type="button" id="rules-save-button" class="btn btn-primary">Salvar Regras</button>
     </div>
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script src="/static/js/admin_contexts.js"></script>
 {% endblock %}

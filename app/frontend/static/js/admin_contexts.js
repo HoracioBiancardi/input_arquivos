@@ -113,7 +113,7 @@ async function loadContexts() {
   rows.innerHTML = contexts
     .map(
       (context) => `
-      <tr class="border-b border-black/5 dark:border-white/10 last:border-0 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800" data-id="${context.id}">
+      <tr class="border-b border-slate-700/30 last:border-0 cursor-pointer" data-id="${context.id}">
         <td class="px-4 py-2 font-medium">${context.name}</td>
         <td class="px-4 py-2">${context.destination_summary}</td>
         <td class="px-4 py-2">${context.allowed_file_types.split(",").map((t) => FILE_TYPE_LABELS[t] || t).join(", ")}</td>
@@ -182,16 +182,16 @@ function resetForm() {
 
 function openCreateModal() {
   resetForm();
-  document.getElementById("context-modal-title").textContent = "Novo Context";
+  document.getElementById("context-modal-title").textContent = "Novo Contexto";
   modal.classList.remove("hidden");
-  modal.classList.add("flex");
+  modal.classList.add("open", "flex");
 }
 
 async function openEditModal(contextId) {
   const context = await apiFetch(`/api/contexts/${contextId}`);
   resetForm();
   currentEditContext = context;
-  document.getElementById("context-modal-title").textContent = "Editar Context";
+  document.getElementById("context-modal-title").textContent = "Editar Contexto";
   document.getElementById("context-id").value = context.id;
   document.getElementById("context-name").value = context.name;
   context.allowed_file_types.split(",").forEach((type) => {
@@ -212,13 +212,14 @@ async function openEditModal(contextId) {
   updatePdfHelp();
   updateImageHelp();
   modal.classList.remove("hidden");
-  modal.classList.add("flex");
+  modal.classList.add("open", "flex");
 }
 
 function closeModal() {
+  modal.classList.remove("open", "flex");
   modal.classList.add("hidden");
-  modal.classList.remove("flex");
 }
+window.closeModal = closeModal;
 
 async function saveContext(event) {
   event.preventDefault();
@@ -275,14 +276,15 @@ async function openRulesModal(contextId) {
   clearRuleRows();
   (context.column_rules || []).forEach(addRuleRow);
   rulesModal.classList.remove("hidden");
-  rulesModal.classList.add("flex");
+  rulesModal.classList.add("open", "flex");
 }
 
 function closeRulesModal() {
+  rulesModal.classList.remove("open", "flex");
   rulesModal.classList.add("hidden");
-  rulesModal.classList.remove("flex");
   currentRulesContext = null;
 }
+window.closeRulesModal = closeRulesModal;
 
 async function saveRules() {
   if (!currentRulesContext) return;
@@ -338,5 +340,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const path = document.getElementById("context-local-path").value;
     const result = await apiFetch("/api/contexts/test-local", { method: "POST", body: { path } });
     setTestResult("local-test-result", result);
+  });
+
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal) closeModal();
+  });
+  rulesModal.addEventListener("click", (event) => {
+    if (event.target === rulesModal) closeRulesModal();
   });
 });

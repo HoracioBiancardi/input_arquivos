@@ -31,13 +31,14 @@ cp .env.example .env
 # edite o .env: SESSION_SECRET, credenciais do admin bootstrap e do MinIO
 ```
 
-## Executar
+## Executar (Comando Padronizado Universal)
 
 ```bash
-uv run uvicorn app.main:app --reload
+cd /home/swordpower/Documentos/REPO/PESSOAL/input_arquivos
+uv run uvicorn main:app --reload --port 8004
 ```
 
-A aplicação sobe em `http://localhost:8080` (porta configurável via `.env`):
+A aplicação sobe em `http://127.0.0.1:8004`:
 
 - `/login` — login (obrigatório para qualquer usuário)
 - `/` — tela de upload de arquivos

@@ -1,67 +1,70 @@
 {% extends "base.html" %}
 {% block title %}Audit Log • Ingestão de Arquivos{% endblock %}
-{% block header %}
-<header class="flex items-center justify-between px-6 py-3 bg-white dark:bg-slate-900 border-b border-black/5 dark:border-white/10">
-  <span class="text-lg font-semibold">Audit Log</span>
-  <div class="flex items-center gap-3">
-    <a href="/admin" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">← Voltar</a>
-    <button id="dark-mode-toggle" type="button" class="text-sm px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">🌙</button>
-    <button id="logout-button" type="button" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Sair</button>
-  </div>
-</header>
-{% endblock %}
+
 {% block content %}
-<div class="w-full flex items-center justify-center p-6">
+<div class="w-full flex-1 flex flex-col items-center gap-6 p-6">
   <div class="w-full max-w-6xl flex flex-col gap-4">
 
-    <div class="surface-card bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-4">
-      <div class="flex flex-wrap gap-3 items-end">
+    <div>
+      <h1 class="text-xl font-bold" style="color: var(--text);">Audit Log & Histórico de Processamento</h1>
+      <p class="text-xs" style="color: var(--text-muted);">Filtre e rastreie o histórico completo de uploads executados no sistema</p>
+    </div>
+
+    <!-- Filtros de Busca -->
+    <div class="modal glass surface-card shadow-xl p-4" style="max-width:100%; border-radius: var(--r-lg);">
+      <div class="flex flex-wrap gap-4 items-end">
         <div>
-          <label class="block text-xs font-medium text-muted mb-1">Contexto</label>
-          <select id="filter-context" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-1.5 text-sm w-48"></select>
+          <label class="form-label" for="filter-context">Contexto</label>
+          <select id="filter-context" class="form-input" style="width: 200px;"></select>
         </div>
+
         <div>
-          <label class="block text-xs font-medium text-muted mb-1">Status</label>
-          <select id="filter-status" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-1.5 text-sm w-36">
+          <label class="form-label" for="filter-status">Status</label>
+          <select id="filter-status" class="form-input" style="width: 140px;">
             <option value="">Todos</option>
             <option value="success">Sucesso</option>
             <option value="error">Erro</option>
           </select>
         </div>
+
         <div>
-          <label class="block text-xs font-medium text-muted mb-1">Data inicial</label>
-          <input id="filter-start-date" type="date" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-1.5 text-sm">
+          <label class="form-label" for="filter-start-date">Data Inicial</label>
+          <input id="filter-start-date" type="date" class="form-input" style="width: 150px;">
         </div>
+
         <div>
-          <label class="block text-xs font-medium text-muted mb-1">Data final</label>
-          <input id="filter-end-date" type="date" class="rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-1.5 text-sm">
+          <label class="form-label" for="filter-end-date">Data Final</label>
+          <input id="filter-end-date" type="date" class="form-input" style="width: 150px;">
         </div>
-        <button id="filter-button" type="button" class="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90">Filtrar</button>
+
+        <button id="filter-button" type="button" class="btn btn-primary" style="padding: .55rem 1.25rem;">⚡ Filtrar</button>
       </div>
     </div>
 
-    <div class="surface-card bg-white dark:bg-slate-900 rounded-xl overflow-x-auto">
-      <table class="w-full text-sm">
+    <!-- Tabela de Logs de Auditoria -->
+    <div class="modal glass surface-card shadow-xl overflow-x-auto" style="max-width:100%; border-radius: var(--r-lg);">
+      <table class="w-full text-xs text-left" style="color: var(--text);">
         <thead>
-          <tr class="text-left text-xs text-muted border-b border-black/5 dark:border-white/10">
-            <th class="px-4 py-2">Arquivo</th>
-            <th class="px-4 py-2">Contexto</th>
-            <th class="px-4 py-2">Destino</th>
-            <th class="px-4 py-2">Modo</th>
-            <th class="px-4 py-2 text-center">Status</th>
-            <th class="px-4 py-2 text-right">Linhas</th>
-            <th class="px-4 py-2">Enviado por</th>
-            <th class="px-4 py-2">Data de envio</th>
-            <th class="px-4 py-2">Erro</th>
+          <tr style="background: var(--surface-alt); color: var(--text-muted); border-bottom: 1px solid var(--border);">
+            <th class="px-4 py-3 font-semibold">Arquivo</th>
+            <th class="px-4 py-3 font-semibold">Contexto</th>
+            <th class="px-4 py-3 font-semibold">Destino</th>
+            <th class="px-4 py-3 font-semibold">Modo</th>
+            <th class="px-4 py-3 font-semibold text-center">Status</th>
+            <th class="px-4 py-3 font-semibold text-right">Linhas</th>
+            <th class="px-4 py-3 font-semibold">Enviado por</th>
+            <th class="px-4 py-3 font-semibold">Data de Envio</th>
+            <th class="px-4 py-3 font-semibold">Detalhes de Erro</th>
           </tr>
         </thead>
-        <tbody id="audit-rows"></tbody>
+        <tbody id="audit-rows" class="divide-y divide-slate-700/30"></tbody>
       </table>
     </div>
 
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script src="/static/js/admin_audit.js"></script>
 {% endblock %}

@@ -14,7 +14,7 @@ async function loadUsers() {
   rows.innerHTML = users
     .map(
       (user) => `
-      <tr class="border-b border-black/5 dark:border-white/10 last:border-0 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800" data-id="${user.id}">
+      <tr class="border-b border-slate-700/30 last:border-0 cursor-pointer" data-id="${user.id}">
         <td class="px-4 py-2 font-medium">${user.username}</td>
         <td class="px-4 py-2">${user.role}</td>
         <td class="px-4 py-2 text-center">${statusBadge(user.active)}</td>
@@ -30,13 +30,14 @@ function openCreateModal() {
   document.getElementById("create-user-form").reset();
   clearFieldErrors("create");
   createModal.classList.remove("hidden");
-  createModal.classList.add("flex");
+  createModal.classList.add("open", "flex");
 }
 
 function closeCreateModal() {
+  createModal.classList.remove("open", "flex");
   createModal.classList.add("hidden");
-  createModal.classList.remove("flex");
 }
+window.closeCreateModal = closeCreateModal;
 
 async function saveNewUser(event) {
   event.preventDefault();
@@ -92,13 +93,14 @@ async function openManageModal(userId) {
 
   toggleManageContextsField();
   manageModal.classList.remove("hidden");
-  manageModal.classList.add("flex");
+  manageModal.classList.add("open", "flex");
 }
 
 function closeManageModal() {
+  manageModal.classList.remove("open", "flex");
   manageModal.classList.add("hidden");
-  manageModal.classList.remove("flex");
 }
+window.closeManageModal = closeManageModal;
 
 async function saveManagedUser(event) {
   event.preventDefault();

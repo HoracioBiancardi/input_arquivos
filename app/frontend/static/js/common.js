@@ -1,5 +1,94 @@
-// Utilitários compartilhados por todas as páginas: fetch autenticado, toasts, modal de confirmação e dark mode.
+// Utilitários compartilhados por todas as páginas: fetch autenticado, toasts, modal de confirmação, temas SwordPower e Auto-Lock.
 
+const THEME_KEY = 'app-theme';
+const AUTOLOCK_KEY = 'app-autolock-minutes';
+const VALID_THEMES = new Set(['corporate', 'green-neutral']);
+
+function getTheme() {
+  const saved = localStorage.getItem(THEME_KEY);
+  return VALID_THEMES.has(saved) ? saved : 'corporate';
+}
+
+function setTheme(theme) {
+  const valid = VALID_THEMES.has(theme) ? theme : 'corporate';
+  localStorage.setItem(THEME_KEY, valid);
+  VALID_THEMES.forEach((t) => document.body.classList.remove('theme-' + t));
+  document.body.classList.add('theme-' + valid);
+  const el = document.getElementById('settings-theme');
+  if (el) el.value = valid;
+}
+
+function getAutoLockMinutes() {
+  const saved = localStorage.getItem(AUTOLOCK_KEY);
+  return saved === null ? 5 : Number(saved);
+}
+
+function setAutoLockMinutes(minutes) {
+  localStorage.setItem(AUTOLOCK_KEY, String(minutes));
+  const el = document.getElementById('settings-autolock');
+  if (el) el.value = String(minutes);
+  resetAutoLockTimer();
+}
+
+function applyPrefsOnBoot() {
+  setTheme(getTheme());
+  setAutoLockMinutes(getAutoLockMinutes());
+}
+
+function openSettingsModal() {
+  const overlay = document.getElementById('settings-overlay');
+  if (overlay) overlay.classList.add('open');
+}
+
+function closeSettingsModal() {
+  const overlay = document.getElementById('settings-overlay');
+  if (overlay) overlay.classList.remove('open');
+}
+
+function changeTheme(theme) {
+  setTheme(theme);
+}
+
+function changeAutoLock(minutes) {
+  setAutoLockMinutes(Number(minutes));
+}
+
+// ── Auto-Lock por Inatividade ──────────────────────────────────────────
+let _autolockTimer = null;
+
+function resetAutoLockTimer() {
+  if (_autolockTimer) clearTimeout(_autolockTimer);
+  const minutes = getAutoLockMinutes();
+  if (minutes <= 0) return; // Desativado
+
+  _autolockTimer = setTimeout(() => {
+    // Redireciona/desloga por inatividade se houver sessão ativa
+    if (window.location.pathname !== '/login') {
+      showToast('Sessão bloqueada por inatividade.', 'warning');
+      setTimeout(() => logout(), 1000);
+    }
+  }, minutes * 60 * 1000);
+}
+
+function initAutoLockListener() {
+  ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach((evt) => {
+    window.addEventListener(evt, resetAutoLockTimer, { passive: true });
+  });
+  resetAutoLockTimer();
+}
+
+// ── Sanitização XSS ───────────────────────────────────────────────────
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+// ── Fetch Autenticado ──────────────────────────────────────────────────
 async function apiFetch(path, options = {}) {
   const init = { credentials: "same-origin", ...options, headers: { ...(options.headers || {}) } };
   if (init.body && !(init.body instanceof FormData) && typeof init.body !== "string") {
@@ -29,7 +118,6 @@ async function apiFetch(path, options = {}) {
 function extractFieldErrors(errorData) {
   const detail = errorData && errorData.detail;
   if (Array.isArray(detail)) {
-    // Formato padrão de 422 do Pydantic/FastAPI: [{loc: [...], msg: "..."}, ...]
     return detail
       .filter((item) => item && item.loc)
       .map((item) => ({ field: item.loc[item.loc.length - 1], message: item.msg }));
@@ -60,37 +148,43 @@ function applyFieldErrors(prefix, errors) {
   return applied;
 }
 
-function showToast(message, variant = "positive") {
-  const root = document.getElementById("toast-root");
-  if (!root) return;
+function showToast(message, variant = "info") {
+  const root = document.getElementById("toast-root") || document.body;
   const toast = document.createElement("div");
-  toast.className = `toast toast--${variant}`;
+  
+  // Mapeamento de variantes para compatibilidade
+  let typeClass = variant;
+  if (variant === "positive") typeClass = "success";
+  if (variant === "negative") typeClass = "error";
+  if (variant === "warning") typeClass = "warn";
+
+  toast.className = `toast ${typeClass}`;
   toast.textContent = message;
   root.appendChild(toast);
+  
+  requestAnimationFrame(() => toast.classList.add("visible"));
+
   setTimeout(() => {
-    toast.style.opacity = "0";
-    toast.style.transition = "opacity .2s ease";
-    setTimeout(() => toast.remove(), 200);
+    toast.classList.remove("visible");
+    setTimeout(() => toast.remove(), 250);
   }, 4000);
 }
 
 function confirmModal({ title, body, confirmLabel = "Confirmar", cancelLabel = "Cancelar", variant = "primary" }) {
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
-    overlay.className = "fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4";
-
-    const confirmClasses =
-      variant === "warning"
-        ? "bg-amber-600 hover:bg-amber-700"
-        : "bg-primary hover:opacity-90";
+    overlay.className = "overlay open";
 
     overlay.innerHTML = `
-      <div class="w-full max-w-md rounded-2xl bg-white dark:bg-slate-800 p-6 shadow-lg">
-        <h3 class="text-lg font-semibold mb-2 text-slate-900 dark:text-slate-100">${title}</h3>
-        <div class="text-sm text-muted mb-4">${body}</div>
-        <div class="flex justify-end gap-2">
-          <button type="button" data-action="cancel" class="px-4 py-1.5 rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700">${cancelLabel}</button>
-          <button type="button" data-action="confirm" class="px-4 py-1.5 rounded-lg text-sm font-medium text-white ${confirmClasses}">${confirmLabel}</button>
+      <div class="modal glass" style="max-width: 440px">
+        <div class="modal-header">
+          <h2>${esc(title)}</h2>
+          <button class="close-btn" data-action="cancel">X</button>
+        </div>
+        <div class="modal-body mb-4">${body}</div>
+        <div class="modal-footer">
+          <button type="button" data-action="cancel" class="btn btn-ghost">${esc(cancelLabel)}</button>
+          <button type="button" data-action="confirm" class="btn btn-primary">${esc(confirmLabel)}</button>
         </div>
       </div>
     `;
@@ -110,31 +204,19 @@ function confirmModal({ title, body, confirmLabel = "Confirmar", cancelLabel = "
   });
 }
 
-function initDarkMode() {
-  const isDark = localStorage.getItem("dark_mode") === "true";
-  document.documentElement.classList.toggle("dark", isDark);
-  const toggle = document.getElementById("dark-mode-toggle");
-  if (!toggle) return;
-  updateDarkModeIcon(toggle, isDark);
-  toggle.addEventListener("click", () => {
-    const nowDark = !document.documentElement.classList.contains("dark");
-    document.documentElement.classList.toggle("dark", nowDark);
-    localStorage.setItem("dark_mode", String(nowDark));
-    updateDarkModeIcon(toggle, nowDark);
-  });
-}
-
-function updateDarkModeIcon(toggle, isDark) {
-  toggle.textContent = isDark ? "☀️" : "🌙";
-}
-
 async function logout() {
-  await apiFetch("/api/auth/logout", { method: "POST" });
+  try {
+    await apiFetch("/api/auth/logout", { method: "POST" });
+  } catch (e) {
+    // Ignora erro se sessão já foi invalidada
+  }
   window.location.href = "/login";
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  initDarkMode();
+  applyPrefsOnBoot();
+  initAutoLockListener();
+
   const logoutButton = document.getElementById("logout-button");
   if (logoutButton) {
     logoutButton.addEventListener("click", logout);

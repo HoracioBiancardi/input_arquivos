@@ -1,39 +1,52 @@
 {% extends "base.html" %}
 {% block title %}Área Administrativa • Ingestão de Arquivos{% endblock %}
-{% block header %}
-<header class="flex items-center justify-between px-6 py-3 bg-white dark:bg-slate-900 border-b border-black/5 dark:border-white/10">
-  <div class="flex items-center gap-2">
-    <span class="text-primary text-xl">🛠️</span>
-    <span class="text-lg font-semibold">Área Administrativa</span>
-  </div>
-  <div class="flex items-center gap-3">
-    <a href="/" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">← Voltar ao upload</a>
-    <button id="dark-mode-toggle" type="button" class="text-sm px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">🌙</button>
-    <button id="logout-button" type="button" class="text-sm font-medium px-3 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Sair</button>
-  </div>
-</header>
-{% endblock %}
+
 {% block content %}
-<div class="w-full flex items-center justify-center p-6">
-  <div class="w-full max-w-4xl flex flex-col gap-4">
-    <p class="text-sm text-muted mb-1">O que você quer gerenciar?</p>
-    <div class="grid gap-4" style="grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));">
-      <a href="/admin/contexts" class="surface-card hover-lift bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-5 flex flex-col gap-1">
-        <div class="icon-badge mb-1">🔗</div>
-        <span class="text-base font-semibold">Contexts</span>
-        <span class="text-sm text-muted">Mapeamento de contextos para buckets/tabelas de destino</span>
-      </a>
-      <a href="/admin/users" class="surface-card hover-lift bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-5 flex flex-col gap-1">
-        <div class="icon-badge mb-1">👥</div>
-        <span class="text-base font-semibold">Usuários</span>
-        <span class="text-sm text-muted">Cadastro de contas de acesso ao sistema</span>
-      </a>
-      <a href="/admin/audit" class="surface-card hover-lift bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-5 flex flex-col gap-1">
-        <div class="icon-badge mb-1">🕒</div>
-        <span class="text-base font-semibold">Audit Log</span>
-        <span class="text-sm text-muted">Histórico completo de uploads processados</span>
-      </a>
+<div class="w-full flex-1 flex flex-col items-center justify-center p-6">
+  <div class="w-full max-w-4xl flex flex-col gap-6">
+
+    <div>
+      <h1 class="text-xl font-bold" style="color: var(--text);">Painel de Administração</h1>
+      <p class="text-xs" style="color: var(--text-muted);">Gerenciamento de contextos, usuários e registros de auditoria do sistema</p>
     </div>
+
+    <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+      
+      <a href="/admin/contexts" class="modal glass surface-card shadow-xl flex flex-col gap-3 p-6 transition-all hover:scale-[1.02]" style="max-width:100%; border-radius: var(--r-lg); text-decoration:none;">
+        <div class="brand-icon" style="width: 40px; height: 40px;">
+          <span>🔗</span>
+        </div>
+        <div>
+          <span class="text-base font-bold block mb-1" style="color: var(--text);">Contextos de Negócio</span>
+          <span class="text-xs" style="color: var(--text-muted);">Mapeamento de contextos para tabelas SQL, buckets MinIO ou armazenamento local</span>
+        </div>
+        <span class="text-xs font-semibold mt-2" style="color: var(--primary);">Gerenciar Contextos →</span>
+      </a>
+
+      <a href="/admin/users" class="modal glass surface-card shadow-xl flex flex-col gap-3 p-6 transition-all hover:scale-[1.02]" style="max-width:100%; border-radius: var(--r-lg); text-decoration:none;">
+        <div class="brand-icon" style="width: 40px; height: 40px;">
+          <span>👥</span>
+        </div>
+        <div>
+          <span class="text-base font-bold block mb-1" style="color: var(--text);">Controle de Usuários</span>
+          <span class="text-xs" style="color: var(--text-muted);">Cadastro de contas, permissões de acesso e papéis de administração</span>
+        </div>
+        <span class="text-xs font-semibold mt-2" style="color: var(--primary);">Gerenciar Usuários →</span>
+      </a>
+
+      <a href="/admin/audit" class="modal glass surface-card shadow-xl flex flex-col gap-3 p-6 transition-all hover:scale-[1.02]" style="max-width:100%; border-radius: var(--r-lg); text-decoration:none;">
+        <div class="brand-icon" style="width: 40px; height: 40px;">
+          <span>🕒</span>
+        </div>
+        <div>
+          <span class="text-base font-bold block mb-1" style="color: var(--text);">Audit Log & Histórico</span>
+          <span class="text-xs" style="color: var(--text-muted);">Registro completo e auditável de todos os arquivos processados e erros</span>
+        </div>
+        <span class="text-xs font-semibold mt-2" style="color: var(--primary);">Ver Audit Log →</span>
+      </a>
+
+    </div>
+
   </div>
 </div>
 {% endblock %}

@@ -1,71 +1,103 @@
 {% extends "base.html" %}
-{% block title %}Ingestão de Arquivos{% endblock %}
+{% block title %}Enviar Arquivo • Ingestão de Arquivos{% endblock %}
+
 {% block content %}
-<div class="w-full flex flex-col items-center gap-6 p-6">
-  <div class="w-full sm:w-4/5 flex flex-col gap-6">
+<div class="w-full flex-1 flex flex-col items-center gap-6 p-6">
+  <div class="w-full max-w-5xl flex flex-col gap-6">
 
-    <div class="surface-card bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-6">
-      <div class="flex items-center gap-3 mb-1">
-        <div class="icon-badge">☁️</div>
+    <!-- Card de Envio de Arquivo -->
+    <div class="modal glass surface-card shadow-xl" style="max-width:100%; border-radius: var(--r-lg);">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="brand-icon" style="width: 36px; height: 36px;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
         <div>
-          <p class="text-lg font-semibold">Enviar arquivo</p>
-          <p class="text-sm text-muted">Excel, CSV ou PDF — escolha o contexto de destino abaixo</p>
+          <p class="text-base font-bold" style="color: var(--text);">Enviar Arquivo para Ingestão</p>
+          <p class="text-xs" style="color: var(--text-muted);">Suporta formatos Excel (.xlsx, .xls), CSV, PDF, JSON, XML e imagens — selecione o contexto de destino</p>
         </div>
       </div>
 
-      <div id="no-contexts-message" class="hidden items-center gap-2 mt-3 text-muted">
+      <div id="no-contexts-message" class="hidden items-center gap-2 mt-3 p-3 rounded-lg border border-amber-500/20 bg-amber-500/10 text-amber-300 text-xs">
         <span>ℹ️</span>
-        <span id="no-contexts-text"></span>
+        <span id="no-contexts-text">Nenhum contexto liberado. Peça a um admin em /admin/contexts ou /admin/users.</span>
       </div>
 
-      <form id="upload-form" class="hidden flex-col gap-3 mt-2">
-        <div>
-          <label class="block text-xs font-medium text-muted mb-1">Contexto</label>
-          <select id="context-select" class="w-full rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 text-sm"></select>
+      <form id="upload-form" class="flex flex-col gap-4 mt-2">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="context-select">Contexto de Negócio</label>
+          <select id="context-select" class="form-input">
+            <option value="vendas">Vendas (Pasta local Parquet)</option>
+          </select>
         </div>
 
-        <div class="flex items-center gap-2">
-          <span id="destination-icon">❓</span>
-          <span id="destination-label" class="text-sm text-muted">Selecione um contexto</span>
+        <div class="flex items-center gap-2 p-3 rounded-lg" style="background: var(--surface-alt); border: 1px solid var(--border);">
+          <span id="destination-icon" class="text-base">📁</span>
+          <span id="destination-label" class="text-xs font-medium" style="color: var(--text-muted);">Destino: Pasta local Parquet</span>
         </div>
 
-        <div id="write-mode-field" class="hidden flex gap-4 text-sm">
-          <label class="flex items-center gap-1"><input type="radio" name="write_mode" value="append" checked> Append (adicionar à tabela existente)</label>
-          <label class="flex items-center gap-1"><input type="radio" name="write_mode" value="create_new"> Criar nova tabela</label>
+        <div id="write-mode-field" class="hidden flex gap-6 text-xs p-3 rounded-lg" style="background: var(--surface-alt); border: 1px solid var(--border);">
+          <label class="flex items-center gap-2 cursor-pointer" style="color: var(--text);">
+            <input type="radio" name="write_mode" value="append" checked class="accent-indigo-500"> Append (adicionar à tabela existente)
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer" style="color: var(--text);">
+            <input type="radio" name="write_mode" value="create_new" class="accent-indigo-500"> Criar nova tabela
+          </label>
         </div>
 
-        <hr class="my-2 border-black/5 dark:border-white/10">
+        <!-- ZONA DE DROP & FILE INPUT -->
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="file-input">Selecione ou Arraste o Arquivo</label>
+          
+          <div id="drop-zone" class="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl cursor-pointer transition-all" style="border-color: var(--border); background: var(--surface-alt);" onclick="document.getElementById('file-input').click()">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" style="color: var(--primary); margin-bottom: .5rem;">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <p class="text-sm font-semibold" style="color: var(--text);">Clique aqui ou arraste o arquivo</p>
+            <p class="text-xs" style="color: var(--text-subtle); margin-top: .2rem;" id="drop-zone-formats">Suporta .xlsx, .xls, .csv, .pdf, .json, .xml, .txt</p>
+            
+            <div id="selected-file-badge" class="hidden mt-3 px-3 py-1.5 rounded-lg text-xs font-semibold" style="background: var(--primary-dim); color: var(--primary); border: 1px solid var(--border-bright);">
+              <span id="selected-file-name">arquivo.xlsx</span>
+            </div>
+          </div>
 
-        <input id="file-input" type="file" accept=".xlsx,.xls,.csv,.pdf"
-          class="w-full text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-transparent px-3 py-2 file:mr-3 file:rounded-md file:border-0 file:bg-primary file:text-white file:px-3 file:py-1.5 file:text-sm">
+          <input id="file-input" type="file" accept=".xlsx,.xls,.csv,.pdf,.json,.xml,.txt,.ods" class="hidden" onchange="onFileSelected(this)">
+        </div>
 
-        <button type="submit" id="upload-submit" class="self-start px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed">
-          <span id="upload-submit-label">Enviar</span>
+        <button type="submit" id="upload-submit" class="btn btn-primary self-start" style="padding: .6rem 1.5rem;">
+          <span id="upload-submit-label">⚡ Enviar Arquivo</span>
         </button>
       </form>
 
-      <a id="view-last-upload-link" href="#" class="hidden self-start mt-2 text-sm font-medium text-primary hover:underline">Ver tabela deste envio →</a>
+      <a id="view-last-upload-link" href="#" class="hidden self-start mt-3 text-xs font-semibold hover:underline" style="color: var(--primary);">Ver tabela deste envio →</a>
     </div>
 
-    <div class="surface-card bg-white dark:bg-slate-900 rounded-2xl shadow-sm p-6">
-      <div class="flex items-center gap-3 mb-2">
-        <div class="icon-badge">🕒</div>
-        <p class="text-lg font-semibold">Últimos envios</p>
+    <!-- Card de Histórico de Envios -->
+    <div class="modal glass surface-card shadow-xl" style="max-width:100%; border-radius: var(--r-lg);">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="brand-icon" style="width: 32px; height: 32px; background: var(--surface-alt); color: var(--text);">
+          <span>🕒</span>
+        </div>
+        <p class="text-base font-bold" style="color: var(--text);">Últimos Envios Realizados</p>
       </div>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm">
+
+      <div class="overflow-x-auto rounded-lg" style="border: 1px solid var(--border);">
+        <table class="w-full text-xs text-left" style="color: var(--text);">
           <thead>
-            <tr class="text-left text-xs text-muted border-b border-black/5 dark:border-white/10">
-              <th class="px-4 py-2">Arquivo</th>
-              <th class="px-4 py-2">Contexto</th>
-              <th class="px-4 py-2">Destino</th>
-              <th class="px-4 py-2 text-center">Status</th>
-              <th class="px-4 py-2">Enviado por</th>
-              <th class="px-4 py-2">Data de envio</th>
-              <th class="px-4 py-2">Ações</th>
+            <tr style="background: var(--surface-alt); color: var(--text-muted); border-bottom: 1px solid var(--border);">
+              <th class="px-4 py-3 font-semibold">Arquivo</th>
+              <th class="px-4 py-3 font-semibold">Contexto</th>
+              <th class="px-4 py-3 font-semibold">Destino</th>
+              <th class="px-4 py-3 font-semibold text-center">Status</th>
+              <th class="px-4 py-3 font-semibold">Enviado por</th>
+              <th class="px-4 py-3 font-semibold">Data de Envio</th>
+              <th class="px-4 py-3 font-semibold text-right">Ações</th>
             </tr>
           </thead>
-          <tbody id="history-rows"></tbody>
+          <tbody id="history-rows" class="divide-y divide-slate-700/30">
+            <tr><td colspan="7" class="px-4 py-3 text-center text-gray-500">Nenhum envio recente.</td></tr>
+          </tbody>
         </table>
       </div>
     </div>
@@ -73,6 +105,7 @@
   </div>
 </div>
 {% endblock %}
+
 {% block scripts %}
 <script src="/static/js/upload.js"></script>
 {% endblock %}
