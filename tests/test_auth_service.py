@@ -4,11 +4,11 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from app.backend.config import get_settings
-from app.backend.db.session import DatabaseSessionFactory
-from app.backend.models.user import User, UserRole
-from app.backend.services.auth_service import AccountLockedError, AuthService
-from app.backend.services.user_service import UserService
+from input_arquivos.backend.config import get_settings
+from input_arquivos.backend.db.session import DatabaseSessionFactory
+from input_arquivos.backend.models.user import User, UserRole
+from input_arquivos.backend.services.auth_service import AccountLockedError, AuthService
+from input_arquivos.backend.services.user_service import UserService
 
 
 def _create_user(session_factory: DatabaseSessionFactory, auth_service: AuthService) -> User:

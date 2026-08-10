@@ -4,7 +4,7 @@ import io
 
 import pandas as pd
 
-from app.backend.ingestion.parquet import ParquetConverter
+from input_arquivos.backend.ingestion.parquet import ParquetConverter
 
 
 def test_to_bytes_round_trips_dataframe_contents() -> None:

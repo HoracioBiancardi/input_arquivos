@@ -12,15 +12,15 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from app.backend.db.session import DatabaseSessionFactory
-from app.backend.destinations.local_writer import LocalFileWriter
-from app.backend.destinations.sqlserver_writer import SqlServerWriter
-from app.backend.ingestion.parquet import ParquetConverter
-from app.backend.ingestion.pipeline import IngestResult
-from app.backend.models.context import Context, DestinationType, ImageMode, PdfMode, WriteMode
-from app.backend.models.upload_history import UploadHistory, UploadStatus
-from app.backend.services.context_service import ContextService
-from app.backend.services.preview_service import PreviewNotAvailableError, PreviewService, UploadNotFoundError
+from input_arquivos.backend.db.session import DatabaseSessionFactory
+from input_arquivos.backend.destinations.local_writer import LocalFileWriter
+from input_arquivos.backend.destinations.sqlserver_writer import SqlServerWriter
+from input_arquivos.backend.ingestion.parquet import ParquetConverter
+from input_arquivos.backend.ingestion.pipeline import IngestResult
+from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, PdfMode, WriteMode
+from input_arquivos.backend.models.upload_history import UploadHistory, UploadStatus
+from input_arquivos.backend.services.context_service import ContextService
+from input_arquivos.backend.services.preview_service import PreviewNotAvailableError, PreviewService, UploadNotFoundError
 
 
 def _make_artifact(dataframe: pd.DataFrame) -> IngestResult:

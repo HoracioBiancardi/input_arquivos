@@ -2,9 +2,9 @@
 
 import pytest
 
-from app.backend.db.session import DatabaseSessionFactory
-from app.backend.models.context import DestinationType, PdfMode, WriteMode
-from app.backend.services.context_service import ContextService, DuplicateNameError
+from input_arquivos.backend.db.session import DatabaseSessionFactory
+from input_arquivos.backend.models.context import DestinationType, PdfMode, WriteMode
+from input_arquivos.backend.services.context_service import ContextService, DuplicateNameError
 
 
 def test_create_and_get_by_name(session_factory: DatabaseSessionFactory) -> None:

@@ -19,8 +19,8 @@ import pytest
 import yaml
 from PIL import Image, ImageDraw, ImageFont
 
-from app.backend.ingestion.pipeline import FileTypeNotAllowedError, IngestionPipeline, UnsupportedFileTypeError
-from app.backend.models.context import Context, DestinationType, ImageMode, PdfMode, WriteMode
+from input_arquivos.backend.ingestion.pipeline import FileTypeNotAllowedError, IngestionPipeline, UnsupportedFileTypeError
+from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, PdfMode, WriteMode
 
 try:
     import rapidocr  # noqa: F401

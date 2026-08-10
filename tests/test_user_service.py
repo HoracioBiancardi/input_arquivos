@@ -2,10 +2,10 @@
 
 import pytest
 
-from app.backend.db.session import DatabaseSessionFactory
-from app.backend.models.user import UserRole
-from app.backend.services.auth_service import AuthService
-from app.backend.services.user_service import DuplicateUsernameError, UserService
+from input_arquivos.backend.db.session import DatabaseSessionFactory
+from input_arquivos.backend.models.user import UserRole
+from input_arquivos.backend.services.auth_service import AuthService
+from input_arquivos.backend.services.user_service import DuplicateUsernameError, UserService
 
 
 def _make_service(session_factory: DatabaseSessionFactory) -> UserService:

@@ -1,6 +1,6 @@
 """Testes do FileTypeRegistry: mapeamento entre tipos lógicos de arquivo e extensões."""
 
-from app.backend.ingestion.file_types import FileType, FileTypeRegistry
+from input_arquivos.backend.ingestion.file_types import FileType, FileTypeRegistry
 
 
 def test_type_for_extension_resolves_known_extensions() -> None:

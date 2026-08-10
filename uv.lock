@@ -469,7 +469,7 @@ wheels = [
 [[package]]
 name = "file-ingestion-system"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "bcrypt" },
     { name = "beautifulsoup4" },

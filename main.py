@@ -1,7 +1,7 @@
 """
 Entrypoint principal do Sistema de Ingestão de Arquivos (input_arquivos).
-Re-exporta a aplicação FastAPI de app.main para padronização de inicialização.
+Re-exporta a aplicação FastAPI de input_arquivos.main para padronização de inicialização.
 """
-from app.main import app
+from input_arquivos.main import app
 
 __all__ = ["app"]

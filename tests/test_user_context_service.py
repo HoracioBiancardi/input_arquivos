@@ -1,12 +1,12 @@
 """Testes do UserContextService: controle de quais contexts cada usuário comum pode acessar."""
 
-from app.backend.db.session import DatabaseSessionFactory
-from app.backend.models.context import DestinationType, PdfMode, WriteMode
-from app.backend.models.user import UserRole
-from app.backend.services.auth_service import AuthService
-from app.backend.services.context_service import ContextService
-from app.backend.services.user_context_service import UserContextService
-from app.backend.services.user_service import UserService
+from input_arquivos.backend.db.session import DatabaseSessionFactory
+from input_arquivos.backend.models.context import DestinationType, PdfMode, WriteMode
+from input_arquivos.backend.models.user import UserRole
+from input_arquivos.backend.services.auth_service import AuthService
+from input_arquivos.backend.services.context_service import ContextService
+from input_arquivos.backend.services.user_context_service import UserContextService
+from input_arquivos.backend.services.user_service import UserService
 
 
 def _make_services(session_factory: DatabaseSessionFactory) -> tuple[ContextService, UserService, UserContextService]:
