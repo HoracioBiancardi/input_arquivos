@@ -8,8 +8,10 @@ from sqlalchemy.exc import IntegrityError
 from input_arquivos.backend.api.routes_audit import router as audit_router
 from input_arquivos.backend.api.routes_auth import router as auth_router
 from input_arquivos.backend.api.routes_contexts import router as contexts_router
+from input_arquivos.backend.api.routes_system import router as system_router
 from input_arquivos.backend.api.routes_upload import router as upload_router
 from input_arquivos.backend.api.routes_users import router as users_router
+from input_arquivos.backend.config import get_settings
 from input_arquivos.backend.db.bootstrap import DatabaseBootstrapper
 from input_arquivos.backend.db.session import get_session_factory
 from input_arquivos.backend.services.container import get_container
@@ -43,6 +45,7 @@ def create_app() -> FastAPI:
     fastapi_app.include_router(upload_router)
     fastapi_app.include_router(users_router)
     fastapi_app.include_router(audit_router)
+    fastapi_app.include_router(system_router)
     fastapi_app.include_router(pages_router)
 
     container = get_container()
@@ -52,3 +55,20 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
+
+
+def start() -> None:
+    """Sobe o servidor Uvicorn usando host/porta/reload de `backend/config.py`.
+
+    Entrypoint do console script `input-arquivos` declarado em
+    `pyproject.toml` (`input_arquivos.main:start`) — antes não existia,
+    deixando o script quebrado.
+    """
+    import uvicorn
+
+    settings = get_settings()
+    uvicorn.run("input_arquivos.main:app", host=settings.host, port=settings.port, reload=settings.reload)
+
+
+if __name__ == "__main__":
+    start()

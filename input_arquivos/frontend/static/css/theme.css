@@ -1,6 +1,6 @@
 /* =====================================================================
    TEMAS DE CORES — SwordPower Web Starter
-   Suporte exclusivo para Corporate (Padrão) e Verde Escuro Neutro
+   Suporte para Corporate (Padrão), Verde Escuro Neutro e Cyber Dark
    ===================================================================== */
 
 /* Theme Corporativo (Neutro — Padrão) */
@@ -72,3 +72,31 @@ body.theme-green-neutral .brand-by-bg circle { fill: var(--primary) !important; 
 body.theme-green-neutral .brand-by-bg rect:last-of-type { fill: var(--text) !important; }
 body.theme-green-neutral .brand-by-bg path:first-of-type { fill: var(--surface-alt) !important; opacity: 1 !important; stroke: var(--border-bright) !important; stroke-width: 1 !important; }
 body.theme-green-neutral .brand-by-bg path:last-of-type { fill: var(--primary-glow) !important; }
+
+/* Theme Cyber Dark (Neon Violet) */
+body.theme-cyber-dark {
+  --bg:              #080914;
+  --surface:         #0f1123;
+  --surface-alt:     #171936;
+  --surface-hover:   #21244d;
+
+  --border:          #282c5e;
+  --border-muted:    #171936;
+  --border-bright:   #404694;
+
+  --primary:         #8b5cf6;
+  --primary-hover:   #a78bfa;
+  --primary-dim:     rgba(139, 92, 246, 0.15);
+  --primary-glow:    rgba(139, 92, 246, 0.25);
+  --glow-ring:       0 0 0 3px rgba(139, 92, 246, 0.25);
+
+  --text:            #f3f4f6;
+  --text-muted:      #9ca3af;
+  --text-subtle:     #6b7280;
+
+  --success:         #06b6d4;
+  --warn:            #f59e0b;
+  --danger:          #ec4899;
+  --danger-dim:      rgba(236, 72, 153, 0.12);
+  --info:            #3b82f6;
+}

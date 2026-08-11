@@ -56,6 +56,10 @@ uv run pytest
 uv run ruff check .
 ```
 
+## Rotas de sistema (paridade com o app_template)
+
+`GET /api/system/health` e `GET /api/system/metrics` (uptime + contagem de usuários/contexts, nunca dados sensíveis), protegidas por `require_admin` como as demais rotas administrativas. Sem `/api/system/logs`: o projeto não usa o módulo `logging` do Python — a rastreabilidade de uploads já é feita de forma persistente via `/admin/audit`.
+
 Os testes cobrem o pipeline de ingestão (Excel/CSV), a conversão Parquet, o CRUD de contexts e a
 lógica de append/create-versionado do writer de SQL Server (esta última validada contra um SQLite
 temporário, já que a lógica de branching é agnóstica de dialeto SQL — particularidades reais do
@@ -118,7 +122,7 @@ validar a integração real com MinIO/SQL Server:
 ## Estrutura de pastas
 
 ```
-app/
+input_arquivos/
 ├── main.py                # cria o FastAPI, monta os arquivos estáticos e inclui as rotas
 ├── backend/                # tudo que não depende de HTML: API, regras de negócio, persistência
 │   ├── config.py            # configurações (variáveis de ambiente/.env)
@@ -128,17 +132,19 @@ app/
 │   ├── ingestion/             # leitores de arquivo, conversão Parquet e orquestração do pipeline
 │   ├── destinations/          # writers de destino (MinIO, SQL Server) + registry
 │   ├── services/               # camada de serviços (contexts, usuários, upload, auth) + container de DI
-│   ├── api/                    # rotas REST (/api/auth, /api/contexts, /api/users, /api/upload(s), /api/audit)
+│   ├── api/                    # rotas REST (/api/auth, /api/contexts, /api/users, /api/upload(s), /api/audit, /api/system)
 │   └── auth/                    # sessão via cookie assinado (session.py) + dependencies do FastAPI
 └── frontend/                # tudo que é servido para o navegador
     ├── web/                    # rotas de página (renderizam os templates Jinja2, sem lógica de negócio)
     ├── templates/               # templates Jinja2 (login, upload, admin/*) + base.html (layout Tailwind)
     └── static/
-        ├── css/                   # estilos que não são triviais de expressar só com Tailwind
+        ├── css/                   # theme.css (corporate/green-neutral/cyber-dark) + estilos não triviais em Tailwind
         └── js/                    # interatividade de cada página (fetch para a API REST)
 tests/                    # testes automatizados (pytest)
 data/                     # SQLite local de configuração (gitignored)
 ```
+
+(o pacote Python real fica em `input_arquivos/input_arquivos/` — a pasta acima — dentro da raiz do projeto `input_arquivos/`, onde vivem `pyproject.toml`/`tests/`/`data/`.)
 
 O `frontend/` só conversa com o `backend/` através da API REST (`/api/*`, chamada via `fetch` pelo
 JS de cada página) — as rotas de página em `frontend/web/` apenas renderizam o HTML esqueleto e não
@@ -153,6 +159,7 @@ acessam serviços/banco diretamente.
   cada context define apenas o bucket a usar nesse mesmo servidor.
 - **SQL Server**: cada context tem sua própria connection string, podendo apontar para bancos ou
   servidores diferentes.
-- **Autenticação**: sessão via cookie assinado (`SESSION_SECRET`, ver `app/backend/auth/session.py`), tanto
+- **Autenticação**: sessão via cookie assinado (`SESSION_SECRET`, ver `backend/auth/session.py`), tanto
   para as páginas quanto para a API REST — toda rota sob `/api/*` (exceto `/api/auth/login`) exige
   login, e as rotas administrativas exigem papel `admin`.
+- **Tema**: `corporate` (padrão), `green-neutral` e `cyber-dark`, trocáveis pelo modal de Configurações — mesmo sistema de tokens CSS usado nos demais projetos SwordPower.

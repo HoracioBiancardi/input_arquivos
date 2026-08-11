@@ -2,7 +2,7 @@
 
 const THEME_KEY = 'app-theme';
 const AUTOLOCK_KEY = 'app-autolock-minutes';
-const VALID_THEMES = new Set(['corporate', 'green-neutral']);
+const VALID_THEMES = new Set(['corporate', 'green-neutral', 'cyber-dark']);
 
 function getTheme() {
   const saved = localStorage.getItem(THEME_KEY);

@@ -74,10 +74,12 @@
     <div class="topbar-right">
       <span id="conn-badge" class="conn-badge online">online</span>
       <span class="text-xs text-muted hidden md:inline-block">Olá, {{ current_user.username }}</span>
-      
+
       {% if current_user.role == "admin" %}
       <a href="/admin" class="btn btn-ghost btn-sm">Admin</a>
       {% endif %}
+
+      <a href="/" class="btn btn-ghost btn-sm">Update</a>
 
       <button type="button" class="btn btn-ghost btn-sm" onclick="openSettingsModal()" title="Configurações">⚙️ Configurações</button>
       <button type="button" id="logout-button" class="btn btn-ghost btn-sm" title="Sair da Sessão">Sair</button>
@@ -104,6 +106,7 @@
           <select id="settings-theme" class="form-input" onchange="changeTheme(this.value)">
             <option value="corporate">Corporativo (Padrão)</option>
             <option value="green-neutral">Verde Escuro Neutro</option>
+            <option value="cyber-dark">Cyber Dark (Neon Violeta)</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0">
