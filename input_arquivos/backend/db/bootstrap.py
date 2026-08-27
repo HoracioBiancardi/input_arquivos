@@ -66,5 +66,6 @@ class DatabaseBootstrapper:
                 password_hash=self._auth_service.hash_password(settings.admin_bootstrap_password),
                 role=UserRole.ADMIN,
                 active=True,
+                must_change_password=True,
             )
             db_session.add(admin_user)

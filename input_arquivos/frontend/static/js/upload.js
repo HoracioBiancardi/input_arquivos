@@ -104,7 +104,7 @@ async function loadContexts() {
       contextsByName[context.name] = context;
     });
 
-    contextSelect.innerHTML = data.contexts.map((context) => `<option value="${context.name}">${context.name}</option>`).join("");
+    contextSelect.innerHTML = data.contexts.map((context) => `<option value="${esc(context.name)}">${esc(context.name)}</option>`).join("");
     if (data.last_context_name) {
       contextSelect.value = data.last_context_name;
     }
@@ -143,11 +143,11 @@ async function loadHistory() {
       .map(
         (item) => `
         <tr class="border-b border-black/5 dark:border-white/10 last:border-0">
-          <td class="px-4 py-2 font-mono font-bold">${item.filename}</td>
-          <td class="px-4 py-2">${item.context_name}</td>
-          <td class="px-4 py-2">${item.destination_detail || "-"}</td>
+          <td class="px-4 py-2 font-mono font-bold">${esc(item.filename)}</td>
+          <td class="px-4 py-2">${esc(item.context_name)}</td>
+          <td class="px-4 py-2">${esc(item.destination_detail) || "-"}</td>
           <td class="px-4 py-2 text-center">${statusBadge(item.status)}</td>
-          <td class="px-4 py-2">${item.uploaded_by}</td>
+          <td class="px-4 py-2">${esc(item.uploaded_by)}</td>
           <td class="px-4 py-2">${formatDate(item.created_at)}</td>
           <td class="px-4 py-2 text-right">${viewTableAction(item)}</td>
         </tr>`

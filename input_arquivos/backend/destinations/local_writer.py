@@ -34,9 +34,13 @@ class LocalFileWriter(DestinationWriter):
         Returns:
             Resultado da escrita, contendo o caminho absoluto do arquivo criado.
         """
-        root_path = context.local_path or "."
+        root_path = Path(context.local_path or ".").resolve()
         relative_key = self._key_builder.build(context.name, artifact.suggested_filename)
-        destination_path = Path(root_path, *relative_key.split("/")).resolve()
+        destination_path = (root_path / relative_key).resolve()
+        if destination_path != root_path and root_path not in destination_path.parents:
+            raise ValueError(
+                f"Caminho de destino '{destination_path}' escapa da pasta local configurada '{root_path}'."
+            )
         destination_path.parent.mkdir(parents=True, exist_ok=True)
         destination_path.write_bytes(artifact.artifact_bytes)
 

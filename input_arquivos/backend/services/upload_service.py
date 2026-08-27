@@ -284,21 +284,25 @@ class UploadService:
             db_session.expunge(history)
         return history
 
-    def list_recent(self, limit: int = 20) -> list[UploadHistory]:
+    def list_recent(self, limit: int = 20, allowed_context_names: set[str] | None = None) -> list[UploadHistory]:
         """Lista os uploads mais recentes, para exibição na tela principal.
 
         Args:
             limit: Quantidade máxima de registros a retornar.
+            allowed_context_names: Nomes de contexts que o usuário autenticado
+                pode acessar. Se informado (usuários comuns), a listagem é
+                restrita a uploads desses contexts. `None` (admins) lista de
+                todos os contexts.
 
         Returns:
             Lista de `UploadHistory` ordenada do mais recente para o mais antigo.
         """
+        query = select(UploadHistory)
+        if allowed_context_names is not None:
+            query = query.where(UploadHistory.context_name.in_(allowed_context_names))
+        query = query.order_by(UploadHistory.created_at.desc()).limit(limit)
         with self._session_factory.session() as db_session:
-            return list(
-                db_session.execute(
-                    select(UploadHistory).order_by(UploadHistory.created_at.desc()).limit(limit)
-                ).scalars().all()
-            )
+            return list(db_session.execute(query).scalars().all())
 
     def list_filtered(
         self,

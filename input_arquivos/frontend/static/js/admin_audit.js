@@ -13,7 +13,7 @@ async function loadContextOptions() {
   const contexts = await apiFetch("/api/contexts");
   select.innerHTML =
     '<option value="">Todos</option>' +
-    contexts.map((context) => `<option value="${context.name}">${context.name}</option>`).join("");
+    contexts.map((context) => `<option value="${esc(context.name)}">${esc(context.name)}</option>`).join("");
 }
 
 async function applyFilters() {
@@ -33,15 +33,15 @@ async function applyFilters() {
     .map(
       (item) => `
       <tr class="border-b border-black/5 dark:border-white/10 last:border-0">
-        <td class="px-4 py-2">${item.filename}</td>
-        <td class="px-4 py-2">${item.context_name}</td>
-        <td class="px-4 py-2">${item.destination_detail || "-"}</td>
-        <td class="px-4 py-2">${item.write_mode || "-"}</td>
+        <td class="px-4 py-2">${esc(item.filename)}</td>
+        <td class="px-4 py-2">${esc(item.context_name)}</td>
+        <td class="px-4 py-2">${esc(item.destination_detail) || "-"}</td>
+        <td class="px-4 py-2">${esc(item.write_mode) || "-"}</td>
         <td class="px-4 py-2 text-center">${statusBadge(item.status)}</td>
         <td class="px-4 py-2 text-right">${item.row_count ?? "-"}</td>
-        <td class="px-4 py-2">${item.uploaded_by}</td>
+        <td class="px-4 py-2">${esc(item.uploaded_by)}</td>
         <td class="px-4 py-2">${formatDate(item.created_at)}</td>
-        <td class="px-4 py-2">${item.error_message || "-"}</td>
+        <td class="px-4 py-2">${esc(item.error_message) || "-"}</td>
       </tr>`
     )
     .join("");

@@ -114,8 +114,8 @@ async function loadContexts() {
     .map(
       (context) => `
       <tr class="border-b border-slate-700/30 last:border-0 cursor-pointer" data-id="${context.id}">
-        <td class="px-4 py-2 font-medium">${context.name}</td>
-        <td class="px-4 py-2">${context.destination_summary}</td>
+        <td class="px-4 py-2 font-medium">${esc(context.name)}</td>
+        <td class="px-4 py-2">${esc(context.destination_summary)}</td>
         <td class="px-4 py-2">${context.allowed_file_types.split(",").map((t) => FILE_TYPE_LABELS[t] || t).join(", ")}</td>
         <td class="px-4 py-2">${PDF_MODE_LABELS[context.pdf_mode] || context.pdf_mode}</td>
         <td class="px-4 py-2">${IMAGE_MODE_LABELS[context.image_mode] || context.image_mode}</td>

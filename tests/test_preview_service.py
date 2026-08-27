@@ -20,7 +20,12 @@ from input_arquivos.backend.ingestion.pipeline import IngestResult
 from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, PdfMode, WriteMode
 from input_arquivos.backend.models.upload_history import UploadHistory, UploadStatus
 from input_arquivos.backend.services.context_service import ContextService
-from input_arquivos.backend.services.preview_service import PreviewNotAvailableError, PreviewService, UploadNotFoundError
+from input_arquivos.backend.services.preview_service import (
+    PreviewNotAvailableError,
+    PreviewService,
+    UploadAccessDeniedError,
+    UploadNotFoundError,
+)
 
 
 def _make_artifact(dataframe: pd.DataFrame) -> IngestResult:
@@ -134,3 +139,34 @@ def test_get_preview_raises_when_upload_not_found(session_factory: DatabaseSessi
     """Um id inexistente deve levantar `UploadNotFoundError`."""
     with pytest.raises(UploadNotFoundError):
         PreviewService(session_factory, ContextService(session_factory)).get_preview(999)
+
+
+def test_get_preview_denies_access_to_context_outside_allowed_set(
+    session_factory: DatabaseSessionFactory, tmp_path: Path
+) -> None:
+    """Um usuário sem acesso ao context do upload não deve conseguir ver o preview (IDOR).
+
+    Antes da correção, `get_preview` não recebia nenhuma informação sobre
+    quem estava pedindo o preview — qualquer usuário autenticado conseguia
+    ler dados de qualquer context só iterando `upload_id`.
+    """
+    dataframe = pd.DataFrame({"produto": ["A"], "valor": [1]})
+    context = Context(
+        id=1, name="vendas", destination_type=DestinationType.LOCAL, local_path=str(tmp_path),
+        default_write_mode=WriteMode.APPEND, pdf_mode=PdfMode.METADATA_ONLY, image_mode=ImageMode.RAW_ARCHIVE,
+        active=True,
+    )
+    write_result = LocalFileWriter().write(_make_artifact(dataframe), context, None)
+    history = _add_history(
+        session_factory, destination_type=DestinationType.LOCAL,
+        destination_detail=write_result.destination_detail, row_count=1,
+    )
+
+    service = PreviewService(session_factory, ContextService(session_factory))
+
+    with pytest.raises(UploadAccessDeniedError):
+        service.get_preview(history.id, allowed_context_names={"outro-contexto"})
+
+    # Com o context correto no conjunto permitido, o preview funciona normalmente.
+    preview = service.get_preview(history.id, allowed_context_names={"vendas"})
+    assert preview.columns == ["produto", "valor"]

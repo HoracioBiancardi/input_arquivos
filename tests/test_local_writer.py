@@ -44,6 +44,31 @@ def test_write_saves_parquet_artifact_under_local_path(tmp_path: Path) -> None:
     assert result.row_count == 1
 
 
+def test_write_rejects_filename_that_would_escape_local_path(tmp_path: Path) -> None:
+    """Um `suggested_filename` malicioso não deve conseguir escrever fora da pasta configurada.
+
+    Mesmo que `PartitionedKeyBuilder` já sanitize o filename, este teste
+    cobre a checagem de contenção do próprio writer (defesa em profundidade):
+    se, por algum motivo, a chave resultante ainda apontasse para fora de
+    `local_path`, a escrita deve falhar em vez de silenciosamente escrever
+    em outra pasta do disco.
+    """
+    context = _make_context(str(tmp_path / "sandbox"))
+    artifact = IngestResult(
+        artifact_bytes=b"conteudo",
+        artifact_kind="parquet",
+        dataframe=pd.DataFrame({"a": [1]}),
+        row_count=1,
+        page_count=None,
+        suggested_filename="../../evil.parquet",
+    )
+
+    result = LocalFileWriter().write(artifact, context, write_mode=None)
+
+    written_path = Path(result.destination_detail)
+    assert written_path.is_relative_to((tmp_path / "sandbox").resolve())
+
+
 def test_write_defaults_to_current_directory_when_local_path_missing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

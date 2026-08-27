@@ -21,7 +21,10 @@ class SessionUserResponse(BaseModel):
     Attributes:
         username: Nome do usuário autenticado.
         role: Papel do usuário ("admin" ou "user").
+        must_change_password: Se a conta ainda está com a senha padrão do
+            bootstrap e deveria trocá-la.
     """
 
     username: str
     role: str
+    must_change_password: bool = False

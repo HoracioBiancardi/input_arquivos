@@ -12,6 +12,7 @@ wheels/
 # Configuração local e segredos
 .env
 data/*.db
+data/.session_secret
 
 # Ferramentas
 .ruff_cache/

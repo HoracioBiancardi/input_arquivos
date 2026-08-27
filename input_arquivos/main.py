@@ -24,7 +24,13 @@ def create_app() -> FastAPI:
     Returns:
         Instância do FastAPI pronta para ser servida pelo Uvicorn.
     """
-    fastapi_app = FastAPI(title="Sistema de Ingestão de Arquivos")
+    settings = get_settings()
+    fastapi_app = FastAPI(
+        title="Sistema de Ingestão de Arquivos",
+        docs_url="/docs" if settings.debug else None,
+        redoc_url="/redoc" if settings.debug else None,
+        openapi_url="/openapi.json" if settings.debug else None,
+    )
     fastapi_app.mount("/static", StaticFiles(directory="input_arquivos/frontend/static"), name="static")
 
     @fastapi_app.exception_handler(IntegrityError)

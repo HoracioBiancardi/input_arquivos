@@ -24,21 +24,24 @@ def login(payload: LoginRequest, response: Response) -> SessionUserResponse:
         Dados básicos do usuário autenticado.
 
     Raises:
-        HTTPException: 401 se usuário/senha forem inválidos, ou 423 se a
-            conta estiver temporariamente bloqueada por tentativas erradas.
+        HTTPException: 401 se usuário/senha forem inválidos, ou se a conta
+            estiver temporariamente bloqueada por tentativas erradas — mesmo
+            status nos dois casos (a mensagem ainda diferencia, mas usar
+            status codes diferentes permitiria enumerar usernames válidos só
+            observando qual devolve 423 depois de várias tentativas).
     """
     try:
         user = get_container().auth_service.authenticate(payload.username, payload.password)
     except AccountLockedError as error:
         minutes = max(1, error.retry_after_seconds // 60)
         raise HTTPException(
-            status_code=status.HTTP_423_LOCKED,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Conta bloqueada temporariamente por excesso de tentativas. Tente novamente em {minutes} minuto(s).",
         ) from error
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário ou senha inválidos.")
     _session_cookie.issue(response, SessionUser(user_id=user.id, username=user.username, role=user.role.value))
-    return SessionUserResponse(username=user.username, role=user.role.value)
+    return SessionUserResponse(username=user.username, role=user.role.value, must_change_password=user.must_change_password)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -61,4 +64,4 @@ def me(user: SessionUser = Depends(require_login)) -> SessionUserResponse:
     Returns:
         Dados básicos do usuário autenticado.
     """
-    return SessionUserResponse(username=user.username, role=user.role)
+    return SessionUserResponse(username=user.username, role=user.role, must_change_password=user.must_change_password)

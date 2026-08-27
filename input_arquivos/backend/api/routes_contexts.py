@@ -71,9 +71,14 @@ def _to_response(context: Context) -> ContextResponse:
     return response
 
 
-@router.get("", response_model=list[ContextResponse], dependencies=[Depends(require_login)])
+@router.get("", response_model=list[ContextResponse], dependencies=[Depends(require_admin)])
 def list_contexts(active_only: bool = False) -> list[ContextResponse]:
-    """Lista os contexts cadastrados.
+    """Lista os contexts cadastrados, incluindo dados sensíveis (ex.: `db_connection_string`).
+
+    Restrito a admins: `ContextResponse` inclui a connection string do
+    banco de destino em texto puro, que não deve ser exposta a usuários
+    comuns. Usuários comuns usam `/api/contexts/me/accessible`, que retorna
+    apenas os campos necessários para a tela de upload.
 
     Args:
         active_only: Se `True`, retorna apenas os contexts ativos.

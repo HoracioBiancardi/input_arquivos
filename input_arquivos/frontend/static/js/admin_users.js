@@ -15,8 +15,8 @@ async function loadUsers() {
     .map(
       (user) => `
       <tr class="border-b border-slate-700/30 last:border-0 cursor-pointer" data-id="${user.id}">
-        <td class="px-4 py-2 font-medium">${user.username}</td>
-        <td class="px-4 py-2">${user.role}</td>
+        <td class="px-4 py-2 font-medium">${esc(user.username)}</td>
+        <td class="px-4 py-2">${esc(user.role)}</td>
         <td class="px-4 py-2 text-center">${statusBadge(user.active)}</td>
       </tr>`
     )
@@ -86,7 +86,7 @@ async function openManageModal(userId) {
       (context) => `
       <label class="flex items-center gap-2">
         <input type="checkbox" class="manage-context-checkbox" value="${context.id}" ${assignedIds.has(context.id) ? "checked" : ""}>
-        ${context.name}
+        ${esc(context.name)}
       </label>`
     )
     .join("");

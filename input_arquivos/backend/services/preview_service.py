@@ -17,6 +17,10 @@ class UploadNotFoundError(ValueError):
     """Erro levantado quando o `UploadHistory` informado não existe."""
 
 
+class UploadAccessDeniedError(ValueError):
+    """Erro levantado quando o usuário autenticado não tem acesso ao contexto deste upload."""
+
+
 class PreviewNotAvailableError(ValueError):
     """Erro levantado quando o upload não gerou uma tabela para visualizar."""
 
@@ -58,23 +62,33 @@ class PreviewService:
         self._session_factory = session_factory
         self._context_service = context_service
 
-    def get_preview(self, upload_id: int, limit: int = 200) -> TablePreview:
+    def get_preview(
+        self, upload_id: int, limit: int = 200, allowed_context_names: set[str] | None = None
+    ) -> TablePreview:
         """Monta um recorte da tabela gerada por um upload.
 
         Args:
             upload_id: Identificador do `UploadHistory`.
             limit: Quantidade máxima de linhas a retornar.
+            allowed_context_names: Nomes de contexts que o usuário autenticado
+                pode acessar. Se informado (usuários comuns) e o context do
+                upload não estiver nesse conjunto, o acesso é negado. `None`
+                (admins) não restringe por context.
 
         Returns:
             Recorte da tabela, pronto para serialização.
 
         Raises:
             UploadNotFoundError: Se não existir um `UploadHistory` com esse id.
+            UploadAccessDeniedError: Se `allowed_context_names` for informado
+                e não incluir o context deste upload.
             PreviewNotAvailableError: Se o upload não tiver sido bem-sucedido,
                 ou não tiver gerado uma tabela (ex.: PDF/imagem em modo
                 raw_archive).
         """
         history = self._get_history(upload_id)
+        if allowed_context_names is not None and history.context_name not in allowed_context_names:
+            raise UploadAccessDeniedError(f"Upload '{upload_id}' não encontrado.")
         if history.status != UploadStatus.SUCCESS or history.artifact_kind != "parquet":
             raise PreviewNotAvailableError("Este envio não gerou uma tabela para visualizar.")
 

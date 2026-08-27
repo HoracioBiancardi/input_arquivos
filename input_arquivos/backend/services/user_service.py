@@ -90,6 +90,10 @@ class UserService:
     def reset_password(self, user_id: int, new_plain_password: str) -> None:
         """Redefine a senha de um usuário existente.
 
+        Também zera `must_change_password`: se a conta estava marcada como
+        usando a senha padrão do bootstrap, essa marca deixa de fazer
+        sentido assim que uma senha nova é definida.
+
         Args:
             user_id: Identificador do usuário.
             new_plain_password: Nova senha em texto puro.
@@ -98,6 +102,7 @@ class UserService:
             user = db_session.get(User, user_id)
             if user is not None:
                 user.password_hash = self._auth_service.hash_password(new_plain_password)
+                user.must_change_password = False
 
     def set_active(self, user_id: int, active: bool) -> None:
         """Ativa ou desativa a conta de um usuário.

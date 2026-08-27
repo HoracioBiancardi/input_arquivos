@@ -88,6 +88,17 @@
   {% endif %}
   {% endblock %}
 
+  {% if current_user and current_user.must_change_password %}
+  <div class="toast warn" style="position:static;margin:0.75rem auto;max-width:64rem" role="alert">
+    ⚠️ Esta conta ainda usa a senha padrão gerada na instalação.
+    {% if current_user.role == "admin" %}
+      Troque-a em <a href="/admin/users" style="text-decoration:underline">Admin → Usuários</a> assim que possível.
+    {% else %}
+      Peça a um administrador para trocá-la.
+    {% endif %}
+  </div>
+  {% endif %}
+
   <!-- Conteúdo Principal -->
   <main class="app-layout">
     {% block content %}{% endblock %}

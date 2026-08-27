@@ -35,6 +35,9 @@ class User(Base):
             desbloqueio). Zerado a cada autenticação bem-sucedida.
         locked_until: Se preenchido e no futuro, a conta está temporariamente
             bloqueada para login (mesmo com a senha correta) até essa data/hora.
+        must_change_password: Se `True`, a senha atual é a senha padrão gerada
+            no bootstrap (ou foi marcada assim por um admin) e deve ser trocada.
+            Zerado automaticamente da próxima vez que a senha for redefinida.
     """
 
     __tablename__ = "users"
@@ -48,3 +51,4 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     failed_login_attempts: Mapped[int] = mapped_column(default=0)
     locked_until: Mapped[datetime | None] = mapped_column(default=None)
+    must_change_password: Mapped[bool] = mapped_column(default=False)

@@ -31,6 +31,14 @@ class Settings(BaseSettings):
         host: Endereço de bind do servidor Uvicorn.
         port: Porta de bind do servidor Uvicorn.
         reload: Se o Uvicorn deve recarregar automaticamente em mudanças de código.
+        debug: Se `True`, habilita `/docs`, `/redoc` e `/openapi.json`. Deve
+            ficar `False` em qualquer ambiente acessível pela rede.
+        max_upload_size_bytes: Tamanho máximo aceito para um arquivo enviado,
+            em bytes. Uploads maiores são rejeitados antes da leitura do
+            conteúdo, para evitar exaustão de memória.
+        session_cookie_secure: Se `True`, o cookie de sessão só é enviado pelo
+            navegador em conexões HTTPS. Deve ficar `True` sempre que a
+            aplicação estiver atrás de TLS (direto ou via proxy reverso).
     """
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -49,6 +57,9 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8080
     reload: bool = False
+    debug: bool = False
+    max_upload_size_bytes: int = 200 * 1024 * 1024
+    session_cookie_secure: bool = False
 
 
 @lru_cache
