@@ -23,11 +23,13 @@ def client(tmp_path, monkeypatch):
 
     from input_arquivos.backend import config as config_module
     from input_arquivos.backend.db import session as session_module
+    from input_arquivos.backend.security import secret_box
     from input_arquivos.backend.services import container as container_module
 
     config_module.get_settings.cache_clear()
     session_module._factory = None
     container_module._container = None
+    secret_box.reset_for_testing()
 
     import input_arquivos.main as main_module
     importlib.reload(main_module)
@@ -38,6 +40,7 @@ def client(tmp_path, monkeypatch):
     config_module.get_settings.cache_clear()
     session_module._factory = None
     container_module._container = None
+    secret_box.reset_for_testing()
 
 
 def _login_as_admin(client: TestClient) -> None:

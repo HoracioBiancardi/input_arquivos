@@ -6,8 +6,8 @@ from pathlib import Path
 from minio import Minio
 from sqlalchemy import create_engine, select, text
 
-from input_arquivos.backend.config import get_settings
 from input_arquivos.backend.db.session import DatabaseSessionFactory
+from input_arquivos.backend.destinations.minio_client import build_minio_client
 from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, PdfMode, WriteMode
 
 
@@ -192,8 +192,8 @@ class ContextService:
         """Testa a conectividade com um bucket no servidor MinIO configurado globalmente.
 
         O endpoint e as credenciais do MinIO são compartilhados por todos os
-        contexts (vêm das configurações da aplicação); apenas o bucket varia
-        por context.
+        contexts (config salva via admin em `/admin/settings`, com fallback
+        pro `.env`); apenas o bucket varia por context.
 
         Args:
             bucket: Nome do bucket a verificar/criar.
@@ -201,18 +201,36 @@ class ContextService:
         Returns:
             Resultado do teste de conectividade.
         """
-        settings = get_settings()
         try:
-            client = Minio(
-                settings.minio_endpoint,
-                access_key=settings.minio_access_key,
-                secret_key=settings.minio_secret_key,
-                secure=settings.minio_secure,
-            )
+            client = build_minio_client()
             if not client.bucket_exists(bucket):
                 client.make_bucket(bucket)
                 return ConnectionTestResult(True, f"Conectado com sucesso. Bucket '{bucket}' criado.")
             return ConnectionTestResult(True, f"Conectado com sucesso. Bucket '{bucket}' já existe.")
+        except Exception as error:  # noqa: BLE001 - erro de conectividade externo, reportado ao usuário
+            return ConnectionTestResult(False, f"Falha ao conectar no MinIO: {error}")
+
+    def test_minio_config(self, endpoint: str, access_key: str, secret_key: str, secure: bool) -> ConnectionTestResult:
+        """Testa conectividade com valores de endpoint/credenciais ainda não salvos (tela de configurações).
+
+        Diferente de `test_minio_connection`, que testa um bucket contra a
+        configuração já ativa, este método testa os valores que o admin
+        acabou de digitar no formulário, antes de confirmar o salvamento.
+
+        Args:
+            endpoint: Endereço (host:porta) do servidor MinIO a testar.
+            access_key: Chave de acesso a testar.
+            secret_key: Chave secreta a testar.
+            secure: Se a conexão deve usar HTTPS.
+
+        Returns:
+            Resultado do teste de conectividade (lista os buckets visíveis
+            com essas credenciais, sem criar/alterar nada).
+        """
+        try:
+            client = Minio(endpoint, access_key=access_key, secret_key=secret_key, secure=secure)
+            buckets = client.list_buckets()
+            return ConnectionTestResult(True, f"Conectado com sucesso. {len(buckets)} bucket(s) visível(is).")
         except Exception as error:  # noqa: BLE001 - erro de conectividade externo, reportado ao usuário
             return ConnectionTestResult(False, f"Falha ao conectar no MinIO: {error}")
 

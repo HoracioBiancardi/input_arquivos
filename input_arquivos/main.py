@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from input_arquivos.backend.api.routes_audit import router as audit_router
 from input_arquivos.backend.api.routes_auth import router as auth_router
 from input_arquivos.backend.api.routes_contexts import router as contexts_router
+from input_arquivos.backend.api.routes_settings import router as settings_router
 from input_arquivos.backend.api.routes_system import router as system_router
 from input_arquivos.backend.api.routes_upload import router as upload_router
 from input_arquivos.backend.api.routes_users import router as users_router
@@ -52,6 +53,7 @@ def create_app() -> FastAPI:
     fastapi_app.include_router(users_router)
     fastapi_app.include_router(audit_router)
     fastapi_app.include_router(system_router)
+    fastapi_app.include_router(settings_router)
     fastapi_app.include_router(pages_router)
 
     container = get_container()

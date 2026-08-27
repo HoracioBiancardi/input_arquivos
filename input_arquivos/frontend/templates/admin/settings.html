@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Configurações • Ingestão de Arquivos{% endblock %}
+
+{% block content %}
+<div class="w-full flex-1 flex flex-col items-center gap-6 p-6">
+  <div class="w-full max-w-2xl flex flex-col gap-4">
+
+    <div>
+      <h1 class="text-xl font-bold" style="color: var(--text);">Configurações do Sistema</h1>
+      <p class="text-xs" style="color: var(--text-muted);">Endpoint e credenciais globais do MinIO, cifrados em repouso — usados por todos os contextos do tipo MinIO</p>
+    </div>
+
+    <div class="modal glass surface-card shadow-xl flex flex-col gap-4 p-6" style="max-width:100%; border-radius: var(--r-lg);">
+      <div class="flex items-center gap-2">
+        <span class="text-xs" style="color: var(--text-muted);">Origem atual:</span>
+        <span id="minio-source-badge" class="status-badge status-badge--muted">—</span>
+      </div>
+
+      <form id="minio-settings-form" class="flex flex-col gap-4">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="minio-endpoint">Endpoint (host:porta)</label>
+          <input id="minio-endpoint" required class="form-input" placeholder="minio.exemplo.com:9000">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="minio-access-key">Access Key</label>
+          <input id="minio-access-key" required class="form-input">
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="minio-secret-key">Secret Key</label>
+          <input id="minio-secret-key" type="password" class="form-input" placeholder="">
+          <p id="minio-secret-hint" class="form-hint"></p>
+        </div>
+
+        <label class="flex items-center gap-2 text-xs cursor-pointer" style="color: var(--text);">
+          <input type="checkbox" id="minio-secure" class="accent-indigo-500"> Usar HTTPS
+        </label>
+
+        <div class="flex items-center gap-3">
+          <button type="button" id="minio-test-button" class="btn btn-ghost btn-sm">Testar conexão</button>
+          <p id="minio-test-result" class="text-xs"></p>
+        </div>
+
+        <div class="modal-footer" style="padding-top:0">
+          <button type="button" id="minio-clear-button" class="btn btn-ghost">Voltar a usar o .env</button>
+          <button type="submit" class="btn btn-primary">Salvar Configuração</button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/admin_settings.js"></script>
+{% endblock %}

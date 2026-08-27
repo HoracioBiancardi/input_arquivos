@@ -109,6 +109,22 @@ def admin_users_page(request: Request, user: SessionUser | RedirectResponse = De
     return templates.TemplateResponse(request, "admin/users.html", {"current_user": user})
 
 
+@router.get("/admin/settings", response_class=HTMLResponse)
+def admin_settings_page(request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)):
+    """Renderiza a página administrativa de configuração global do MinIO.
+
+    Args:
+        request: Requisição HTTP recebida.
+        user: Usuário autenticado como admin, ou um redirect se não for o caso.
+
+    Returns:
+        Página de configurações renderizada, ou o redirect resolvido pela dependency.
+    """
+    if isinstance(user, RedirectResponse):
+        return user
+    return templates.TemplateResponse(request, "admin/settings.html", {"current_user": user})
+
+
 @router.get("/admin/audit", response_class=HTMLResponse)
 def admin_audit_page(request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)):
     """Renderiza a página administrativa de audit log.

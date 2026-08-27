@@ -13,6 +13,7 @@ wheels/
 .env
 data/*.db
 data/.session_secret
+data/.config_encryption_key
 
 # Ferramentas
 .ruff_cache/

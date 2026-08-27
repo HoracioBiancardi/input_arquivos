@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "bcrypt<4.1",
     "beautifulsoup4>=4.15.0",
+    "cryptography>=44.0.0",
     "fastapi>=0.139.2",
     "html5lib>=1.1",
     "img2table[rapidocr]>=1.4.5",

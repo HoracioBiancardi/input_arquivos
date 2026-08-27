@@ -473,6 +473,7 @@ source = { editable = "." }
 dependencies = [
     { name = "bcrypt" },
     { name = "beautifulsoup4" },
+    { name = "cryptography" },
     { name = "fastapi" },
     { name = "html5lib" },
     { name = "img2table", extra = ["rapidocr"] },
@@ -507,6 +508,7 @@ dev = [
 requires-dist = [
     { name = "bcrypt", specifier = "<4.1" },
     { name = "beautifulsoup4", specifier = ">=4.15.0" },
+    { name = "cryptography", specifier = ">=44.0.0" },
     { name = "fastapi", specifier = ">=0.139.2" },
     { name = "html5lib", specifier = ">=1.1" },
     { name = "img2table", extras = ["rapidocr"], specifier = ">=1.4.5" },

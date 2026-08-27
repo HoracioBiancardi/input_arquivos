@@ -8,6 +8,7 @@ from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from input_arquivos.backend.models.base import Base
+from input_arquivos.backend.models.encrypted_string import EncryptedString
 
 
 class DestinationType(str, enum.Enum):
@@ -61,7 +62,11 @@ class Context(Base):
         destination_type: Tipo de destino (MinIO, SQL Server ou pasta local).
         minio_bucket: Nome do bucket MinIO, quando `destination_type` é MINIO.
         db_connection_string: URL de conexão SQLAlchemy do banco de destino,
-            quando `destination_type` é SQLSERVER.
+            quando `destination_type` é SQLSERVER. Cifrada em repouso (ver
+            `EncryptedString`) — a senha do banco costuma estar embutida na
+            URL. Leitura/escrita continuam transparentes em texto puro para
+            o resto do código; só o valor gravado em `data/app_config.db`
+            é que fica cifrado.
         db_schema: Schema da tabela de destino no banco de dados.
         db_table: Nome da tabela de destino no banco de dados.
         local_path: Pasta no disco local onde os artefatos são salvos, quando
@@ -94,7 +99,7 @@ class Context(Base):
     name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     destination_type: Mapped[DestinationType] = mapped_column(SqlEnum(DestinationType))
     minio_bucket: Mapped[str | None] = mapped_column(String(255), default=None)
-    db_connection_string: Mapped[str | None] = mapped_column(String(1000), default=None)
+    db_connection_string: Mapped[str | None] = mapped_column(EncryptedString(2000), default=None)
     db_schema_name: Mapped[str] = mapped_column(String(100), default="dbo")
     db_table: Mapped[str | None] = mapped_column(String(255), default=None)
     local_path: Mapped[str | None] = mapped_column(String(500), default=None)

@@ -37,11 +37,13 @@ def _reset_app_state(tmp_path, monkeypatch, extra_env: dict[str, str] | None = N
 
     from input_arquivos.backend import config as config_module
     from input_arquivos.backend.db import session as session_module
+    from input_arquivos.backend.security import secret_box
     from input_arquivos.backend.services import container as container_module
 
     config_module.get_settings.cache_clear()
     session_module._factory = None
     container_module._container = None
+    secret_box.reset_for_testing()
 
     import input_arquivos.main as main_module
 
@@ -58,11 +60,13 @@ def client(tmp_path, monkeypatch):
 
     from input_arquivos.backend import config as config_module
     from input_arquivos.backend.db import session as session_module
+    from input_arquivos.backend.security import secret_box
     from input_arquivos.backend.services import container as container_module
 
     config_module.get_settings.cache_clear()
     session_module._factory = None
     container_module._container = None
+    secret_box.reset_for_testing()
 
 
 def _login(client: TestClient, username: str, password: str) -> None:
@@ -304,6 +308,65 @@ def test_must_change_password_clears_after_password_reset(client: TestClient) ->
 
 
 # ── #12: status code unificado no lockout de login ───────────────────────
+
+
+# ── Configuração global do MinIO (/api/settings/minio) ───────────────────
+
+
+def test_minio_settings_require_admin(client: TestClient) -> None:
+    """Configuração do MinIO (endpoint/credenciais) deve ser admin-only."""
+    _login(client, "admin", "admin123")
+    _create_user(client, "maria", "senhaforte123")
+
+    with TestClient(client.app) as user_client:
+        _login(user_client, "maria", "senhaforte123")
+        assert user_client.get("/api/settings/minio").status_code == 403
+        assert user_client.put(
+            "/api/settings/minio",
+            json={"endpoint": "x:9000", "access_key": "a", "secret_key": "b", "secure": False},
+        ).status_code == 403
+
+
+def test_minio_settings_default_to_env_source(client: TestClient) -> None:
+    """Sem nada salvo via admin, a config exibida deve indicar origem 'env'."""
+    _login(client, "admin", "admin123")
+    response = client.get("/api/settings/minio")
+    assert response.status_code == 200
+    assert response.json()["source"] == "env"
+
+
+def test_minio_settings_update_never_returns_secret_key(client: TestClient) -> None:
+    """Salvar a configuração do MinIO deve confirmar sem nunca ecoar a chave secreta em texto puro."""
+    _login(client, "admin", "admin123")
+
+    response = client.put(
+        "/api/settings/minio",
+        json={"endpoint": "minio.interno:9000", "access_key": "chave-acesso", "secret_key": "chave-secreta", "secure": True},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source"] == "admin"
+    assert data["secret_key_configured"] is True
+    assert "chave-secreta" not in response.text
+
+    # GET subsequente também não deve expor a chave.
+    get_response = client.get("/api/settings/minio")
+    assert "chave-secreta" not in get_response.text
+
+
+def test_minio_settings_clear_reverts_to_env(client: TestClient) -> None:
+    """Remover a configuração salva deve voltar a mostrar origem 'env'."""
+    _login(client, "admin", "admin123")
+    client.put(
+        "/api/settings/minio",
+        json={"endpoint": "minio.interno:9000", "access_key": "chave-acesso", "secret_key": "chave-secreta", "secure": False},
+    )
+
+    delete_response = client.delete("/api/settings/minio")
+    assert delete_response.status_code == 204
+
+    get_response = client.get("/api/settings/minio")
+    assert get_response.json()["source"] == "env"
 
 
 def test_locked_account_returns_same_status_as_invalid_credentials(client: TestClient) -> None:

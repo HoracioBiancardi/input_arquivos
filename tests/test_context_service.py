@@ -1,9 +1,11 @@
 """Testes do CRUD de contexts, contra o banco de configuração local (SQLite temporário)."""
 
 import pytest
+from sqlalchemy import text
 
 from input_arquivos.backend.db.session import DatabaseSessionFactory
 from input_arquivos.backend.models.context import DestinationType, PdfMode, WriteMode
+from input_arquivos.backend.security import secret_box
 from input_arquivos.backend.services.context_service import ContextService, DuplicateNameError
 
 
@@ -24,6 +26,41 @@ def test_create_and_get_by_name(session_factory: DatabaseSessionFactory) -> None
     assert context.destination_type == DestinationType.MINIO
     assert context.minio_bucket == "vendas"
     assert context.active is True
+
+
+def test_db_connection_string_is_encrypted_at_rest(session_factory: DatabaseSessionFactory) -> None:
+    """`db_connection_string` deve ficar cifrado na tabela `contexts`, mas transparente via ORM.
+
+    Antes desta correção, a senha do banco de destino (embutida na
+    connection string) ficava gravada em texto puro em `data/app_config.db`
+    — qualquer um com acesso ao arquivo (ou a um backup dele) lia a
+    credencial direto, sem precisar de nenhum acesso à aplicação.
+    """
+    service = ContextService(session_factory)
+    plain_connection_string = "mssql+pyodbc://usuario:SenhaSecreta123@host:1433/GOLD"
+
+    created = service.create(
+        name="vendas",
+        destination_type=DestinationType.SQLSERVER,
+        default_write_mode=WriteMode.APPEND,
+        pdf_mode=PdfMode.METADATA_ONLY,
+        db_connection_string=plain_connection_string,
+        db_table="pedidos",
+    )
+
+    # Via ORM, o valor continua transparente em texto puro.
+    assert created.db_connection_string == plain_connection_string
+    fetched = service.get_by_name("vendas")
+    assert fetched.db_connection_string == plain_connection_string
+
+    # Mas o valor gravado de fato na tabela não é o texto puro.
+    with session_factory.session() as db_session:
+        raw_value = db_session.execute(
+            text("SELECT db_connection_string FROM contexts WHERE name = 'vendas'")
+        ).scalar_one()
+    assert raw_value != plain_connection_string
+    assert "SenhaSecreta123" not in raw_value
+    assert secret_box.decrypt(raw_value) == plain_connection_string
 
 
 def test_list_active_excludes_inactive_contexts(session_factory: DatabaseSessionFactory) -> None:

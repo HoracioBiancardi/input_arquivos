@@ -6,6 +6,7 @@ from input_arquivos.backend.ingestion.pipeline import IngestionPipeline
 from input_arquivos.backend.services.auth_service import AuthService
 from input_arquivos.backend.services.context_service import ContextService
 from input_arquivos.backend.services.preview_service import PreviewService
+from input_arquivos.backend.services.system_settings_service import SystemSettingsService
 from input_arquivos.backend.services.upload_service import UploadService
 from input_arquivos.backend.services.user_context_service import UserContextService
 from input_arquivos.backend.services.user_service import UserService
@@ -32,6 +33,7 @@ class ServiceContainer:
             writer_registry=DestinationWriterRegistry(),
         )
         self.preview_service = PreviewService(session_factory=session_factory, context_service=self.context_service)
+        self.system_settings_service = SystemSettingsService(session_factory)
 
 
 _container: ServiceContainer | None = None

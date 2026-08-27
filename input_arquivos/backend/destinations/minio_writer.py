@@ -18,11 +18,14 @@ class MinioWriter(DestinationWriter):
         """Inicializa o writer MinIO.
 
         Args:
-            client: Cliente `Minio` a usar. Se `None`, um cliente é criado a
-                partir das configurações globais da aplicação (endpoint e
-                credenciais são compartilhados por todos os contexts).
+            client: Cliente `Minio` a usar em toda escrita. Se `None`
+                (padrão), um cliente é criado sob demanda a cada `write()` a
+                partir da configuração global mais atual (admin, com
+                fallback pro `.env`) — não cacheado na construção, para que
+                uma configuração alterada pelo admin em `/admin/settings`
+                valha na próxima escrita sem reiniciar o servidor.
         """
-        self._client = client if client is not None else build_minio_client()
+        self._client_override = client
         self._key_builder = PartitionedKeyBuilder()
 
     def write(self, artifact: IngestResult, context: Context, write_mode: WriteMode | None) -> WriteResult:
@@ -42,12 +45,13 @@ class MinioWriter(DestinationWriter):
         if not context.minio_bucket:
             raise ValueError(f"Context '{context.name}' não possui um bucket MinIO configurado.")
 
-        if not self._client.bucket_exists(context.minio_bucket):
-            self._client.make_bucket(context.minio_bucket)
+        client = self._client_override if self._client_override is not None else build_minio_client()
+        if not client.bucket_exists(context.minio_bucket):
+            client.make_bucket(context.minio_bucket)
 
         object_key = self._key_builder.build(context.name, artifact.suggested_filename)
         data = io.BytesIO(artifact.artifact_bytes)
-        self._client.put_object(
+        client.put_object(
             bucket_name=context.minio_bucket,
             object_name=object_key,
             data=data,

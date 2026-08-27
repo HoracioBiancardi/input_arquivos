@@ -6,9 +6,11 @@ from input_arquivos.backend.config import get_settings
 from input_arquivos.backend.db.session import DatabaseSessionFactory
 from input_arquivos.backend.models.base import Base
 from input_arquivos.backend.models.context import Context  # noqa: F401 - garante o registro do modelo no metadata
+from input_arquivos.backend.models.system_settings import SystemSettings  # noqa: F401 - garante o registro do modelo no metadata
 from input_arquivos.backend.models.upload_history import UploadHistory  # noqa: F401 - garante o registro do modelo no metadata
 from input_arquivos.backend.models.user import User, UserRole
 from input_arquivos.backend.models.user_context_access import user_context_access  # noqa: F401 - garante o registro no metadata
+from input_arquivos.backend.security import secret_box
 from input_arquivos.backend.services.auth_service import AuthService
 
 
@@ -30,6 +32,7 @@ class DatabaseBootstrapper:
         Base.metadata.create_all(self._session_factory.engine)
         self._sync_missing_columns()
         self._seed_first_admin()
+        self._encrypt_legacy_plaintext_secrets()
 
     def _sync_missing_columns(self) -> None:
         """Adiciona à força, via `ALTER TABLE`, colunas que o código já conhece mas o banco ainda não tem.
@@ -69,3 +72,30 @@ class DatabaseBootstrapper:
                 must_change_password=True,
             )
             db_session.add(admin_user)
+
+    def _encrypt_legacy_plaintext_secrets(self) -> None:
+        """Re-cifra em repouso segredos gravados em texto puro antes de `EncryptedString` existir.
+
+        `EncryptedString` já trata um valor legado em texto puro como texto
+        puro na leitura (não quebra a aplicação para linhas antigas), mas
+        sem este passo elas ficariam em texto puro para sempre, a menos que
+        um admin editasse o context de novo. Roda a cada startup; idempotente
+        (só reescreve a linha se o valor gravado ainda não for um token
+        Fernet válido). Usa SQL bruto de propósito, para não disparar a
+        cifragem automática do `EncryptedString` duas vezes.
+        """
+        engine = self._session_factory.engine
+        inspector = inspect(engine)
+        if not inspector.has_table("contexts"):
+            return
+        with engine.begin() as connection:
+            rows = connection.execute(
+                text("SELECT id, db_connection_string FROM contexts WHERE db_connection_string IS NOT NULL")
+            ).all()
+            for context_id, raw_value in rows:
+                if secret_box.is_valid_ciphertext(raw_value):
+                    continue
+                connection.execute(
+                    text("UPDATE contexts SET db_connection_string = :new_value WHERE id = :id"),
+                    {"new_value": secret_box.encrypt(raw_value), "id": context_id},
+                )
