@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pandas as pd
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.engine import Inspector
-from sqlalchemy.types import Text
+from sqlalchemy.types import DateTime, Text
 
 from input_arquivos.backend.destinations.base import DestinationWriter, WriteResult
 from input_arquivos.backend.ingestion.pipeline import IngestResult
@@ -70,7 +70,7 @@ class SqlServerWriter(DestinationWriter):
                 target_table = context.db_table
             pandas_if_exists = "fail"
 
-        dtype_overrides = {"text_content": Text} if "text_content" in artifact.dataframe.columns else None
+        dtype_overrides = self._dtype_overrides(artifact.dataframe)
         artifact.dataframe.to_sql(
             target_table,
             engine,
@@ -83,6 +83,40 @@ class SqlServerWriter(DestinationWriter):
             destination_detail=f"{context.db_schema_name}.{target_table}",
             row_count=len(artifact.dataframe),
         )
+
+    def _dtype_overrides(self, dataframe: pd.DataFrame) -> dict[str, object] | None:
+        """Monta os overrides de tipo SQL passados ao `to_sql`, para colunas onde a inferência padrão do pandas não serve.
+
+        Duas colunas precisam de override:
+
+        - `text_content`: forçada para `Text` (padrão do pandas seria uma
+          coluna `VARCHAR` de tamanho fixo, curto demais para texto extraído
+          de PDF/OCR).
+        - `data_envio`: forçada para `DateTime(timezone=True)` (compila para
+          `DATETIMEOFFSET` no dialeto mssql). Sem esse override, o pandas
+          mapeia qualquer coluna datetime timezone-aware para
+          `TIMESTAMP(timezone=True)` (ver `pandas.io.sql.SQLTable._sqlalchemy_type`,
+          motivado por Postgres, onde `TIMESTAMP WITH TIME ZONE` é um tipo
+          normal) — mas no SQL Server, `TIMESTAMP` é sinônimo do tipo
+          proprietário de rowversion, que nunca aceita um valor explícito no
+          INSERT. Como `data_envio` é injetada como timezone-aware
+          (`datetime.now(timezone.utc)`) em todo upload não-raw, isso quebra
+          a primeira escrita (criação da tabela) em qualquer destino SQL
+          Server.
+
+        Args:
+            dataframe: DataFrame a ser gravado.
+
+        Returns:
+            Dict de overrides de tipo para passar como `dtype=` ao `to_sql`,
+            ou `None` se nenhuma das colunas acima estiver presente.
+        """
+        overrides: dict[str, object] = {}
+        if "text_content" in dataframe.columns:
+            overrides["text_content"] = Text
+        if "data_envio" in dataframe.columns:
+            overrides["data_envio"] = DateTime(timezone=True)
+        return overrides or None
 
     def _validate_column_compatibility(
         self, inspector: Inspector, table_name: str, schema_name: str, dataframe: pd.DataFrame

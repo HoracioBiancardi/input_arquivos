@@ -8,11 +8,14 @@ mapeamento de tipos T-SQL) — essas exigem um SQL Server de verdade, conforme
 o plano de verificação manual.
 """
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 import pytest
 from sqlalchemy import create_engine, inspect
+from sqlalchemy.dialects import mssql
+from sqlalchemy.types import TIMESTAMP, DateTime
 
 from input_arquivos.backend.destinations.sqlserver_writer import SchemaMismatchError, SqlServerWriter
 from input_arquivos.backend.ingestion.pipeline import IngestResult
@@ -112,3 +115,42 @@ def test_append_raises_on_schema_mismatch(connection_string: str) -> None:
 
     with pytest.raises(SchemaMismatchError):
         SqlServerWriter().write(incompatible_artifact, context, WriteMode.APPEND)
+
+
+def test_data_envio_dtype_override_avoids_mssql_rowversion_trap() -> None:
+    """`data_envio` (sempre timezone-aware) não pode cair no tipo que o pandas escolheria por padrão.
+
+    Sem override, `pandas.to_sql` mapeia qualquer coluna datetime
+    timezone-aware para `sqlalchemy.types.TIMESTAMP(timezone=True)` (ver
+    `pandas.io.sql.SQLTable._sqlalchemy_type`) — no dialeto mssql, esse tipo
+    compila para o sinônimo do rowversion proprietário do SQL Server, que
+    nunca aceita um valor explícito no INSERT. Isso quebrava a criação de
+    tabela em qualquer destino SQL Server real, no primeiro upload de
+    qualquer contexto (reproduzido contra um SQL Server real durante a
+    revisão que motivou este teste).
+    """
+    dataframe = pd.DataFrame(
+        {"data_envio": [datetime.now(timezone.utc)], "contexto": ["vendas"], "valor": [10]}
+    )
+
+    overrides = SqlServerWriter()._dtype_overrides(dataframe)
+
+    assert overrides is not None
+    data_envio_type = overrides["data_envio"]
+    assert isinstance(data_envio_type, DateTime)
+    assert not isinstance(data_envio_type, TIMESTAMP)
+    assert str(data_envio_type.compile(dialect=mssql.dialect())) == "DATETIMEOFFSET"
+
+
+def test_write_with_timezone_aware_data_envio_column(connection_string: str) -> None:
+    """Uma coluna `data_envio` timezone-aware (como injetada pelo pipeline) deve gravar sem erro."""
+    context = _make_context(connection_string)
+    artifact = _make_artifact(
+        pd.DataFrame(
+            {"data_envio": [datetime.now(timezone.utc)], "contexto": ["vendas"], "valor": [10]}
+        )
+    )
+
+    result = SqlServerWriter().write(artifact, context, WriteMode.CREATE_NEW)
+
+    assert result.row_count == 1
