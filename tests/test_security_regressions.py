@@ -143,11 +143,11 @@ def test_deactivated_user_loses_access_immediately(client: TestClient) -> None:
         assert user_client.get("/api/auth/me").status_code == 401
 
 
-# ── #4: db_connection_string só para admin ───────────────────────────────
+# ── #4: listagem completa de contexts só para admin ──────────────────────
 
 
 def test_regular_user_cannot_list_contexts(client: TestClient) -> None:
-    """`GET /api/contexts` (que inclui `db_connection_string`) deve ser admin-only."""
+    """`GET /api/contexts` deve ser admin-only."""
     _login(client, "admin", "admin123")
     _create_user(client, "maria", "senhaforte123")
 

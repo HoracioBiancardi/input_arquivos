@@ -8,7 +8,7 @@ from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from input_arquivos.backend.models.base import Base
-from input_arquivos.backend.models.context import DestinationType, WriteMode
+from input_arquivos.backend.models.context import DestinationType
 
 
 class UploadStatus(str, enum.Enum):
@@ -28,8 +28,7 @@ class UploadHistory(Base):
             mesmo que o contexto seja editado/desativado depois).
         destination_type: Tipo de destino para o qual os dados foram enviados.
         destination_detail: Detalhe do destino final (ex.: chave do objeto no
-            MinIO, ou "schema.tabela" no SQL Server).
-        write_mode: Modo de escrita usado (apenas relevante para destinos de banco).
+            MinIO, ou caminho do arquivo local).
         status: Resultado do processamento (sucesso ou erro).
         artifact_kind: Tipo do artefato gerado ("parquet", "raw_pdf" ou
             "raw_image"), usado para saber se há uma tabela para visualizar.
@@ -48,7 +47,6 @@ class UploadHistory(Base):
     context_name: Mapped[str] = mapped_column(String(100), index=True)
     destination_type: Mapped[DestinationType] = mapped_column(SqlEnum(DestinationType))
     destination_detail: Mapped[str] = mapped_column(String(1000))
-    write_mode: Mapped[WriteMode | None] = mapped_column(SqlEnum(WriteMode), default=None)
     status: Mapped[UploadStatus] = mapped_column(SqlEnum(UploadStatus))
     artifact_kind: Mapped[str | None] = mapped_column(String(20), default=None)
     row_count: Mapped[int | None] = mapped_column(default=None)

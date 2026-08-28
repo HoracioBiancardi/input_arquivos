@@ -4,11 +4,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from minio import Minio
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import select
 
 from input_arquivos.backend.db.session import DatabaseSessionFactory
 from input_arquivos.backend.destinations.minio_client import build_minio_client
-from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, PdfMode, WriteMode
+from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, PdfMode
 
 
 class DuplicateNameError(ValueError):
@@ -17,7 +17,7 @@ class DuplicateNameError(ValueError):
 
 @dataclass
 class ConnectionTestResult:
-    """Resultado de um teste de conectividade com um destino (MinIO ou banco de dados).
+    """Resultado de um teste de conectividade com um destino (MinIO ou pasta local).
 
     Attributes:
         success: Se a conexão foi bem-sucedida.
@@ -89,13 +89,9 @@ class ContextService:
         self,
         name: str,
         destination_type: DestinationType,
-        default_write_mode: WriteMode,
         pdf_mode: PdfMode,
         image_mode: ImageMode = ImageMode.RAW_ARCHIVE,
         minio_bucket: str | None = None,
-        db_connection_string: str | None = None,
-        db_schema_name: str = "dbo",
-        db_table: str | None = None,
         local_path: str | None = None,
         allowed_file_types: str = "excel,csv,pdf",
         column_rules: str | None = None,
@@ -104,14 +100,10 @@ class ContextService:
 
         Args:
             name: Nome único do context.
-            destination_type: Tipo de destino (MinIO, SQL Server ou pasta local).
-            default_write_mode: Modo de escrita pré-selecionado na tela de upload.
+            destination_type: Tipo de destino (MinIO ou pasta local).
             pdf_mode: Modo de tratamento de PDFs para este context.
             image_mode: Modo de tratamento de imagens para este context.
             minio_bucket: Nome do bucket, quando `destination_type` é MINIO.
-            db_connection_string: URL de conexão do banco, quando `destination_type` é SQLSERVER.
-            db_schema_name: Schema da tabela de destino.
-            db_table: Nome da tabela de destino.
             local_path: Pasta no disco local, quando `destination_type` é LOCAL.
             allowed_file_types: Tipos de arquivo aceitos (valores de `FileType`
                 separados por vírgula, ex. "excel,csv").
@@ -130,13 +122,9 @@ class ContextService:
         context = Context(
             name=name,
             destination_type=destination_type,
-            default_write_mode=default_write_mode,
             pdf_mode=pdf_mode,
             image_mode=image_mode,
             minio_bucket=minio_bucket,
-            db_connection_string=db_connection_string,
-            db_schema_name=db_schema_name,
-            db_table=db_table,
             local_path=local_path,
             allowed_file_types=allowed_file_types,
             column_rules=column_rules,
@@ -234,28 +222,11 @@ class ContextService:
         except Exception as error:  # noqa: BLE001 - erro de conectividade externo, reportado ao usuário
             return ConnectionTestResult(False, f"Falha ao conectar no MinIO: {error}")
 
-    def test_db_connection(self, connection_string: str) -> ConnectionTestResult:
-        """Testa a conectividade com o banco de dados de destino executando um SELECT simples.
-
-        Args:
-            connection_string: URL de conexão SQLAlchemy do banco de destino.
-
-        Returns:
-            Resultado do teste de conectividade.
-        """
-        try:
-            engine = create_engine(connection_string)
-            with engine.connect() as connection:
-                connection.execute(text("SELECT 1"))
-            return ConnectionTestResult(True, "Conexão com o banco de dados estabelecida com sucesso.")
-        except Exception as error:  # noqa: BLE001 - erro de conectividade externo, reportado ao usuário
-            return ConnectionTestResult(False, f"Falha ao conectar no banco de dados: {error}")
-
     def test_local_path(self, path: str) -> ConnectionTestResult:
         """Testa se a pasta local de destino pode ser criada e é gravável.
 
         Útil para contexts do tipo "local", usados para testar o sistema por
-        completo sem depender de um MinIO/SQL Server externo.
+        completo sem depender de um MinIO externo.
 
         Args:
             path: Caminho da pasta local a verificar/criar.

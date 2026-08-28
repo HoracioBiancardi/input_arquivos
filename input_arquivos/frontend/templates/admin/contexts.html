@@ -70,7 +70,6 @@
         <label class="form-label" for="context-destination">Destino</label>
         <select id="context-destination" class="form-input">
           <option value="minio">MinIO</option>
-          <option value="sqlserver">SQL Server</option>
           <option value="local">Pasta local</option>
         </select>
       </div>
@@ -84,25 +83,6 @@
         <p id="minio-test-result" class="text-xs"></p>
       </div>
 
-      <div id="db-fields" class="flex flex-col gap-2 p-3 rounded-lg" style="background: var(--surface-alt); border: 1px solid var(--border);">
-        <div class="form-group" style="margin-bottom:0">
-          <label class="form-label" for="context-db-connection">Connection string (SQLAlchemy)</label>
-          <input id="context-db-connection" class="form-input">
-        </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div class="form-group" style="margin-bottom:0">
-            <label class="form-label" for="context-db-schema">Schema</label>
-            <input id="context-db-schema" class="form-input" value="dbo">
-          </div>
-          <div class="form-group" style="margin-bottom:0">
-            <label class="form-label" for="context-db-table">Tabela</label>
-            <input id="context-db-table" class="form-input">
-          </div>
-        </div>
-        <button type="button" id="test-db-button" class="btn btn-ghost btn-sm self-start">Testar conexão do banco</button>
-        <p id="db-test-result" class="text-xs"></p>
-      </div>
-
       <div id="local-fields" class="flex flex-col gap-2 p-3 rounded-lg" style="background: var(--surface-alt); border: 1px solid var(--border);">
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label" for="context-local-path">Pasta raiz local (opcional)</label>
@@ -111,14 +91,6 @@
         </div>
         <button type="button" id="test-local-button" class="btn btn-ghost btn-sm self-start">Testar/criar pasta local</button>
         <p id="local-test-result" class="text-xs"></p>
-      </div>
-
-      <div class="form-group" style="margin-bottom:0">
-        <label class="form-label" for="context-write-mode">Modo de escrita padrão</label>
-        <select id="context-write-mode" class="form-input">
-          <option value="append">Append</option>
-          <option value="create_new">Criar nova tabela</option>
-        </select>
       </div>
 
       <div class="form-group" style="margin-bottom:0">

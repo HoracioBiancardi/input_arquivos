@@ -2,22 +2,19 @@
 
 Upload de arquivos (Excel, CSV, PDF, imagem, JSON, XML, TXT, YAML, ODS, HTML) com conversão
 automática para **Parquet** e envio para
-**MinIO** (bucket) ou **SQL Server** (tabela), de acordo com um **contexto de negócio** (ex.:
+**MinIO** (bucket), de acordo com um **contexto de negócio** (ex.:
 "vendas"). Cada envio grava `data_envio`, `contexto` e `enviado_por` como as três primeiras colunas
 do resultado. Cada contexto pode ter **regras de validação de dados por coluna** (tipo esperado e
 obrigatoriedade), que rejeitam o arquivo inteiro se alguma célula estiver fora do esperado — ver
 seção [Validação de dados por coluna](#validação-de-dados-por-coluna) abaixo. Uma área administrativa
-(`/admin`, protegida por login) gerencia os contexts, os usuários do sistema e o audit log de uploads.
+(`/admin`, protegida por login) gerencia os contexts, os usuários do sistema, a configuração do MinIO
+e o audit log de uploads.
 
 ## Requisitos
 
 - Python 3.12+
 - [uv](https://docs.astral.sh/uv/) como gerenciador de pacotes
 - Um servidor **MinIO** acessível (para contexts do tipo MinIO)
-- Um servidor **SQL Server** acessível (para contexts do tipo SQL Server)
-- **Driver ODBC 17 ou 18 da Microsoft** instalado no sistema operacional — exigido pelo `pyodbc`
-  para conectar no SQL Server. No Linux (Debian/Ubuntu), siga o guia oficial da Microsoft para
-  instalar `msodbcsql18` + `unixodbc`.
 
 O OCR local usado para extrair tabelas de imagens (contexts com `image_mode` diferente de
 `raw_archive`) é feito com `RapidOCR` (via `img2table[rapidocr]`), um motor 100% Python/ONNX — não
@@ -61,9 +58,7 @@ uv run ruff check .
 `GET /api/system/health` e `GET /api/system/metrics` (uptime + contagem de usuários/contexts, nunca dados sensíveis), protegidas por `require_admin` como as demais rotas administrativas. Sem `/api/system/logs`: o projeto não usa o módulo `logging` do Python — a rastreabilidade de uploads já é feita de forma persistente via `/admin/audit`.
 
 Os testes cobrem o pipeline de ingestão (Excel/CSV), a conversão Parquet, o CRUD de contexts e a
-lógica de append/create-versionado do writer de SQL Server (esta última validada contra um SQLite
-temporário, já que a lógica de branching é agnóstica de dialeto SQL — particularidades reais do
-SQL Server/`pyodbc` devem ser conferidas manualmente, ver seção abaixo).
+criptografia em repouso da configuração do MinIO.
 
 ## Validação de dados por coluna
 
@@ -82,10 +77,10 @@ coluna) não bater, **o arquivo inteiro é rejeitado** (nada é gravado no desti
 mostra quais colunas e quantas linhas tiveram problema; a rejeição também fica registrada em
 `/admin/audit`.
 
-## Testando sem MinIO/SQL Server (destino "Pasta local")
+## Testando sem MinIO (destino "Pasta local")
 
-Além de MinIO e SQL Server, um context pode usar `destination_type = local`: em vez de subir para
-um bucket ou banco externo, o Parquet (ou o PDF bruto, em modo raw_archive) é salvo direto numa
+Além de MinIO, um context pode usar `destination_type = local`: em vez de subir para
+um bucket externo, o Parquet (ou o PDF bruto, em modo raw_archive) é salvo direto numa
 pasta no disco, com a mesma estrutura de particionamento por data usada no MinIO
 (`{pasta_raiz}/{contexto}/{ano}/{mes}/{dia}/arquivo_HHMMSS_uuid.parquet`). Em `/admin/contexts`,
 escolha "Pasta local" como destino e informe uma pasta raiz (ex.: `data/local_storage`) — o nome
@@ -96,23 +91,23 @@ sem nenhuma conexão externa.
 
 ## Verificação manual ponta a ponta
 
-Sem MinIO/SQL Server disponíveis, é possível validar toda a lógica de negócio localmente (testes
+Sem MinIO disponível, é possível validar toda a lógica de negócio localmente (testes
 automatizados acima, ou usando um context do tipo "Pasta local" descrito na seção anterior). Para
-validar a integração real com MinIO/SQL Server:
+validar a integração real com MinIO:
 
-1. Suba instâncias descartáveis para teste (não fazem parte da infraestrutura do projeto):
+1. Suba uma instância descartável para teste (não faz parte da infraestrutura do projeto):
    ```bash
    docker run -p 9000:9000 -p 9001:9001 minio/minio server /data --console-address ":9001"
-   docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=SuaSenhaForte123" -p 1433:1433 mcr.microsoft.com/mssql/server
    ```
-2. Em `/admin/contexts`, crie um context de cada tipo (MinIO e SQL Server) e use os botões
-   "Testar conexão" para confirmar que os dados de conexão estão corretos.
+2. Configure o endpoint/credenciais em `/admin/settings` (ou no `.env`) e use o botão "Testar
+   conexão". Em `/admin/contexts`, crie um context do tipo MinIO e use "Testar conexão MinIO" para
+   confirmar o bucket.
 3. Em `/admin/users`, crie um usuário comum (não-admin).
-4. Faça login como esse usuário comum em `/` e envie um Excel/CSV/PDF para cada context.
-5. Confira: o objeto no console do MinIO / as linhas na tabela do SQL Server (com
-   `data_envio`/`contexto`/`enviado_por` corretos) e o registro correspondente em `/admin/audit`.
-6. Teste um caso de erro proposital (ex.: append com colunas incompatíveis) e confirme que o
-   audit log mostra uma mensagem de erro clara, sem stack trace vazando para a UI.
+4. Faça login como esse usuário comum em `/` e envie um Excel/CSV/PDF para o context.
+5. Confira: o objeto no console do MinIO (com `data_envio`/`contexto`/`enviado_por` corretos) e o
+   registro correspondente em `/admin/audit`.
+6. Teste um caso de erro proposital (ex.: bucket sem permissão) e confirme que o audit log mostra
+   uma mensagem de erro clara, sem stack trace vazando para a UI.
 7. Configure uma regra de validação de dados numa coluna (ex.: tipo "Número decimal") e envie um
    arquivo com uma célula inválida nessa coluna — confirme que o upload é rejeitado (nada gravado no
    destino), que a mensagem indica a coluna e a quantidade de linhas com problema, e que a rejeição
@@ -130,7 +125,7 @@ input_arquivos/
 │   ├── models/               # modelos ORM: Context, UploadHistory, User
 │   ├── schemas/               # schemas Pydantic da API REST
 │   ├── ingestion/             # leitores de arquivo, conversão Parquet e orquestração do pipeline
-│   ├── destinations/          # writers de destino (MinIO, SQL Server) + registry
+│   ├── destinations/          # writers de destino (MinIO, pasta local) + registry
 │   ├── services/               # camada de serviços (contexts, usuários, upload, auth) + container de DI
 │   ├── api/                    # rotas REST (/api/auth, /api/contexts, /api/users, /api/upload(s), /api/audit, /api/system)
 │   └── auth/                    # sessão via cookie assinado (session.py) + dependencies do FastAPI
@@ -155,10 +150,9 @@ acessam serviços/banco diretamente.
 - **Front-end**: HTML/CSS/JS servidos pelo próprio FastAPI (templates Jinja2 + Tailwind via CDN),
   sem build step nem framework de front-end — a interatividade de cada página é JavaScript puro
   chamando a API REST (`/api/*`).
-- **MinIO**: endpoint e credenciais são globais (`.env`), compartilhados por todos os contexts —
-  cada context define apenas o bucket a usar nesse mesmo servidor.
-- **SQL Server**: cada context tem sua própria connection string, podendo apontar para bancos ou
-  servidores diferentes.
+- **MinIO**: endpoint e credenciais são globais, compartilhados por todos os contexts — cada
+  context define apenas o bucket a usar nesse mesmo servidor. Configuráveis via `/admin/settings`
+  (cifrados em repouso, sobrepõe o `.env`) ou diretamente no `.env` como fallback.
 - **Autenticação**: sessão via cookie assinado (`SESSION_SECRET`, ver `backend/auth/session.py`), tanto
   para as páginas quanto para a API REST — toda rota sob `/api/*` (exceto `/api/auth/login`) exige
   login, e as rotas administrativas exigem papel `admin`.

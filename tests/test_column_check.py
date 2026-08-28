@@ -5,7 +5,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from input_arquivos.backend.models.context import Context, DestinationType, PdfMode, WriteMode
+from input_arquivos.backend.models.context import Context, DestinationType, PdfMode
 from input_arquivos.backend.services.column_check import ColumnDataValidator, ColumnMismatchChecker
 
 
@@ -19,7 +19,6 @@ def _make_context(
         name="vendas",
         destination_type=DestinationType.LOCAL,
         local_path=None,
-        default_write_mode=WriteMode.APPEND,
         pdf_mode=PdfMode.METADATA_ONLY,
         expected_columns=expected_columns,
         column_rules=json.dumps(column_rules) if isinstance(column_rules, list) else column_rules,

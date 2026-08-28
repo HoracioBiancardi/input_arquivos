@@ -20,7 +20,7 @@ import yaml
 from PIL import Image, ImageDraw, ImageFont
 
 from input_arquivos.backend.ingestion.pipeline import FileTypeNotAllowedError, IngestionPipeline, UnsupportedFileTypeError
-from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, PdfMode, WriteMode
+from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, PdfMode
 
 try:
     import rapidocr  # noqa: F401
@@ -41,7 +41,6 @@ def _make_context(
         name=name,
         destination_type=DestinationType.MINIO,
         minio_bucket="vendas",
-        default_write_mode=WriteMode.APPEND,
         pdf_mode=PdfMode.METADATA_ONLY,
         image_mode=image_mode,
         allowed_file_types=allowed_file_types,

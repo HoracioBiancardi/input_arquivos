@@ -4,13 +4,11 @@ import io
 from dataclasses import dataclass
 
 import pandas as pd
-from sqlalchemy import MetaData, Table, create_engine, select
 
 from input_arquivos.backend.db.session import DatabaseSessionFactory
 from input_arquivos.backend.destinations.minio_client import build_minio_client
 from input_arquivos.backend.models.context import DestinationType
 from input_arquivos.backend.models.upload_history import UploadHistory, UploadStatus
-from input_arquivos.backend.services.context_service import ContextService
 
 
 class UploadNotFoundError(ValueError):
@@ -51,16 +49,13 @@ class TablePreview:
 class PreviewService:
     """Reconstrói o DataFrame gerado por um upload, lendo de volta do destino onde foi gravado."""
 
-    def __init__(self, session_factory: DatabaseSessionFactory, context_service: ContextService) -> None:
+    def __init__(self, session_factory: DatabaseSessionFactory) -> None:
         """Inicializa o serviço de preview.
 
         Args:
             session_factory: Fábrica de sessões do banco de configuração local.
-            context_service: Serviço usado para buscar o context (necessário
-                para obter a connection string em previews de SQL Server).
         """
         self._session_factory = session_factory
-        self._context_service = context_service
 
     def get_preview(
         self, upload_id: int, limit: int = 200, allowed_context_names: set[str] | None = None
@@ -129,37 +124,24 @@ class PreviewService:
 
         Args:
             history: Registro do upload, já confirmado como tendo gerado um Parquet.
-            limit: Quantidade máxima de linhas a ler (só é aplicado na origem
-                para o destino SQL Server, para não puxar a tabela inteira).
+            limit: Quantidade máxima de linhas a ler. Não usado aqui — MinIO e
+                pasta local sempre leem o Parquet inteiro (o corte de linhas
+                acontece depois, em `get_preview`); mantido na assinatura para
+                não quebrar o chamador se um destino futuro precisar limitar
+                na origem.
 
         Returns:
             DataFrame lido de volta do destino.
-
-        Raises:
-            PreviewNotAvailableError: Se o context original não existir mais
-                (necessário para reconstruir a conexão com SQL Server).
         """
         if history.destination_type == DestinationType.LOCAL:
             return pd.read_parquet(history.destination_detail)
 
-        if history.destination_type == DestinationType.MINIO:
-            bucket, key = history.destination_detail.split("/", 1)
-            client = build_minio_client()
-            response = client.get_object(bucket, key)
-            try:
-                data = response.read()
-            finally:
-                response.close()
-                response.release_conn()
-            return pd.read_parquet(io.BytesIO(data))
-
-        context = self._context_service.get_by_name(history.context_name)
-        if context is None or not context.db_connection_string:
-            raise PreviewNotAvailableError(
-                f"O contexto '{history.context_name}' não existe mais ou não tem conexão de banco "
-                "configurada — não é possível reconstruir a tabela."
-            )
-        schema_name, table_name = history.destination_detail.split(".", 1)
-        engine = create_engine(context.db_connection_string)
-        table = Table(table_name, MetaData(), autoload_with=engine, schema=schema_name)
-        return pd.read_sql(select(table).limit(limit), engine)
+        bucket, key = history.destination_detail.split("/", 1)
+        client = build_minio_client()
+        response = client.get_object(bucket, key)
+        try:
+            data = response.read()
+        finally:
+            response.close()
+            response.release_conn()
+        return pd.read_parquet(io.BytesIO(data))

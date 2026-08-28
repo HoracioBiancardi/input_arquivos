@@ -21,7 +21,7 @@ def _isolate_secret_box(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
 def test_encrypt_decrypt_roundtrip() -> None:
     """Um valor cifrado deve decifrar de volta exatamente igual."""
-    plaintext = "mssql+pyodbc://user:S3nh@!@host:1433/GOLD"
+    plaintext = "S3gr3d0!C0mplic4do"
 
     ciphertext = secret_box.encrypt(plaintext)
 
@@ -52,4 +52,4 @@ def test_is_valid_ciphertext_distinguishes_legacy_plaintext() -> None:
     ciphertext = secret_box.encrypt("segredo")
 
     assert secret_box.is_valid_ciphertext(ciphertext) is True
-    assert secret_box.is_valid_ciphertext("mssql+pyodbc://user:pass@host/db") is False
+    assert secret_box.is_valid_ciphertext("um-valor-qualquer-em-texto-puro") is False

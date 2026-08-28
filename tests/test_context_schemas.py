@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import pytest
 from pydantic import ValidationError
 
-from input_arquivos.backend.models.context import DestinationType, ImageMode, PdfMode, WriteMode
+from input_arquivos.backend.models.context import DestinationType, ImageMode, PdfMode
 from input_arquivos.backend.schemas.context import ColumnRule, ContextCreateRequest, ContextResponse
 
 
@@ -60,14 +60,10 @@ def _context_response_kwargs(column_rules: object) -> dict:
         "name": "vendas",
         "destination_type": DestinationType.LOCAL,
         "minio_bucket": None,
-        "db_connection_string": None,
-        "db_schema_name": "dbo",
-        "db_table": None,
         "local_path": "data/local_storage",
         "allowed_file_types": "excel,csv,pdf",
         "expected_columns": None,
         "column_rules": column_rules,
-        "default_write_mode": WriteMode.APPEND,
         "pdf_mode": PdfMode.METADATA_ONLY,
         "image_mode": ImageMode.RAW_ARCHIVE,
         "active": True,

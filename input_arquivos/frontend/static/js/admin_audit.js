@@ -36,7 +36,6 @@ async function applyFilters() {
         <td class="px-4 py-2">${esc(item.filename)}</td>
         <td class="px-4 py-2">${esc(item.context_name)}</td>
         <td class="px-4 py-2">${esc(item.destination_detail) || "-"}</td>
-        <td class="px-4 py-2">${esc(item.write_mode) || "-"}</td>
         <td class="px-4 py-2 text-center">${statusBadge(item.status)}</td>
         <td class="px-4 py-2 text-right">${item.row_count ?? "-"}</td>
         <td class="px-4 py-2">${esc(item.uploaded_by)}</td>

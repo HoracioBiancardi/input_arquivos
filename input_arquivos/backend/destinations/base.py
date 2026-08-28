@@ -1,10 +1,10 @@
-"""Contrato comum a todo destination writer (MinIO, SQL Server, ou destinos futuros)."""
+"""Contrato comum a todo destination writer (MinIO, pasta local, ou destinos futuros)."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from input_arquivos.backend.ingestion.pipeline import IngestResult
-from input_arquivos.backend.models.context import Context, WriteMode
+from input_arquivos.backend.models.context import Context
 
 
 @dataclass
@@ -13,7 +13,7 @@ class WriteResult:
 
     Attributes:
         destination_detail: Descrição do local final dos dados (ex.: chave do
-            objeto no MinIO, ou "schema.tabela" no SQL Server).
+            objeto no MinIO, ou caminho do arquivo local).
         row_count: Quantidade de linhas efetivamente gravadas, quando aplicável.
     """
 
@@ -25,14 +25,12 @@ class DestinationWriter(ABC):
     """Contrato implementado por todo writer capaz de enviar um `IngestResult` a um destino."""
 
     @abstractmethod
-    def write(self, artifact: IngestResult, context: Context, write_mode: WriteMode | None) -> WriteResult:
+    def write(self, artifact: IngestResult, context: Context) -> WriteResult:
         """Envia o artefato de ingestão para o destino configurado no contexto.
 
         Args:
             artifact: Artefato produzido pelo `IngestionPipeline`.
-            context: Contexto que define os detalhes do destino (bucket, tabela, etc.).
-            write_mode: Modo de escrita (append/create_new), relevante apenas
-                para destinos de banco de dados.
+            context: Contexto que define os detalhes do destino (bucket, pasta, etc.).
 
         Returns:
             Resultado da escrita, usado para preencher o audit log.

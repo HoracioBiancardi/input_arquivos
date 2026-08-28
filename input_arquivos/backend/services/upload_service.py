@@ -7,7 +7,7 @@ from sqlalchemy import select
 from input_arquivos.backend.db.session import DatabaseSessionFactory
 from input_arquivos.backend.destinations.registry import DestinationWriterRegistry
 from input_arquivos.backend.ingestion.pipeline import IngestionPipeline, IngestResult
-from input_arquivos.backend.models.context import Context, WriteMode
+from input_arquivos.backend.models.context import Context
 from input_arquivos.backend.models.upload_history import UploadHistory, UploadStatus
 from input_arquivos.backend.services.column_check import (
     ColumnDataValidator,
@@ -139,7 +139,6 @@ class UploadService:
         self,
         artifact: IngestResult,
         context: Context,
-        write_mode: WriteMode | None,
         filename: str,
         uploaded_by: str,
     ) -> UploadHistory:
@@ -152,7 +151,6 @@ class UploadService:
         Args:
             artifact: Artefato já construído por `build_artifact`.
             context: Contexto de destino.
-            write_mode: Modo de escrita escolhido (relevante só para destinos de banco).
             filename: Nome original do arquivo, para o registro de auditoria.
             uploaded_by: Nome do usuário autenticado que realizou o upload.
 
@@ -161,13 +159,12 @@ class UploadService:
         """
         try:
             writer = self._writer_registry.get(context.destination_type)
-            result = writer.write(artifact, context, write_mode)
+            result = writer.write(artifact, context)
             history = UploadHistory(
                 filename=filename,
                 context_name=context.name,
                 destination_type=context.destination_type,
                 destination_detail=result.destination_detail,
-                write_mode=write_mode,
                 status=UploadStatus.SUCCESS,
                 artifact_kind=artifact.artifact_kind,
                 row_count=result.row_count,
@@ -184,7 +181,6 @@ class UploadService:
                 context_name=context.name,
                 destination_type=context.destination_type,
                 destination_detail="",
-                write_mode=write_mode,
                 status=UploadStatus.ERROR,
                 row_count=None,
                 error_message=str(error),
@@ -198,7 +194,6 @@ class UploadService:
         file_bytes: bytes,
         filename: str,
         context_name: str,
-        write_mode: WriteMode | None,
         uploaded_by: str,
     ) -> UploadHistory:
         """Processa um arquivo enviado de ponta a ponta e registra o resultado no audit log.
@@ -213,7 +208,6 @@ class UploadService:
             file_bytes: Conteúdo bruto do arquivo enviado.
             filename: Nome original do arquivo.
             context_name: Nome do contexto selecionado pelo usuário.
-            write_mode: Modo de escrita escolhido (relevante só para destinos de banco).
             uploaded_by: Nome do usuário autenticado que realizou o upload.
 
         Returns:
@@ -226,18 +220,18 @@ class UploadService:
         try:
             artifact = self.build_artifact(file_bytes, filename, context, uploaded_by)
         except Exception as error:  # noqa: BLE001 - qualquer falha vira um registro de auditoria com erro
-            return self.record_error(context, filename, write_mode, uploaded_by, str(error))
+            return self.record_error(context, filename, uploaded_by, str(error))
 
         violation = self.check_column_data(context, artifact)
         if violation is not None:
             return self.record_error(
-                context, filename, write_mode, uploaded_by, self.describe_column_data_violation(violation)
+                context, filename, uploaded_by, self.describe_column_data_violation(violation)
             )
 
-        return self.finalize(artifact, context, write_mode, filename, uploaded_by)
+        return self.finalize(artifact, context, filename, uploaded_by)
 
     def record_error(
-        self, context: Context, filename: str, write_mode: WriteMode | None, uploaded_by: str, error_message: str
+        self, context: Context, filename: str, uploaded_by: str, error_message: str
     ) -> UploadHistory:
         """Registra no audit log uma tentativa de upload que falhou antes de gravar em qualquer destino.
 
@@ -248,7 +242,6 @@ class UploadService:
         Args:
             context: Contexto selecionado pelo usuário.
             filename: Nome original do arquivo.
-            write_mode: Modo de escrita escolhido, se aplicável.
             uploaded_by: Nome do usuário autenticado que realizou o upload.
             error_message: Mensagem descrevendo o motivo da falha/cancelamento.
 
@@ -260,7 +253,6 @@ class UploadService:
             context_name=context.name,
             destination_type=context.destination_type,
             destination_detail="",
-            write_mode=write_mode,
             status=UploadStatus.ERROR,
             row_count=None,
             error_message=error_message,

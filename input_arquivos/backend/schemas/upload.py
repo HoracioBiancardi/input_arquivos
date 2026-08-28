@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from input_arquivos.backend.models.context import DestinationType, WriteMode
+from input_arquivos.backend.models.context import DestinationType
 from input_arquivos.backend.models.upload_history import UploadStatus
 
 
@@ -17,7 +17,6 @@ class UploadHistoryResponse(BaseModel):
         context_name: Nome do contexto usado no upload.
         destination_type: Tipo de destino para o qual os dados foram enviados.
         destination_detail: Detalhe do destino final dos dados.
-        write_mode: Modo de escrita usado, quando aplicável.
         status: Resultado do processamento (sucesso ou erro).
         artifact_kind: Tipo do artefato gerado ("parquet", "raw_pdf" ou
             "raw_image"), usado pelo front-end para decidir se mostra o link
@@ -35,7 +34,6 @@ class UploadHistoryResponse(BaseModel):
     context_name: str
     destination_type: DestinationType
     destination_detail: str
-    write_mode: WriteMode | None
     status: UploadStatus
     artifact_kind: str | None
     row_count: int | None

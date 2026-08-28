@@ -8,22 +8,13 @@ from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from input_arquivos.backend.models.base import Base
-from input_arquivos.backend.models.encrypted_string import EncryptedString
 
 
 class DestinationType(str, enum.Enum):
     """Tipo de destino para onde os dados de um contexto são enviados."""
 
     MINIO = "minio"
-    SQLSERVER = "sqlserver"
     LOCAL = "local"
-
-
-class WriteMode(str, enum.Enum):
-    """Modo de escrita em uma tabela de banco de dados relacional."""
-
-    APPEND = "append"
-    CREATE_NEW = "create_new"
 
 
 class PdfMode(str, enum.Enum):
@@ -59,20 +50,11 @@ class Context(Base):
     Attributes:
         id: Identificador interno do contexto.
         name: Nome único do contexto, exibido no seletor da tela de upload.
-        destination_type: Tipo de destino (MinIO, SQL Server ou pasta local).
+        destination_type: Tipo de destino (MinIO ou pasta local).
         minio_bucket: Nome do bucket MinIO, quando `destination_type` é MINIO.
-        db_connection_string: URL de conexão SQLAlchemy do banco de destino,
-            quando `destination_type` é SQLSERVER. Cifrada em repouso (ver
-            `EncryptedString`) — a senha do banco costuma estar embutida na
-            URL. Leitura/escrita continuam transparentes em texto puro para
-            o resto do código; só o valor gravado em `data/app_config.db`
-            é que fica cifrado.
-        db_schema: Schema da tabela de destino no banco de dados.
-        db_table: Nome da tabela de destino no banco de dados.
         local_path: Pasta no disco local onde os artefatos são salvos, quando
             `destination_type` é LOCAL. Útil para testar o sistema por completo
-            sem depender de um MinIO/SQL Server externo.
-        default_write_mode: Modo de escrita pré-selecionado na tela de upload.
+            sem depender de um MinIO externo.
         pdf_mode: Modo de tratamento de PDFs enviados sob este contexto.
         image_mode: Modo de tratamento de imagens enviadas sob este contexto.
         allowed_file_types: Tipos de arquivo que este contexto aceita (valores de
@@ -99,11 +81,7 @@ class Context(Base):
     name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     destination_type: Mapped[DestinationType] = mapped_column(SqlEnum(DestinationType))
     minio_bucket: Mapped[str | None] = mapped_column(String(255), default=None)
-    db_connection_string: Mapped[str | None] = mapped_column(EncryptedString(2000), default=None)
-    db_schema_name: Mapped[str] = mapped_column(String(100), default="dbo")
-    db_table: Mapped[str | None] = mapped_column(String(255), default=None)
     local_path: Mapped[str | None] = mapped_column(String(500), default=None)
-    default_write_mode: Mapped[WriteMode] = mapped_column(SqlEnum(WriteMode), default=WriteMode.APPEND)
     pdf_mode: Mapped[PdfMode] = mapped_column(SqlEnum(PdfMode), default=PdfMode.METADATA_ONLY)
     image_mode: Mapped[ImageMode] = mapped_column(SqlEnum(ImageMode), default=ImageMode.RAW_ARCHIVE)
     allowed_file_types: Mapped[str] = mapped_column(String(50), default="excel,csv,pdf")

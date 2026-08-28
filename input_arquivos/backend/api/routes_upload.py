@@ -5,7 +5,6 @@ from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
 from input_arquivos.backend.auth.dependencies import require_login
 from input_arquivos.backend.auth.session import SessionUser
 from input_arquivos.backend.config import get_settings
-from input_arquivos.backend.models.context import WriteMode
 from input_arquivos.backend.models.user import UserRole
 from input_arquivos.backend.schemas.upload import UploadHistoryResponse, UploadPreviewResponse
 from input_arquivos.backend.services.container import ServiceContainer, get_container
@@ -65,7 +64,6 @@ def _reject_if_too_large(file: UploadFile) -> None:
 async def upload_file(
     file: UploadFile,
     context_name: str = Form(...),
-    write_mode: WriteMode | None = Form(default=None),
     user: SessionUser = Depends(require_login),
 ) -> UploadHistoryResponse:
     """Processa um arquivo enviado via API, usando o mesmo pipeline da tela de upload.
@@ -76,7 +74,6 @@ async def upload_file(
     Args:
         file: Arquivo enviado (Excel, CSV ou PDF).
         context_name: Nome do context de destino.
-        write_mode: Modo de escrita, relevante apenas para contexts de banco de dados.
         user: Usuário autenticado na sessão atual — `uploaded_by` é sempre o
             username da sessão, nunca um valor enviado pelo cliente (evita
             que um upload seja atribuído a outra pessoa no audit log).
@@ -96,7 +93,6 @@ async def upload_file(
             file_bytes=file_bytes,
             filename=file.filename or "arquivo_sem_nome",
             context_name=context_name,
-            write_mode=write_mode,
             uploaded_by=user.username,
         )
     except ContextNotFoundError as error:
@@ -108,7 +104,6 @@ async def upload_file(
 async def upload_interactive(
     file: UploadFile,
     context_name: str = Form(...),
-    write_mode: WriteMode | None = Form(default=None),
     confirm_mismatch: bool = Form(default=False),
     cancelled: bool = Form(default=False),
     user: SessionUser = Depends(require_login),
@@ -125,7 +120,6 @@ async def upload_interactive(
     Args:
         file: Arquivo enviado (Excel, CSV ou PDF).
         context_name: Nome do context de destino.
-        write_mode: Modo de escrita, relevante apenas para contexts de banco de dados.
         confirm_mismatch: Se o usuário já confirmou o envio apesar da divergência de colunas.
         cancelled: Se o usuário cancelou o envio após ver a divergência de colunas.
         user: Usuário autenticado na sessão atual.
@@ -155,7 +149,6 @@ async def upload_interactive(
         history = container.upload_service.record_error(
             context,
             filename,
-            write_mode,
             username,
             "Envio cancelado pelo usuário: colunas diferentes do último arquivo aceito para este contexto.",
         )
@@ -166,7 +159,7 @@ async def upload_interactive(
     try:
         artifact = container.upload_service.build_artifact(file_bytes, filename, context, username)
     except Exception as error:  # noqa: BLE001 - erro de leitura vira registro de auditoria
-        history = container.upload_service.record_error(context, filename, write_mode, username, str(error))
+        history = container.upload_service.record_error(context, filename, username, str(error))
         return UploadHistoryResponse.model_validate(history)
 
     column_data_violation = container.upload_service.check_column_data(context, artifact)
@@ -174,7 +167,6 @@ async def upload_interactive(
         container.upload_service.record_error(
             context,
             filename,
-            write_mode,
             username,
             container.upload_service.describe_column_data_violation(column_data_violation),
         )
@@ -207,7 +199,7 @@ async def upload_interactive(
                 },
             )
 
-    history = container.upload_service.finalize(artifact, context, write_mode, filename, username)
+    history = container.upload_service.finalize(artifact, context, filename, username)
     if history.status.value == "success":
         container.user_service.set_last_context(user.user_id, context.name)
     return UploadHistoryResponse.model_validate(history)

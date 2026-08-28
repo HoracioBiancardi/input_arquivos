@@ -1,4 +1,4 @@
-"""Testes do LocalFileWriter: escrita de artefatos em uma pasta local, sem depender de MinIO/SQL Server."""
+"""Testes do LocalFileWriter: escrita de artefatos em uma pasta local, sem depender de MinIO."""
 
 from pathlib import Path
 
@@ -7,7 +7,7 @@ import pytest
 
 from input_arquivos.backend.destinations.local_writer import LocalFileWriter
 from input_arquivos.backend.ingestion.pipeline import IngestResult
-from input_arquivos.backend.models.context import Context, DestinationType, PdfMode, WriteMode
+from input_arquivos.backend.models.context import Context, DestinationType, PdfMode
 
 
 def _make_context(local_path: str | None) -> Context:
@@ -17,7 +17,6 @@ def _make_context(local_path: str | None) -> Context:
         name="vendas",
         destination_type=DestinationType.LOCAL,
         local_path=local_path,
-        default_write_mode=WriteMode.APPEND,
         pdf_mode=PdfMode.METADATA_ONLY,
         active=True,
     )
@@ -35,7 +34,7 @@ def test_write_saves_parquet_artifact_under_local_path(tmp_path: Path) -> None:
         suggested_filename="vendas.parquet",
     )
 
-    result = LocalFileWriter().write(artifact, context, write_mode=None)
+    result = LocalFileWriter().write(artifact, context)
 
     written_path = Path(result.destination_detail)
     assert written_path.exists()
@@ -63,7 +62,7 @@ def test_write_rejects_filename_that_would_escape_local_path(tmp_path: Path) -> 
         suggested_filename="../../evil.parquet",
     )
 
-    result = LocalFileWriter().write(artifact, context, write_mode=None)
+    result = LocalFileWriter().write(artifact, context)
 
     written_path = Path(result.destination_detail)
     assert written_path.is_relative_to((tmp_path / "sandbox").resolve())
@@ -84,7 +83,7 @@ def test_write_defaults_to_current_directory_when_local_path_missing(
         suggested_filename="a.parquet",
     )
 
-    result = LocalFileWriter().write(artifact, context, write_mode=None)
+    result = LocalFileWriter().write(artifact, context)
 
     written_path = Path(result.destination_detail)
     assert written_path.exists()

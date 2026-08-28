@@ -26,7 +26,8 @@ def session_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator
     "de verdade" (aponta pro `data/` real do projeto sempre que nenhum
     teste tiver feito override antes), criando um `.config_encryption_key`
     real como efeito colateral de rodar a suíte — qualquer teste que toque
-    `Context.db_connection_string` (cifrado) dispara essa resolução.
+    `SystemSettings.minio_access_key`/`minio_secret_key` (cifrados) dispara
+    essa resolução.
 
     Args:
         tmp_path: Diretório temporário único fornecido pelo pytest para este teste.

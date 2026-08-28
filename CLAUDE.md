@@ -1,7 +1,7 @@
 # CLAUDE.md — Contexto e Diretrizes do Ingestão de Arquivos (`input_arquivos`)
 
 ## Visão Geral do Projeto
-O **Sistema de Ingestão de Arquivos (`input_arquivos`)** é a solução de upload e pipeline de ingestão de dados em múltiplos formatos (**Excel, CSV, PDF, Imagens/OCR, JSON, XML, TXT, YAML, ODS, HTML**) com conversão automática para **Parquet** e gravação em **MinIO** ou **SQL Server**.
+O **Sistema de Ingestão de Arquivos (`input_arquivos`)** é a solução de upload e pipeline de ingestão de dados em múltiplos formatos (**Excel, CSV, PDF, Imagens/OCR, JSON, XML, TXT, YAML, ODS, HTML**) com conversão automática para **Parquet** e gravação em **MinIO** (ou pasta local, só para testes). Suporte a SQL Server como destino foi removido — o sistema só grava em MinIO.
 
 ---
 
@@ -17,7 +17,7 @@ uv run uvicorn main:app --reload --port 8004
 # Alternativa nomeada
 uv run uvicorn input_arquivos.main:app --reload --port 8004
 
-# Executar a Suíte Completa de Testes Automatizados (Pytest - 87 testes)
+# Executar a Suíte Completa de Testes Automatizados (Pytest)
 uv run pytest -v
 
 # Console script (agora funcional — antes o entry point `start` não existia)
@@ -30,9 +30,9 @@ uv run input-arquivos
 
 ## 📐 Arquitetura & Ingestão
 
-- **Pipeline de Conversão**: Excel/CSV/JSON/XML/PDF/Imagem -> Pandas -> PyArrow Parquet -> MinIO / SQL Server.
+- **Pipeline de Conversão**: Excel/CSV/JSON/XML/PDF/Imagem -> Pandas -> PyArrow Parquet -> MinIO (ou pasta local).
 - **Validação de Colunas**: Checagem dinâmica de tipos (Texto, Inteiro, Decimal, Data DD/MM/AAAA, Boolean) e obrigatoriedade.
-- **Área Administrativa (`/admin`)**: Gestão de Contextos de negócio, Usuários e Log de Auditoria.
+- **Área Administrativa (`/admin`)**: Gestão de Contextos de negócio, Usuários, configuração do MinIO (`/admin/settings`, cifrada em repouso) e Log de Auditoria.
 
 ## Diferenças em relação ao padrão do app_template
 

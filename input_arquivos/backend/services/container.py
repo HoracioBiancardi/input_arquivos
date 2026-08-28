@@ -32,7 +32,7 @@ class ServiceContainer:
             pipeline=IngestionPipeline(),
             writer_registry=DestinationWriterRegistry(),
         )
-        self.preview_service = PreviewService(session_factory=session_factory, context_service=self.context_service)
+        self.preview_service = PreviewService(session_factory=session_factory)
         self.system_settings_service = SystemSettingsService(session_factory)
 
 

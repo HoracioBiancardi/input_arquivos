@@ -1,9 +1,9 @@
 """Writer de destino que salva artefatos em uma pasta no disco local.
 
 Existe para permitir testar o sistema por completo (upload -> conversão ->
-persistência) sem depender de um MinIO ou SQL Server externos: um context
-configurado com `destination_type=local` grava o Parquet (ou o PDF bruto, em
-modo raw_archive) direto numa pasta local, com a mesma estrutura de
+persistência) sem depender de um MinIO externo: um context configurado com
+`destination_type=local` grava o Parquet (ou o PDF bruto, em modo
+raw_archive) direto numa pasta local, com a mesma estrutura de
 particionamento por data usada no MinIO.
 """
 
@@ -12,7 +12,7 @@ from pathlib import Path
 from input_arquivos.backend.destinations.base import DestinationWriter, WriteResult
 from input_arquivos.backend.destinations.key_builder import PartitionedKeyBuilder
 from input_arquivos.backend.ingestion.pipeline import IngestResult
-from input_arquivos.backend.models.context import Context, WriteMode
+from input_arquivos.backend.models.context import Context
 
 
 class LocalFileWriter(DestinationWriter):
@@ -22,14 +22,13 @@ class LocalFileWriter(DestinationWriter):
         """Inicializa o writer local."""
         self._key_builder = PartitionedKeyBuilder()
 
-    def write(self, artifact: IngestResult, context: Context, write_mode: WriteMode | None) -> WriteResult:
+    def write(self, artifact: IngestResult, context: Context) -> WriteResult:
         """Grava o artefato em um arquivo dentro da pasta local do contexto.
 
         Args:
             artifact: Artefato produzido pelo `IngestionPipeline`.
             context: Contexto de destino. Se `local_path` não for informado,
                 os arquivos são salvos a partir da raiz do projeto.
-            write_mode: Ignorado neste writer (não se aplica a arquivos em disco).
 
         Returns:
             Resultado da escrita, contendo o caminho absoluto do arquivo criado.

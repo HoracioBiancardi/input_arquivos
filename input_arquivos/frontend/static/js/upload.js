@@ -1,11 +1,10 @@
-const DESTINATION_ICONS = { minio: "☁️", sqlserver: "🗄️", local: "📁" };
+const DESTINATION_ICONS = { minio: "☁️", local: "📁" };
 
 let contextsByName = {};
 
 const contextSelect = document.getElementById("context-select");
 const destinationIcon = document.getElementById("destination-icon");
 const destinationLabel = document.getElementById("destination-label");
-const writeModeField = document.getElementById("write-mode-field");
 const fileInput = document.getElementById("file-input");
 const uploadForm = document.getElementById("upload-form");
 
@@ -59,7 +58,6 @@ function handleContextChange() {
   if (!context) {
     destinationIcon.textContent = "📁";
     destinationLabel.textContent = "Destino: Pasta local Parquet";
-    writeModeField.classList.add("hidden");
     fileInput.setAttribute("accept", ".xlsx,.xls,.csv,.pdf,.json,.xml,.txt");
     return;
   }
@@ -67,15 +65,8 @@ function handleContextChange() {
   destinationIcon.textContent = DESTINATION_ICONS[context.destination_type] || "❓";
   if (context.destination_type === "minio") {
     destinationLabel.textContent = `MinIO → bucket "${context.minio_bucket}"`;
-    writeModeField.classList.add("hidden");
-  } else if (context.destination_type === "local") {
-    destinationLabel.textContent = `Pasta local → ${context.local_path || "data/parquet"}`;
-    writeModeField.classList.add("hidden");
   } else {
-    destinationLabel.textContent = `SQL Server → ${context.db_schema_name || "dbo"}.${context.db_table || "tabela"}`;
-    writeModeField.classList.remove("hidden");
-    const radio = document.querySelector(`input[name="write_mode"][value="${context.default_write_mode || "append"}"]`);
-    if (radio) radio.checked = true;
+    destinationLabel.textContent = `Pasta local → ${context.local_path || "data/parquet"}`;
   }
   if (context.allowed_extensions && context.allowed_extensions.length > 0) {
     fileInput.setAttribute("accept", context.allowed_extensions.join(","));
@@ -171,16 +162,10 @@ async function handleSubmit(event) {
     showToast("Selecione um contexto e um arquivo antes de enviar.", "warning");
     return;
   }
-  const context = contextsByName[contextName];
-  const writeMode = (context && context.destination_type === "sqlserver")
-    ? (document.querySelector('input[name="write_mode"]:checked')?.value || "append")
-    : "";
-
   const buildFormData = (extra) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("context_name", contextName);
-    if (writeMode) formData.append("write_mode", writeMode);
     Object.entries(extra || {}).forEach(([key, value]) => formData.append(key, value));
     return formData;
   };

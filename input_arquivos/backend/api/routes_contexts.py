@@ -16,7 +16,6 @@ from input_arquivos.backend.schemas.context import (
     ContextCreateRequest,
     ContextResponse,
     ContextUpdateRequest,
-    DbConnectionTestRequest,
     LocalConnectionTestRequest,
     MinioConnectionTestRequest,
 )
@@ -47,14 +46,11 @@ def _describe_destination(context: Context) -> str:
         context: Context a descrever.
 
     Returns:
-        Texto descrevendo o destino ("MinIO → bucket", "SQL Server →
-        schema.tabela" ou "Local → pasta").
+        Texto descrevendo o destino ("MinIO → bucket" ou "Local → pasta").
     """
     if context.destination_type == DestinationType.MINIO:
         return f"MinIO → {context.minio_bucket}"
-    if context.destination_type == DestinationType.LOCAL:
-        return f"Local → {context.local_path}"
-    return f"SQL Server → {context.db_schema_name}.{context.db_table}"
+    return f"Local → {context.local_path}"
 
 
 def _to_response(context: Context) -> ContextResponse:
@@ -73,12 +69,7 @@ def _to_response(context: Context) -> ContextResponse:
 
 @router.get("", response_model=list[ContextResponse], dependencies=[Depends(require_admin)])
 def list_contexts(active_only: bool = False) -> list[ContextResponse]:
-    """Lista os contexts cadastrados, incluindo dados sensíveis (ex.: `db_connection_string`).
-
-    Restrito a admins: `ContextResponse` inclui a connection string do
-    banco de destino em texto puro, que não deve ser exposta a usuários
-    comuns. Usuários comuns usam `/api/contexts/me/accessible`, que retorna
-    apenas os campos necessários para a tela de upload.
+    """Lista os contexts cadastrados.
 
     Args:
         active_only: Se `True`, retorna apenas os contexts ativos.
@@ -125,10 +116,7 @@ def list_accessible_contexts(user: SessionUser = Depends(require_login)) -> Acce
                 name=context.name,
                 destination_type=context.destination_type,
                 minio_bucket=context.minio_bucket,
-                db_schema_name=context.db_schema_name,
-                db_table=context.db_table,
                 local_path=context.local_path,
-                default_write_mode=context.default_write_mode,
                 allowed_extensions=file_type_registry.extensions_for_types(
                     file_type_registry.deserialize(context.allowed_file_types)
                 ),
@@ -175,13 +163,9 @@ def create_context(payload: ContextCreateRequest) -> ContextResponse:
         context = context_service.create(
             name=payload.name,
             destination_type=payload.destination_type,
-            default_write_mode=payload.default_write_mode,
             pdf_mode=payload.pdf_mode,
             image_mode=payload.image_mode,
             minio_bucket=payload.minio_bucket,
-            db_connection_string=payload.db_connection_string,
-            db_schema_name=payload.db_schema_name,
-            db_table=payload.db_table,
             local_path=payload.local_path,
             allowed_file_types=payload.allowed_file_types,
             column_rules=_serialize_column_rules(payload.column_rules),
@@ -213,13 +197,9 @@ def update_context(context_id: int, payload: ContextUpdateRequest) -> ContextRes
             context_id,
             name=payload.name,
             destination_type=payload.destination_type,
-            default_write_mode=payload.default_write_mode,
             pdf_mode=payload.pdf_mode,
             image_mode=payload.image_mode,
             minio_bucket=payload.minio_bucket,
-            db_connection_string=payload.db_connection_string,
-            db_schema_name=payload.db_schema_name,
-            db_table=payload.db_table,
             local_path=payload.local_path,
             allowed_file_types=payload.allowed_file_types,
             column_rules=_serialize_column_rules(payload.column_rules),
@@ -245,20 +225,6 @@ def test_minio_connection(payload: MinioConnectionTestRequest) -> ConnectionTest
         Resultado do teste de conectividade.
     """
     result = get_container().context_service.test_minio_connection(payload.bucket)
-    return ConnectionTestResponse(success=result.success, message=result.message)
-
-
-@router.post("/test-db", response_model=ConnectionTestResponse, dependencies=[Depends(require_admin)])
-def test_db_connection(payload: DbConnectionTestRequest) -> ConnectionTestResponse:
-    """Testa a conectividade com um banco de dados de destino.
-
-    Args:
-        payload: Connection string a testar.
-
-    Returns:
-        Resultado do teste de conectividade.
-    """
-    result = get_container().context_service.test_db_connection(payload.connection_string)
     return ConnectionTestResponse(success=result.success, message=result.message)
 
 

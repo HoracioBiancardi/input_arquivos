@@ -1,7 +1,7 @@
 """Testes do UserContextService: controle de quais contexts cada usuário comum pode acessar."""
 
 from input_arquivos.backend.db.session import DatabaseSessionFactory
-from input_arquivos.backend.models.context import DestinationType, PdfMode, WriteMode
+from input_arquivos.backend.models.context import DestinationType, PdfMode
 from input_arquivos.backend.models.user import UserRole
 from input_arquivos.backend.services.auth_service import AuthService
 from input_arquivos.backend.services.context_service import ContextService
@@ -24,7 +24,6 @@ def test_admin_sees_all_active_contexts_regardless_of_assignment(session_factory
     context = context_service.create(
         name="vendas",
         destination_type=DestinationType.LOCAL,
-        default_write_mode=WriteMode.APPEND,
         pdf_mode=PdfMode.METADATA_ONLY,
     )
     admin = user_service.create(username="admin", plain_password="123456", role=UserRole.ADMIN)
@@ -40,13 +39,11 @@ def test_regular_user_sees_only_assigned_contexts(session_factory: DatabaseSessi
     vendas = context_service.create(
         name="vendas",
         destination_type=DestinationType.LOCAL,
-        default_write_mode=WriteMode.APPEND,
         pdf_mode=PdfMode.METADATA_ONLY,
     )
     context_service.create(
         name="estoque",
         destination_type=DestinationType.LOCAL,
-        default_write_mode=WriteMode.APPEND,
         pdf_mode=PdfMode.METADATA_ONLY,
     )
     user = user_service.create(username="maria", plain_password="123456", role=UserRole.USER)
@@ -63,13 +60,11 @@ def test_set_contexts_for_user_replaces_previous_assignment(session_factory: Dat
     vendas = context_service.create(
         name="vendas",
         destination_type=DestinationType.LOCAL,
-        default_write_mode=WriteMode.APPEND,
         pdf_mode=PdfMode.METADATA_ONLY,
     )
     estoque = context_service.create(
         name="estoque",
         destination_type=DestinationType.LOCAL,
-        default_write_mode=WriteMode.APPEND,
         pdf_mode=PdfMode.METADATA_ONLY,
     )
     user = user_service.create(username="maria", plain_password="123456", role=UserRole.USER)
@@ -86,7 +81,6 @@ def test_user_without_any_assignment_sees_no_contexts(session_factory: DatabaseS
     context_service.create(
         name="vendas",
         destination_type=DestinationType.LOCAL,
-        default_write_mode=WriteMode.APPEND,
         pdf_mode=PdfMode.METADATA_ONLY,
     )
     user = user_service.create(username="maria", plain_password="123456", role=UserRole.USER)

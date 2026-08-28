@@ -2,9 +2,7 @@
 
 MinIO não é testado aqui (não há um `test_minio_writer.py` no projeto pelo
 mesmo motivo — precisa de um servidor MinIO real; ver plano de verificação
-manual). SQL Server é testado contra SQLite, mesmo padrão de
-`tests/test_sqlserver_writer.py`: valida a lógica SQLAlchemy agnóstica de
-dialeto (reflexão de tabela + LIMIT), não particularidades do T-SQL.
+manual).
 """
 
 from pathlib import Path
@@ -14,12 +12,10 @@ import pytest
 
 from input_arquivos.backend.db.session import DatabaseSessionFactory
 from input_arquivos.backend.destinations.local_writer import LocalFileWriter
-from input_arquivos.backend.destinations.sqlserver_writer import SqlServerWriter
 from input_arquivos.backend.ingestion.parquet import ParquetConverter
 from input_arquivos.backend.ingestion.pipeline import IngestResult
-from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, PdfMode, WriteMode
+from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, PdfMode
 from input_arquivos.backend.models.upload_history import UploadHistory, UploadStatus
-from input_arquivos.backend.services.context_service import ContextService
 from input_arquivos.backend.services.preview_service import (
     PreviewNotAvailableError,
     PreviewService,
@@ -45,7 +41,6 @@ def _add_history(session_factory: DatabaseSessionFactory, **fields: object) -> U
     defaults = {
         "filename": "vendas.csv",
         "context_name": "vendas",
-        "write_mode": None,
         "status": UploadStatus.SUCCESS,
         "artifact_kind": "parquet",
         "row_count": None,
@@ -66,51 +61,22 @@ def test_get_preview_reads_local_parquet(session_factory: DatabaseSessionFactory
     dataframe = pd.DataFrame({"produto": ["A", "B"], "valor": [1, 2]})
     context = Context(
         id=1, name="vendas", destination_type=DestinationType.LOCAL, local_path=str(tmp_path),
-        default_write_mode=WriteMode.APPEND, pdf_mode=PdfMode.METADATA_ONLY, image_mode=ImageMode.RAW_ARCHIVE,
+        pdf_mode=PdfMode.METADATA_ONLY, image_mode=ImageMode.RAW_ARCHIVE,
         active=True,
     )
-    write_result = LocalFileWriter().write(_make_artifact(dataframe), context, None)
+    write_result = LocalFileWriter().write(_make_artifact(dataframe), context)
     history = _add_history(
         session_factory, destination_type=DestinationType.LOCAL,
         destination_detail=write_result.destination_detail, row_count=2,
     )
 
-    preview = PreviewService(session_factory, ContextService(session_factory)).get_preview(history.id)
+    preview = PreviewService(session_factory).get_preview(history.id)
 
     assert preview.filename == "vendas.csv"
     assert preview.columns == ["produto", "valor"]
     assert preview.rows == [["A", 1], ["B", 2]]
     assert preview.total_row_count == 2
     assert preview.truncated is False
-
-
-def test_get_preview_reads_sqlserver_table(session_factory: DatabaseSessionFactory, tmp_path: Path) -> None:
-    """Um upload SQL Server deve ser lido de volta via SQLAlchemy Core (testado contra SQLite)."""
-    connection_string = f"sqlite:///{tmp_path / 'destino.db'}"
-    dataframe = pd.DataFrame({"produto": ["A", "B", "C"], "valor": [1, 2, 3]})
-    context = Context(
-        id=1, name="vendas", destination_type=DestinationType.SQLSERVER, db_connection_string=connection_string,
-        db_schema_name="main", db_table="pedidos", default_write_mode=WriteMode.APPEND,
-        pdf_mode=PdfMode.METADATA_ONLY, image_mode=ImageMode.RAW_ARCHIVE, active=True,
-    )
-    context_service = ContextService(session_factory)
-    context_service.create(
-        name="vendas", destination_type=DestinationType.SQLSERVER, default_write_mode=WriteMode.APPEND,
-        pdf_mode=PdfMode.METADATA_ONLY, db_connection_string=connection_string, db_schema_name="main",
-        db_table="pedidos",
-    )
-    write_result = SqlServerWriter().write(_make_artifact(dataframe), context, WriteMode.CREATE_NEW)
-    history = _add_history(
-        session_factory, destination_type=DestinationType.SQLSERVER,
-        destination_detail=write_result.destination_detail, row_count=3,
-    )
-
-    preview = PreviewService(session_factory, context_service).get_preview(history.id, limit=2)
-
-    assert preview.columns == ["produto", "valor"]
-    assert preview.rows == [["A", 1], ["B", 2]]
-    assert preview.total_row_count == 3
-    assert preview.truncated is True
 
 
 def test_get_preview_raises_when_not_available(session_factory: DatabaseSessionFactory) -> None:
@@ -121,7 +87,7 @@ def test_get_preview_raises_when_not_available(session_factory: DatabaseSessionF
     )
 
     with pytest.raises(PreviewNotAvailableError):
-        PreviewService(session_factory, ContextService(session_factory)).get_preview(history.id)
+        PreviewService(session_factory).get_preview(history.id)
 
 
 def test_get_preview_raises_for_failed_upload(session_factory: DatabaseSessionFactory) -> None:
@@ -132,13 +98,13 @@ def test_get_preview_raises_for_failed_upload(session_factory: DatabaseSessionFa
     )
 
     with pytest.raises(PreviewNotAvailableError):
-        PreviewService(session_factory, ContextService(session_factory)).get_preview(history.id)
+        PreviewService(session_factory).get_preview(history.id)
 
 
 def test_get_preview_raises_when_upload_not_found(session_factory: DatabaseSessionFactory) -> None:
     """Um id inexistente deve levantar `UploadNotFoundError`."""
     with pytest.raises(UploadNotFoundError):
-        PreviewService(session_factory, ContextService(session_factory)).get_preview(999)
+        PreviewService(session_factory).get_preview(999)
 
 
 def test_get_preview_denies_access_to_context_outside_allowed_set(
@@ -153,16 +119,16 @@ def test_get_preview_denies_access_to_context_outside_allowed_set(
     dataframe = pd.DataFrame({"produto": ["A"], "valor": [1]})
     context = Context(
         id=1, name="vendas", destination_type=DestinationType.LOCAL, local_path=str(tmp_path),
-        default_write_mode=WriteMode.APPEND, pdf_mode=PdfMode.METADATA_ONLY, image_mode=ImageMode.RAW_ARCHIVE,
+        pdf_mode=PdfMode.METADATA_ONLY, image_mode=ImageMode.RAW_ARCHIVE,
         active=True,
     )
-    write_result = LocalFileWriter().write(_make_artifact(dataframe), context, None)
+    write_result = LocalFileWriter().write(_make_artifact(dataframe), context)
     history = _add_history(
         session_factory, destination_type=DestinationType.LOCAL,
         destination_detail=write_result.destination_detail, row_count=1,
     )
 
-    service = PreviewService(session_factory, ContextService(session_factory))
+    service = PreviewService(session_factory)
 
     with pytest.raises(UploadAccessDeniedError):
         service.get_preview(history.id, allowed_context_names={"outro-contexto"})

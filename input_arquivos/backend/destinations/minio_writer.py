@@ -8,7 +8,7 @@ from input_arquivos.backend.destinations.base import DestinationWriter, WriteRes
 from input_arquivos.backend.destinations.key_builder import PartitionedKeyBuilder
 from input_arquivos.backend.destinations.minio_client import build_minio_client
 from input_arquivos.backend.ingestion.pipeline import IngestResult
-from input_arquivos.backend.models.context import Context, WriteMode
+from input_arquivos.backend.models.context import Context
 
 
 class MinioWriter(DestinationWriter):
@@ -28,13 +28,12 @@ class MinioWriter(DestinationWriter):
         self._client_override = client
         self._key_builder = PartitionedKeyBuilder()
 
-    def write(self, artifact: IngestResult, context: Context, write_mode: WriteMode | None) -> WriteResult:
+    def write(self, artifact: IngestResult, context: Context) -> WriteResult:
         """Faz upload do artefato para o bucket do contexto, sob uma chave particionada por data.
 
         Args:
             artifact: Artefato produzido pelo `IngestionPipeline`.
             context: Contexto de destino; deve ter `minio_bucket` preenchido.
-            write_mode: Ignorado neste writer (não se aplica a armazenamento de objetos).
 
         Returns:
             Resultado da escrita, contendo a chave do objeto criado no bucket.

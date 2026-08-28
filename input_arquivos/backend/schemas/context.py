@@ -6,7 +6,7 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-from input_arquivos.backend.models.context import ColumnRuleType, DestinationType, ImageMode, PdfMode, WriteMode
+from input_arquivos.backend.models.context import ColumnRuleType, DestinationType, ImageMode, PdfMode
 
 
 class ColumnRule(BaseModel):
@@ -51,36 +51,15 @@ def _validate_unique_rule_columns(column_rules: list[ColumnRule]) -> None:
         seen.add(key)
 
 
-def _validate_db_connection_string(destination_type: DestinationType, db_connection_string: str | None) -> None:
-    """Garante que uma connection string plausível foi informada para destinos SQL Server.
-
-    Args:
-        destination_type: Tipo de destino selecionado.
-        db_connection_string: Connection string informada, se houver.
-
-    Raises:
-        ValueError: Se `destination_type` for SQLSERVER e a connection string
-            estiver vazia ou não parecer uma URL de conexão SQLAlchemy.
-    """
-    if destination_type != DestinationType.SQLSERVER:
-        return
-    if not db_connection_string or "://" not in db_connection_string:
-        raise ValueError("Connection string do banco é obrigatória e deve ter o formato de uma URL (ex.: mssql+pyodbc://...).")
-
-
 class ContextCreateRequest(BaseModel):
     """Corpo da requisição para criação de um novo context.
 
     Attributes:
         name: Nome único do context.
-        destination_type: Tipo de destino (MinIO ou SQL Server).
-        default_write_mode: Modo de escrita pré-selecionado na tela de upload.
+        destination_type: Tipo de destino (MinIO ou pasta local).
         pdf_mode: Modo de tratamento de PDFs para este context.
         image_mode: Modo de tratamento de imagens para este context.
         minio_bucket: Nome do bucket, quando `destination_type` é MINIO.
-        db_connection_string: URL de conexão do banco, quando `destination_type` é SQLSERVER.
-        db_schema_name: Schema da tabela de destino.
-        db_table: Nome da tabela de destino.
         local_path: Pasta no disco local, quando `destination_type` é LOCAL.
         allowed_file_types: Tipos de arquivo aceitos, separados por vírgula
             (ex. "excel,csv"). Vazio equivale a aceitar todos os tipos.
@@ -90,22 +69,12 @@ class ContextCreateRequest(BaseModel):
 
     name: str
     destination_type: DestinationType
-    default_write_mode: WriteMode = WriteMode.APPEND
     pdf_mode: PdfMode = PdfMode.METADATA_ONLY
     image_mode: ImageMode = ImageMode.RAW_ARCHIVE
     minio_bucket: str | None = None
-    db_connection_string: str | None = None
-    db_schema_name: str = "dbo"
-    db_table: str | None = None
     local_path: str | None = None
     allowed_file_types: str = "excel,csv,pdf"
     column_rules: list[ColumnRule] = []
-
-    @model_validator(mode="after")
-    def _validate_destination_fields(self) -> Self:
-        """Garante que os campos exigidos pelo `destination_type` escolhido foram informados."""
-        _validate_db_connection_string(self.destination_type, self.db_connection_string)
-        return self
 
     @model_validator(mode="after")
     def _validate_column_rules(self) -> Self:
@@ -119,14 +88,10 @@ class ContextUpdateRequest(BaseModel):
 
     Attributes:
         name: Nome único do context.
-        destination_type: Tipo de destino (MinIO, SQL Server ou pasta local).
-        default_write_mode: Modo de escrita pré-selecionado na tela de upload.
+        destination_type: Tipo de destino (MinIO ou pasta local).
         pdf_mode: Modo de tratamento de PDFs para este context.
         image_mode: Modo de tratamento de imagens para este context.
         minio_bucket: Nome do bucket, quando `destination_type` é MINIO.
-        db_connection_string: URL de conexão do banco, quando `destination_type` é SQLSERVER.
-        db_schema_name: Schema da tabela de destino.
-        db_table: Nome da tabela de destino.
         local_path: Pasta no disco local, quando `destination_type` é LOCAL.
         allowed_file_types: Tipos de arquivo aceitos, separados por vírgula
             (ex. "excel,csv"). Vazio equivale a aceitar todos os tipos.
@@ -137,23 +102,13 @@ class ContextUpdateRequest(BaseModel):
 
     name: str
     destination_type: DestinationType
-    default_write_mode: WriteMode = WriteMode.APPEND
     pdf_mode: PdfMode = PdfMode.METADATA_ONLY
     image_mode: ImageMode = ImageMode.RAW_ARCHIVE
     minio_bucket: str | None = None
-    db_connection_string: str | None = None
-    db_schema_name: str = "dbo"
-    db_table: str | None = None
     local_path: str | None = None
     allowed_file_types: str = "excel,csv,pdf"
     column_rules: list[ColumnRule] = []
     active: bool = True
-
-    @model_validator(mode="after")
-    def _validate_destination_fields(self) -> Self:
-        """Garante que os campos exigidos pelo `destination_type` escolhido foram informados."""
-        _validate_db_connection_string(self.destination_type, self.db_connection_string)
-        return self
 
     @model_validator(mode="after")
     def _validate_column_rules(self) -> Self:
@@ -170,16 +125,6 @@ class MinioConnectionTestRequest(BaseModel):
     """
 
     bucket: str
-
-
-class DbConnectionTestRequest(BaseModel):
-    """Corpo da requisição de teste de conectividade com um banco de dados.
-
-    Attributes:
-        connection_string: URL de conexão SQLAlchemy do banco de destino.
-    """
-
-    connection_string: str
 
 
 class LocalConnectionTestRequest(BaseModel):
@@ -212,9 +157,6 @@ class ContextResponse(BaseModel):
         name: Nome único do context.
         destination_type: Tipo de destino configurado.
         minio_bucket: Bucket MinIO configurado, se aplicável.
-        db_connection_string: Connection string configurada, se aplicável.
-        db_schema_name: Schema da tabela de destino, se aplicável.
-        db_table: Tabela de destino, se aplicável.
         local_path: Pasta local configurada, se aplicável.
         allowed_file_types: Tipos de arquivo aceitos, separados por vírgula.
         expected_columns: Colunas do último arquivo aceito para este context,
@@ -222,7 +164,6 @@ class ContextResponse(BaseModel):
             Usado pela UI para sugerir nomes de coluna ao configurar regras.
         column_rules: Regras de validação de tipo/obrigatoriedade por coluna,
             já convertidas de JSON (armazenado no banco) para uma lista.
-        default_write_mode: Modo de escrita pré-selecionado.
         pdf_mode: Modo de tratamento de PDFs configurado.
         image_mode: Modo de tratamento de imagens configurado.
         active: Se o context está ativo.
@@ -238,14 +179,10 @@ class ContextResponse(BaseModel):
     name: str
     destination_type: DestinationType
     minio_bucket: str | None
-    db_connection_string: str | None
-    db_schema_name: str
-    db_table: str | None
     local_path: str | None
     allowed_file_types: str
     expected_columns: str | None = None
     column_rules: list[ColumnRule] = []
-    default_write_mode: WriteMode
     pdf_mode: PdfMode
     image_mode: ImageMode
     active: bool
@@ -284,10 +221,7 @@ class AccessibleContextResponse(BaseModel):
         name: Nome do context.
         destination_type: Tipo de destino configurado.
         minio_bucket: Bucket MinIO configurado, se aplicável.
-        db_schema_name: Schema da tabela de destino, se aplicável.
-        db_table: Tabela de destino, se aplicável.
         local_path: Pasta local configurada, se aplicável.
-        default_write_mode: Modo de escrita pré-selecionado.
         allowed_extensions: Extensões de arquivo aceitas (com o ponto, ex. ".csv"),
             computadas no servidor a partir de `allowed_file_types`.
     """
@@ -296,10 +230,7 @@ class AccessibleContextResponse(BaseModel):
     name: str
     destination_type: DestinationType
     minio_bucket: str | None
-    db_schema_name: str
-    db_table: str | None
     local_path: str | None
-    default_write_mode: WriteMode
     allowed_extensions: list[str]
 
 

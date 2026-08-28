@@ -1,12 +1,11 @@
 """Criptografia simétrica para dados sensíveis persistidos no banco local.
 
-Usado para dois tipos de segredo que, antes desta correção, ficavam em texto
-puro em `data/app_config.db`: `Context.db_connection_string` (senha do banco
-de destino embutida na URL) e as credenciais globais do MinIO cadastradas via
-`/admin/settings`. Mesma estratégia já usada para `session_secret` em
-`auth/session.py`: se nenhuma chave for configurada explicitamente, gera uma
-chave Fernet aleatória na primeira execução e persiste em disco (0600) ao
-lado do banco local, para ser reaproveitada entre reinicializações.
+Usado para cifrar em repouso as credenciais globais do MinIO cadastradas via
+`/admin/settings` (`SystemSettings.minio_access_key`/`minio_secret_key`).
+Mesma estratégia já usada para `session_secret` em `auth/session.py`: se
+nenhuma chave for configurada explicitamente, gera uma chave Fernet aleatória
+na primeira execução e persiste em disco (0600) ao lado do banco local, para
+ser reaproveitada entre reinicializações.
 """
 
 from pathlib import Path

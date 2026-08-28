@@ -140,7 +140,6 @@ async function loadContexts() {
 function toggleDestinationFields() {
   const selected = destinationSelect.value;
   document.getElementById("minio-fields").classList.toggle("hidden", selected !== "minio");
-  document.getElementById("db-fields").classList.toggle("hidden", selected !== "sqlserver");
   document.getElementById("local-fields").classList.toggle("hidden", selected !== "local");
 }
 
@@ -153,7 +152,7 @@ function updateImageHelp() {
 }
 
 function clearTestResults() {
-  ["minio-test-result", "db-test-result", "local-test-result"].forEach((id) => {
+  ["minio-test-result", "local-test-result"].forEach((id) => {
     const el = document.getElementById(id);
     el.textContent = "";
     el.className = "text-sm";
@@ -170,7 +169,6 @@ function resetForm() {
   form.reset();
   document.getElementById("context-id").value = "";
   document.querySelectorAll(".context-file-type").forEach((checkbox) => (checkbox.checked = false));
-  document.getElementById("context-db-schema").value = "dbo";
   document.getElementById("context-active").checked = true;
   currentEditContext = null;
   clearTestResults();
@@ -200,11 +198,7 @@ async function openEditModal(contextId) {
   });
   destinationSelect.value = context.destination_type;
   document.getElementById("context-minio-bucket").value = context.minio_bucket || "";
-  document.getElementById("context-db-connection").value = context.db_connection_string || "";
-  document.getElementById("context-db-schema").value = context.db_schema_name || "dbo";
-  document.getElementById("context-db-table").value = context.db_table || "";
   document.getElementById("context-local-path").value = context.local_path || "";
-  document.getElementById("context-write-mode").value = context.default_write_mode;
   pdfModeSelect.value = context.pdf_mode;
   imageModeSelect.value = context.image_mode;
   document.getElementById("context-active").checked = context.active;
@@ -233,13 +227,9 @@ async function saveContext(event) {
   const payload = {
     name: document.getElementById("context-name").value,
     destination_type: destinationSelect.value,
-    default_write_mode: document.getElementById("context-write-mode").value,
     pdf_mode: pdfModeSelect.value,
     image_mode: imageModeSelect.value,
     minio_bucket: document.getElementById("context-minio-bucket").value || null,
-    db_connection_string: document.getElementById("context-db-connection").value || null,
-    db_schema_name: document.getElementById("context-db-schema").value || "dbo",
-    db_table: document.getElementById("context-db-table").value || null,
     local_path: document.getElementById("context-local-path").value || null,
     allowed_file_types: fileTypes.join(","),
     column_rules: currentEditContext ? currentEditContext.column_rules : [],
@@ -292,13 +282,9 @@ async function saveRules() {
   const payload = {
     name: context.name,
     destination_type: context.destination_type,
-    default_write_mode: context.default_write_mode,
     pdf_mode: context.pdf_mode,
     image_mode: context.image_mode,
     minio_bucket: context.minio_bucket,
-    db_connection_string: context.db_connection_string,
-    db_schema_name: context.db_schema_name,
-    db_table: context.db_table,
     local_path: context.local_path,
     allowed_file_types: context.allowed_file_types,
     column_rules: collectColumnRules(),
@@ -330,11 +316,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const bucket = document.getElementById("context-minio-bucket").value;
     const result = await apiFetch("/api/contexts/test-minio", { method: "POST", body: { bucket } });
     setTestResult("minio-test-result", result);
-  });
-  document.getElementById("test-db-button").addEventListener("click", async () => {
-    const connectionString = document.getElementById("context-db-connection").value;
-    const result = await apiFetch("/api/contexts/test-db", { method: "POST", body: { connection_string: connectionString } });
-    setTestResult("db-test-result", result);
   });
   document.getElementById("test-local-button").addEventListener("click", async () => {
     const path = document.getElementById("context-local-path").value;
