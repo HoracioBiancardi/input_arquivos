@@ -24,8 +24,10 @@ def login_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(request, "login.html", {"current_user": None})
 
 
-@router.get("/", response_class=HTMLResponse)
-def upload_page(request: Request, user: SessionUser | RedirectResponse = Depends(require_login_page)):
+@router.get("/", response_class=HTMLResponse, response_model=None)
+def upload_page(
+    request: Request, user: SessionUser | RedirectResponse = Depends(require_login_page)
+) -> HTMLResponse | RedirectResponse:
     """Renderiza a página principal de upload.
 
     Args:
@@ -40,10 +42,10 @@ def upload_page(request: Request, user: SessionUser | RedirectResponse = Depends
     return templates.TemplateResponse(request, "upload.html", {"current_user": user})
 
 
-@router.get("/uploads/{upload_id}/preview", response_class=HTMLResponse)
+@router.get("/uploads/{upload_id}/preview", response_class=HTMLResponse, response_model=None)
 def upload_preview_page(
     request: Request, upload_id: int, user: SessionUser | RedirectResponse = Depends(require_login_page)
-):
+) -> HTMLResponse | RedirectResponse:
     """Renderiza a tela de visualização da tabela gerada por um upload.
 
     Args:
@@ -61,8 +63,10 @@ def upload_preview_page(
     )
 
 
-@router.get("/admin", response_class=HTMLResponse)
-def admin_dashboard_page(request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)):
+@router.get("/admin", response_class=HTMLResponse, response_model=None)
+def admin_dashboard_page(
+    request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)
+) -> HTMLResponse | RedirectResponse:
     """Renderiza o painel inicial da área administrativa.
 
     Args:
@@ -77,8 +81,10 @@ def admin_dashboard_page(request: Request, user: SessionUser | RedirectResponse 
     return templates.TemplateResponse(request, "admin/dashboard.html", {"current_user": user})
 
 
-@router.get("/admin/contexts", response_class=HTMLResponse)
-def admin_contexts_page(request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)):
+@router.get("/admin/contexts", response_class=HTMLResponse, response_model=None)
+def admin_contexts_page(
+    request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)
+) -> HTMLResponse | RedirectResponse:
     """Renderiza a página administrativa de CRUD de contexts.
 
     Args:
@@ -93,8 +99,10 @@ def admin_contexts_page(request: Request, user: SessionUser | RedirectResponse =
     return templates.TemplateResponse(request, "admin/contexts.html", {"current_user": user})
 
 
-@router.get("/admin/users", response_class=HTMLResponse)
-def admin_users_page(request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)):
+@router.get("/admin/users", response_class=HTMLResponse, response_model=None)
+def admin_users_page(
+    request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)
+) -> HTMLResponse | RedirectResponse:
     """Renderiza a página administrativa de CRUD de usuários.
 
     Args:
@@ -109,8 +117,10 @@ def admin_users_page(request: Request, user: SessionUser | RedirectResponse = De
     return templates.TemplateResponse(request, "admin/users.html", {"current_user": user})
 
 
-@router.get("/admin/settings", response_class=HTMLResponse)
-def admin_settings_page(request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)):
+@router.get("/admin/settings", response_class=HTMLResponse, response_model=None)
+def admin_settings_page(
+    request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)
+) -> HTMLResponse | RedirectResponse:
     """Renderiza a página administrativa de configuração global do MinIO.
 
     Args:
@@ -125,8 +135,10 @@ def admin_settings_page(request: Request, user: SessionUser | RedirectResponse =
     return templates.TemplateResponse(request, "admin/settings.html", {"current_user": user})
 
 
-@router.get("/admin/audit", response_class=HTMLResponse)
-def admin_audit_page(request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)):
+@router.get("/admin/audit", response_class=HTMLResponse, response_model=None)
+def admin_audit_page(
+    request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)
+) -> HTMLResponse | RedirectResponse:
     """Renderiza a página administrativa de audit log.
 
     Args:

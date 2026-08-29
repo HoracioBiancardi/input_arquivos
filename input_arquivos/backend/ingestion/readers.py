@@ -13,6 +13,36 @@ from img2table.document import Image as Img2TableImage
 from img2table.ocr import RapidOCR
 
 
+MAX_ROWS = 200_000
+"""Teto de linhas aceito por leitores tabulares (Excel/ODS) em uma única leitura.
+
+Não existe validação de tamanho de arquivo (bytes) que proteja contra um
+arquivo pequeno com um número absurdo de linhas — um .xlsx de ~28 MB pode
+conter 300 mil linhas x 40 colunas e travar o processo por minutos de CPU
+durante o parsing. Este teto falha rápido, antes do restante do pipeline
+(validação de colunas, conversão para Parquet, escrita no destino) rodar
+sobre um DataFrame gigante.
+"""
+
+MAX_PAGES = 200
+"""Teto de páginas aceito por leitores de PDF (`PdfTableReader`/`StockLotsOcrReader`).
+
+`StockLotsOcrReader` rasteriza cada página a `_STOCK_OCR_RESOLUTION` DPI e
+roda OCR nela — um PDF com muitas páginas pode consumir CPU/memória de forma
+desproporcional ao tamanho do arquivo em bytes.
+"""
+
+
+class UploadTooLargeError(ValueError):
+    """Erro levantado quando um arquivo excede o teto de linhas/páginas que o pipeline processa.
+
+    Deriva de `ValueError` para se encaixar no mesmo tratamento de erro já
+    existente em `UploadService`/`routes_upload` (qualquer `Exception` durante
+    a leitura vira um registro de auditoria com status de erro, sem travar
+    a requisição nem expor um 500 genérico).
+    """
+
+
 class FileReader(Protocol):
     """Contrato comum a todo leitor de arquivo usado pelo pipeline de ingestão."""
 
@@ -39,8 +69,16 @@ class ExcelReader:
 
         Returns:
             DataFrame com os dados da primeira planilha do arquivo.
+
+        Raises:
+            UploadTooLargeError: Se a planilha tiver mais de `MAX_ROWS` linhas.
         """
-        return pd.read_excel(io.BytesIO(file_bytes), engine="openpyxl")
+        dataframe = pd.read_excel(io.BytesIO(file_bytes), engine="openpyxl")
+        if len(dataframe) > MAX_ROWS:
+            raise UploadTooLargeError(
+                f"Esta planilha tem {len(dataframe)} linhas, acima do limite de {MAX_ROWS} linhas por arquivo."
+            )
+        return dataframe
 
 
 class CsvReader:
@@ -80,9 +118,14 @@ class PdfTableReader:
 
         Raises:
             ValueError: Se nenhuma tabela puder ser extraída do PDF.
+            UploadTooLargeError: Se o PDF tiver mais de `MAX_PAGES` páginas.
         """
         frames: list[pd.DataFrame] = []
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            if len(pdf.pages) > MAX_PAGES:
+                raise UploadTooLargeError(
+                    f"Este PDF tem {len(pdf.pages)} páginas, acima do limite de {MAX_PAGES} páginas por arquivo."
+                )
             for page_number, page in enumerate(pdf.pages, start=1):
                 for table in page.extract_tables():
                     if not table or len(table) < 2:
@@ -138,6 +181,7 @@ class StockLotsOcrReader:
         Raises:
             ValueError: Se nenhuma linha de produto com lote puder ser extraída do PDF,
                 ou se as dependências opcionais de OCR não estiverem instaladas.
+            UploadTooLargeError: Se o PDF tiver mais de `MAX_PAGES` páginas.
         """
         try:
             from rapidocr import RapidOCR as RawRapidOcrEngine
@@ -149,6 +193,10 @@ class StockLotsOcrReader:
 
         records: list[dict] = []
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            if len(pdf.pages) > MAX_PAGES:
+                raise UploadTooLargeError(
+                    f"Este PDF tem {len(pdf.pages)} páginas, acima do limite de {MAX_PAGES} páginas por arquivo."
+                )
             for page in pdf.pages:
                 image = page.to_image(resolution=_STOCK_OCR_RESOLUTION).original
                 rows = self._ocr_rows(ocr, image)
@@ -281,8 +329,15 @@ class PdfMetadataReader:
 
         Returns:
             DataFrame de uma linha com as colunas `filename`, `page_count` e `text_content`.
+
+        Raises:
+            UploadTooLargeError: Se o PDF tiver mais de `MAX_PAGES` páginas.
         """
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
+            if len(pdf.pages) > MAX_PAGES:
+                raise UploadTooLargeError(
+                    f"Este PDF tem {len(pdf.pages)} páginas, acima do limite de {MAX_PAGES} páginas por arquivo."
+                )
             page_texts = [f"--- page {index} ---\n\n{page.extract_text() or ''}" for index, page in enumerate(pdf.pages, start=1)]
             page_count = len(pdf.pages)
         return pd.DataFrame(
@@ -441,13 +496,19 @@ class OdsReader:
 
         Raises:
             ValueError: Se o pacote `odfpy` não estiver instalado no servidor.
+            UploadTooLargeError: Se a planilha tiver mais de `MAX_ROWS` linhas.
         """
         try:
-            return pd.read_excel(io.BytesIO(file_bytes), engine="odf")
+            dataframe = pd.read_excel(io.BytesIO(file_bytes), engine="odf")
         except ImportError as error:
             raise ValueError(
                 "Leitura de .ods indisponível: verifique se o pacote 'odfpy' está instalado no servidor."
             ) from error
+        if len(dataframe) > MAX_ROWS:
+            raise UploadTooLargeError(
+                f"Esta planilha tem {len(dataframe)} linhas, acima do limite de {MAX_ROWS} linhas por arquivo."
+            )
+        return dataframe
 
 
 class HtmlReader:

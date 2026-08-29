@@ -1,6 +1,7 @@
 """Rotas da API REST de upload: envio programático (headless) e o fluxo interativo da tela de upload."""
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 
 from input_arquivos.backend.auth.dependencies import require_login
 from input_arquivos.backend.auth.session import SessionUser
@@ -89,7 +90,8 @@ async def upload_file(
     upload_service = get_container().upload_service
     file_bytes = await file.read()
     try:
-        history = upload_service.process_upload(
+        history = await run_in_threadpool(
+            upload_service.process_upload,
             file_bytes=file_bytes,
             filename=file.filename or "arquivo_sem_nome",
             context_name=context_name,
@@ -157,7 +159,9 @@ async def upload_interactive(
     file_bytes = await file.read()
 
     try:
-        artifact = container.upload_service.build_artifact(file_bytes, filename, context, username)
+        artifact = await run_in_threadpool(
+            container.upload_service.build_artifact, file_bytes, filename, context, username
+        )
     except Exception as error:  # noqa: BLE001 - erro de leitura vira registro de auditoria
         history = container.upload_service.record_error(context, filename, username, str(error))
         return UploadHistoryResponse.model_validate(history)
@@ -199,7 +203,7 @@ async def upload_interactive(
                 },
             )
 
-    history = container.upload_service.finalize(artifact, context, filename, username)
+    history = await run_in_threadpool(container.upload_service.finalize, artifact, context, filename, username)
     if history.status.value == "success":
         container.user_service.set_last_context(user.user_id, context.name)
     return UploadHistoryResponse.model_validate(history)

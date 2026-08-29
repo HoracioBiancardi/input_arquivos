@@ -90,7 +90,7 @@ class SessionCookie:
             token,
             max_age=self._max_age,
             httponly=True,
-            samesite="lax",
+            samesite="strict",
             path="/",
             secure=self._cookie_secure,
         )

@@ -41,3 +41,7 @@ Este é o app mais divergente do ecossistema — de propósito, não por drift: 
 - **`backend/api/routes_system.py`** (novo): `GET /api/system/health`, `/metrics` — únicos endpoints de paridade adicionados, protegidos por `require_admin` (mesmo padrão de `/api/audit`). Sem `/logs`: projeto não usa o módulo `logging` do Python em lugar nenhum.
 - **Tema**: `frontend/static/css/theme.css` agora tem os 3 temas (`corporate`/`green-neutral`/`cyber-dark`), completando o que faltava.
 - **`main.py::start()`** (novo): o console script `input-arquivos` declarado em `pyproject.toml` apontava pra uma função que não existia — corrigido.
+
+## Revisão de Segurança
+
+@~/.claude/security-review-checklist.md
