@@ -21,4 +21,4 @@ RUN uv sync --frozen --no-dev
 RUN mkdir -p /app/data
 ENV HOST=0.0.0.0 PORT=8004 RELOAD=false
 EXPOSE 8004
-CMD ["uvicorn", "input_arquivos.main:app", "--host", "0.0.0.0", "--port", "8004"]
+CMD ["uvicorn", "input_arquivos.main:app", "--host", "0.0.0.0", "--port", "8004", "--proxy-headers", "--forwarded-allow-ips", "*"]

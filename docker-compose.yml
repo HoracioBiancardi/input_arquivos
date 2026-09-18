@@ -2,11 +2,30 @@ services:
   input-arquivos:
     build: .
     container_name: input-arquivos
-    ports:
-      - "8004:8004"
     env_file: .env
     environment:
       APP_CONFIG_DB_PATH: /app/data/app_config.db
+    ports:
+      - "127.0.0.1:8004:8004"   # só local (debug); o acesso externo é pelo Caddy
     volumes:
       - ./data:/app/data   # SQLite, chave de sessão e chave de cifra persistem aqui
     restart: unless-stopped
+
+  caddy:
+    image: caddy:2
+    container_name: input-arquivos-caddy
+    depends_on:
+      - input-arquivos
+    env_file: .env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data     # guarda a CA local e os certificados
+      - caddy_config:/config
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

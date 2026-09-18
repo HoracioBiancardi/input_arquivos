@@ -1,0 +1,7 @@
+# Proxy reverso com HTTPS. SITE_ADDRESS vem do .env (IP ou hostname interno).
+# "tls internal" = certificado de uma CA local do Caddy (rede interna, sem Let's Encrypt).
+{$SITE_ADDRESS} {
+	tls internal
+	encode gzip
+	reverse_proxy input-arquivos:8004
+}
