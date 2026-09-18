@@ -1,0 +1,12 @@
+services:
+  input-arquivos:
+    build: .
+    container_name: input-arquivos
+    ports:
+      - "8004:8004"
+    env_file: .env
+    environment:
+      APP_CONFIG_DB_PATH: /app/data/app_config.db
+    volumes:
+      - ./data:/app/data   # SQLite, chave de sessão e chave de cifra persistem aqui
+    restart: unless-stopped
