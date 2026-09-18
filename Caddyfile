@@ -1,3 +1,8 @@
+{
+	# Acesso por IP não envia SNI; sem isso o Caddy não acha o certificado dentro do Docker.
+	default_sni {$SITE_ADDRESS}
+}
+
 # Proxy reverso com HTTPS. SITE_ADDRESS vem do .env (IP ou hostname interno).
 # "tls internal" = certificado de uma CA local do Caddy (rede interna, sem Let's Encrypt).
 {$SITE_ADDRESS} {
