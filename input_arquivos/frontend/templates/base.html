@@ -79,7 +79,9 @@
       <a href="/admin" class="btn btn-ghost btn-sm">Admin</a>
       {% endif %}
 
-      <a href="/" class="btn btn-ghost btn-sm">Update</a>
+      {% if request.url.path != "/" %}
+      <a href="/" class="btn btn-ghost btn-sm">Voltar</a>
+      {% endif %}
 
       <button type="button" class="btn btn-ghost btn-sm" onclick="openSettingsModal()" title="Configurações">⚙️ Configurações</button>
       <button type="button" id="logout-button" class="btn btn-ghost btn-sm" title="Sair da Sessão">Sair</button>

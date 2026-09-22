@@ -58,11 +58,11 @@ async function saveMinioConfig(event) {
   clearFieldErrors("minio");
   const values = currentFormValues();
   try {
-    const config = await apiFetch("/api/settings/minio", { method: "PUT", body: values });
+    await apiFetch("/api/settings/minio", { method: "PUT", body: values });
     showToast("Configuração do MinIO salva com sucesso.", "positive");
-    secretInput.value = "";
-    secretHint.textContent = "Já configurada — deixe em branco para manter a atual.";
-    applySourceBadge(config.source);
+    setTimeout(() => {
+      window.location.href = "/admin";
+    }, 800);
   } catch (err) {
     const fieldErrors = extractFieldErrors(err.data);
     if (applyFieldErrors("minio", fieldErrors) === 0) {
