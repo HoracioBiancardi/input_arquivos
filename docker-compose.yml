@@ -6,26 +6,30 @@ services:
     environment:
       APP_CONFIG_DB_PATH: /app/data/app_config.db
     ports:
-      - "127.0.0.1:8004:8004"   # só local (debug); o acesso externo é pelo Caddy
+      - "8004:8004"   # exposto direto na rede interna (HTTP) enquanto o Caddy está desativado — ver abaixo
     volumes:
       - ./data:/app/data   # SQLite, chave de sessão e chave de cifra persistem aqui
     restart: unless-stopped
 
-  caddy:
-    image: caddy:2
-    container_name: input-arquivos-caddy
-    depends_on:
-      - input-arquivos
-    env_file: .env
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data     # guarda a CA local e os certificados
-      - caddy_config:/config
-    restart: unless-stopped
+  # Caddy (proxy reverso HTTPS) desativado enquanto o app está em teste na rede
+  # interna — acesso direto via http://<ip-do-servidor>:8004. Para reativar o
+  # HTTPS, descomente o serviço abaixo e volte o bind de input-arquivos para
+  # "127.0.0.1:8004:8004".
+  # caddy:
+  #   image: caddy:2
+  #   container_name: input-arquivos-caddy
+  #   depends_on:
+  #     - input-arquivos
+  #   env_file: .env
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./Caddyfile:/etc/caddy/Caddyfile:ro
+  #     - caddy_data:/data     # guarda a CA local e os certificados
+  #     - caddy_config:/config
+  #   restart: unless-stopped
 
-volumes:
-  caddy_data:
-  caddy_config:
+# volumes:
+#   caddy_data:
+#   caddy_config:
