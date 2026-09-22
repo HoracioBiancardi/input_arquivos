@@ -15,6 +15,10 @@ class DuplicateNameError(ValueError):
     """Erro levantado ao tentar criar um context com um nome já cadastrado."""
 
 
+class MinioBucketError(RuntimeError):
+    """Erro levantado ao falhar a criação/verificação automática de um bucket no MinIO."""
+
+
 @dataclass
 class ConnectionTestResult:
     """Resultado de um teste de conectividade com um destino (MinIO ou pasta local).
@@ -119,6 +123,9 @@ class ContextService:
         if self.get_by_name(name) is not None:
             raise DuplicateNameError(f"Já existe um context com o nome '{name}'.")
 
+        if destination_type == DestinationType.MINIO and minio_bucket:
+            self._ensure_minio_bucket(minio_bucket)
+
         context = Context(
             name=name,
             destination_type=destination_type,
@@ -160,6 +167,13 @@ class ContextService:
             context = db_session.get(Context, context_id)
             if context is None:
                 return None
+
+            if "minio_bucket" in fields or "destination_type" in fields:
+                effective_destination_type = fields.get("destination_type", context.destination_type)
+                effective_bucket = fields.get("minio_bucket", context.minio_bucket)
+                if effective_destination_type == DestinationType.MINIO and effective_bucket:
+                    self._ensure_minio_bucket(str(effective_bucket))
+
             for field_name, value in fields.items():
                 setattr(context, field_name, value)
             db_session.flush()
@@ -175,6 +189,27 @@ class ContextService:
             active: Novo estado de ativação.
         """
         self.update(context_id, active=active)
+
+    @staticmethod
+    def _ensure_minio_bucket(bucket: str) -> None:
+        """Garante que um bucket exista no MinIO, criando-o se necessário.
+
+        Chamado ao criar/atualizar um context do tipo MinIO, para que o
+        bucket já exista assim que o context é salvo — sem depender do
+        primeiro upload (`MinioWriter`) ou do botão manual "Testar conexão".
+
+        Args:
+            bucket: Nome do bucket a garantir.
+
+        Raises:
+            MinioBucketError: Se não for possível conectar ao MinIO ou criar o bucket.
+        """
+        try:
+            client = build_minio_client()
+            if not client.bucket_exists(bucket):
+                client.make_bucket(bucket)
+        except Exception as error:  # noqa: BLE001 - erro de conectividade externo, reportado ao usuário
+            raise MinioBucketError(f"Falha ao criar/verificar o bucket '{bucket}' no MinIO: {error}") from error
 
     def test_minio_connection(self, bucket: str) -> ConnectionTestResult:
         """Testa a conectividade com um bucket no servidor MinIO configurado globalmente.

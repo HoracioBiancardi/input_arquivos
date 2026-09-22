@@ -4,7 +4,38 @@ import pytest
 
 from input_arquivos.backend.db.session import DatabaseSessionFactory
 from input_arquivos.backend.models.context import DestinationType, PdfMode
-from input_arquivos.backend.services.context_service import ContextService, DuplicateNameError
+from input_arquivos.backend.services import context_service as context_service_module
+from input_arquivos.backend.services.context_service import ContextService, DuplicateNameError, MinioBucketError
+
+
+class _FakeMinioClient:
+    """Dublê do client MinIO, sem I/O de rede, para isolar os testes de CRUD de contexts."""
+
+    def __init__(self, existing_buckets: set[str] | None = None, fail: bool = False) -> None:
+        self.existing_buckets = existing_buckets or set()
+        self.created_buckets: list[str] = []
+        self.fail = fail
+
+    def bucket_exists(self, bucket: str) -> bool:
+        if self.fail:
+            raise RuntimeError("conexão recusada")
+        return bucket in self.existing_buckets
+
+    def make_bucket(self, bucket: str) -> None:
+        self.created_buckets.append(bucket)
+        self.existing_buckets.add(bucket)
+
+
+@pytest.fixture(autouse=True)
+def fake_minio_client(monkeypatch: pytest.MonkeyPatch) -> _FakeMinioClient:
+    """Substitui `build_minio_client` por um dublê, para todos os testes deste módulo.
+
+    Sem isso, todo `create`/`update` de um context MINIO tentaria conectar a
+    um MinIO real (já que agora criam o bucket automaticamente).
+    """
+    client = _FakeMinioClient()
+    monkeypatch.setattr(context_service_module, "build_minio_client", lambda: client)
+    return client
 
 
 def test_create_and_get_by_name(session_factory: DatabaseSessionFactory) -> None:
@@ -155,3 +186,115 @@ def test_update_keeping_same_name_does_not_raise(session_factory: DatabaseSessio
 
     assert updated is not None
     assert updated.pdf_mode == PdfMode.RAW_ARCHIVE
+
+
+def test_create_creates_minio_bucket_when_missing(
+    session_factory: DatabaseSessionFactory, fake_minio_client: _FakeMinioClient
+) -> None:
+    """Criar um context MINIO deve criar o bucket no MinIO se ele ainda não existir."""
+    service = ContextService(session_factory)
+
+    service.create(
+        name="vendas",
+        destination_type=DestinationType.MINIO,
+        pdf_mode=PdfMode.METADATA_ONLY,
+        minio_bucket="vendas",
+    )
+
+    assert fake_minio_client.created_buckets == ["vendas"]
+
+
+def test_create_does_not_recreate_existing_bucket(
+    session_factory: DatabaseSessionFactory, fake_minio_client: _FakeMinioClient
+) -> None:
+    """Criar um context com um bucket que já existe no MinIO não deve chamar `make_bucket`."""
+    fake_minio_client.existing_buckets.add("vendas")
+    service = ContextService(session_factory)
+
+    service.create(
+        name="vendas",
+        destination_type=DestinationType.MINIO,
+        pdf_mode=PdfMode.METADATA_ONLY,
+        minio_bucket="vendas",
+    )
+
+    assert fake_minio_client.created_buckets == []
+
+
+def test_create_local_context_does_not_touch_minio(
+    session_factory: DatabaseSessionFactory, fake_minio_client: _FakeMinioClient
+) -> None:
+    """Criar um context do tipo LOCAL não deve tentar criar bucket nenhum."""
+    fake_minio_client.fail = True
+    service = ContextService(session_factory)
+
+    service.create(
+        name="vendas",
+        destination_type=DestinationType.LOCAL,
+        pdf_mode=PdfMode.METADATA_ONLY,
+        local_path="/tmp/vendas",
+    )
+
+    assert fake_minio_client.created_buckets == []
+
+
+def test_create_raises_and_does_not_persist_when_minio_unreachable(
+    session_factory: DatabaseSessionFactory, fake_minio_client: _FakeMinioClient
+) -> None:
+    """Se o MinIO estiver inacessível, `create` deve levantar `MinioBucketError` e não salvar o context."""
+    fake_minio_client.fail = True
+    service = ContextService(session_factory)
+
+    with pytest.raises(MinioBucketError):
+        service.create(
+            name="vendas",
+            destination_type=DestinationType.MINIO,
+            pdf_mode=PdfMode.METADATA_ONLY,
+            minio_bucket="vendas",
+        )
+
+    assert service.get_by_name("vendas") is None
+
+
+def test_update_creates_bucket_when_bucket_changes(
+    session_factory: DatabaseSessionFactory, fake_minio_client: _FakeMinioClient
+) -> None:
+    """Trocar o bucket de um context existente deve criar o novo bucket, se necessário."""
+    service = ContextService(session_factory)
+    context = service.create(
+        name="vendas",
+        destination_type=DestinationType.MINIO,
+        pdf_mode=PdfMode.METADATA_ONLY,
+        minio_bucket="vendas",
+    )
+
+    service.update(
+        context.id,
+        name="vendas",
+        destination_type=DestinationType.MINIO,
+        pdf_mode=PdfMode.METADATA_ONLY,
+        minio_bucket="vendas-novo",
+    )
+
+    assert "vendas-novo" in fake_minio_client.created_buckets
+
+
+def test_set_active_does_not_require_minio_connectivity(
+    session_factory: DatabaseSessionFactory, fake_minio_client: _FakeMinioClient
+) -> None:
+    """Ativar/desativar um context não deve depender do MinIO estar acessível."""
+    service = ContextService(session_factory)
+    context = service.create(
+        name="vendas",
+        destination_type=DestinationType.MINIO,
+        pdf_mode=PdfMode.METADATA_ONLY,
+        minio_bucket="vendas",
+    )
+
+    fake_minio_client.fail = True
+
+    service.set_active(context.id, active=False)
+
+    updated = service.get_by_id(context.id)
+    assert updated is not None
+    assert updated.active is False
