@@ -322,11 +322,4 @@ document.addEventListener("DOMContentLoaded", () => {
     const result = await apiFetch("/api/contexts/test-local", { method: "POST", body: { path } });
     setTestResult("local-test-result", result);
   });
-
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal) closeModal();
-  });
-  rulesModal.addEventListener("click", (event) => {
-    if (event.target === rulesModal) closeRulesModal();
-  });
 });

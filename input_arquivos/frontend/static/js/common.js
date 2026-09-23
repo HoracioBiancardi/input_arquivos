@@ -194,11 +194,43 @@ function confirmModal({ title, body, confirmLabel = "Confirmar", cancelLabel = "
       resolve(result);
     }
 
-    overlay.addEventListener("click", (event) => {
-      if (event.target === overlay) close(false);
-    });
-    overlay.querySelector('[data-action="cancel"]').addEventListener("click", () => close(false));
+    overlay.querySelectorAll('[data-action="cancel"]').forEach((button) => button.addEventListener("click", () => close(false)));
     overlay.querySelector('[data-action="confirm"]').addEventListener("click", () => close(true));
+
+    document.body.appendChild(overlay);
+  });
+}
+
+function alertModal({ title, body, closeLabel = "Fechar", maxWidth = "560px" }) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "overlay open";
+
+    overlay.innerHTML = `
+      <div class="modal glass" style="max-width: ${maxWidth}; max-height: 90vh; overflow-y: auto">
+        <div class="modal-header">
+          <h2>${esc(title)}</h2>
+          <button class="close-btn" data-action="close">X</button>
+        </div>
+        <div class="modal-body mb-4">${body}</div>
+        <div class="modal-footer">
+          <button type="button" data-action="close" class="btn btn-primary">${esc(closeLabel)}</button>
+        </div>
+      </div>
+    `;
+
+    function close() {
+      overlay.remove();
+      document.removeEventListener("keydown", onKeydown);
+      resolve();
+    }
+
+    function onKeydown(event) {
+      if (event.key === "Escape") close();
+    }
+
+    overlay.querySelectorAll('[data-action="close"]').forEach((button) => button.addEventListener("click", close));
+    document.addEventListener("keydown", onKeydown);
 
     document.body.appendChild(overlay);
   });

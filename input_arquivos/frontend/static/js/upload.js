@@ -121,14 +121,76 @@ function viewTableAction(item) {
   if (item.status === "success" && item.artifact_kind === "parquet") {
     return `<a href="/uploads/${item.id}/preview" class="btn btn-ghost btn-sm">Visualizar →</a>`;
   }
+  if (item.status !== "success") {
+    return `<button type="button" class="btn btn-ghost btn-sm" data-error-id="${item.id}">Ver erro</button>`;
+  }
   return "—";
 }
+
+const DATA_VIOLATION_PREFIX = "Dados inválidos: ";
+const violationReasonLabels = {
+  coluna_ausente: "coluna ausente no arquivo",
+  obrigatoria: "célula(s) vazia(s)",
+  tipo_invalido: "valor(es) fora do tipo esperado",
+};
+const ruleTypeLabels = { text: "Texto", integer: "Inteiro", decimal: "Decimal", date: "Data", boolean: "Boolean" };
+
+// Mensagem gravada no histórico: "Dados inválidos: col (motivo, N linha(s)); col2 (...)" vira uma lista;
+// qualquer outra mensagem (erro de leitura, MinIO, cancelamento) é exibida como texto corrido.
+function errorMessageHtml(message) {
+  if (!message) return "<p>Nenhum detalhe foi registrado para este erro.</p>";
+  if (message.startsWith(DATA_VIOLATION_PREFIX)) {
+    const items = message.slice(DATA_VIOLATION_PREFIX.length).split("; ");
+    return `
+      <p>O arquivo foi rejeitado porque alguns dados não respeitam as regras de coluna do contexto:</p>
+      <ul class="mt-2" style="list-style: disc; padding-left: 1.25rem">${items.map((item) => `<li>${esc(item)}</li>`).join("")}</ul>`;
+  }
+  return `<p style="white-space: pre-wrap; word-break: break-word">${esc(message)}</p>`;
+}
+
+function showHistoryError(item) {
+  alertModal({
+    title: "Detalhes do erro",
+    body: `
+      <p><strong>Arquivo:</strong> ${esc(item.filename)}</p>
+      <p><strong>Contexto:</strong> ${esc(item.context_name)} · <strong>Data:</strong> ${formatDate(item.created_at)}</p>
+      <div class="mt-3">${errorMessageHtml(item.error_message)}</div>`,
+  });
+}
+
+// Resposta 422 da API (antes de gravar no histórico) traz as amostras de linhas com problema,
+// que a mensagem do histórico não guarda — por isso esse modal é mais detalhado que o do "Ver erro".
+function showViolationModal(filename, violations) {
+  const blocks = violations
+    .map((item) => {
+      const reason = violationReasonLabels[item.reason] || item.reason;
+      const type = ruleTypeLabels[item.rule_type] || item.rule_type;
+      const header = `<p class="mt-3"><strong>${esc(item.column)}</strong> (${esc(type)}): ${
+        item.reason === "coluna_ausente" ? esc(reason) : `${item.bad_row_count} linha(s) com ${esc(reason)}`
+      }</p>`;
+      if (!item.sample?.length) return header;
+      const rows = item.sample
+        .map((sample) => `<tr><td class="px-2 py-1">${sample.row}</td><td class="px-2 py-1 font-mono">${esc(sample.value) || "<em>(vazio)</em>"}</td></tr>`)
+        .join("");
+      const more = item.bad_row_count > item.sample.length ? `<p class="text-xs">… e mais ${item.bad_row_count - item.sample.length} linha(s).</p>` : "";
+      return `${header}
+        <table class="text-sm mt-1"><thead><tr><th class="px-2 py-1 text-left">Linha</th><th class="px-2 py-1 text-left">Valor</th></tr></thead><tbody>${rows}</tbody></table>${more}`;
+    })
+    .join("");
+  alertModal({
+    title: "Arquivo rejeitado — dados inválidos",
+    body: `<p><strong>Arquivo:</strong> ${esc(filename)}</p>${blocks}`,
+  });
+}
+
+let historyById = {};
 
 async function loadHistory() {
   try {
     const history = await apiFetch("/api/uploads/recent?limit=20");
     const rows = document.getElementById("history-rows");
     if (!rows || !history || history.length === 0) return;
+    historyById = Object.fromEntries(history.map((item) => [item.id, item]));
 
     rows.innerHTML = history
       .map(
@@ -181,17 +243,7 @@ async function handleSubmit(event) {
       result = await submitUpload(buildFormData());
     } catch (error) {
       if (error.status === 422 && error.data?.detail?.violations) {
-        const violation = error.data.detail;
-        const reasonLabels = {
-          coluna_ausente: "coluna ausente no arquivo",
-          obrigatoria: "célula(s) vazia(s)",
-          tipo_invalido: "valor(es) fora do tipo esperado",
-        };
-        const parts = violation.violations.map((item) => {
-          const kind = reasonLabels[item.reason] || item.reason;
-          return item.reason === "coluna_ausente" ? `${item.column}: ${kind}` : `${item.column}: ${item.bad_row_count} linha(s) com ${kind}`;
-        });
-        showToast(`Arquivo rejeitado — dados inválidos: ${parts.join("; ")}.`, "negative");
+        showViolationModal(file.name, error.data.detail.violations);
         fileInput.value = "";
         await loadHistory();
         return;
@@ -230,7 +282,7 @@ async function handleSubmit(event) {
         viewLastUploadLink.classList.remove("hidden");
       }
     } else if (result) {
-      showToast(`Falha no envio: ${result.error_message || "Erro desconhecido"}`, "negative");
+      showHistoryError(result);
     }
     fileInput.value = "";
     document.getElementById("selected-file-badge")?.classList.add("hidden");
@@ -249,4 +301,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   await loadHistory();
   contextSelect?.addEventListener("change", handleContextChange);
   uploadForm?.addEventListener("submit", handleSubmit);
+  document.getElementById("history-rows")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-error-id]");
+    const item = button && historyById[button.dataset.errorId];
+    if (item) showHistoryError(item);
+  });
 });
