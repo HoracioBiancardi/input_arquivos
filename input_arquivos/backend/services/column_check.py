@@ -12,6 +12,36 @@ _VALID_RULE_TYPES = {"text", "integer", "decimal", "date", "boolean"}
 _BOOLEAN_TRUE_TOKENS = {"sim", "s", "true", "verdadeiro", "1", "yes", "y"}
 _BOOLEAN_FALSE_TOKENS = {"não", "nao", "n", "false", "falso", "0", "no"}
 _SAMPLE_LIMIT = 5
+# Datas no Excel são números de dias desde 30/12/1899 (1 = 01/01/1900, 2958465 = 31/12/9999).
+_EXCEL_EPOCH = "1899-12-30"
+_EXCEL_MAX_SERIAL = 2958465
+
+
+def _parse_dates(values: pd.Series) -> pd.Series:
+    """Converte uma coluna de datas "de planilha" em `datetime64`, com `NaT` onde não der.
+
+    Uma célula numérica (int/float) é tratada como número de série do Excel —
+    é o que sobra de uma célula de data que perdeu a formatação (ex.: `45000`
+    = 15/03/2023). Sem isso, `pd.to_datetime(45000)` interpreta o número como
+    nanossegundos desde 1970 e a data chega errada ao destino sem nenhum
+    aviso. Texto e objetos de data seguem o parse normal, com o dia primeiro
+    (DD/MM/AAAA).
+
+    Args:
+        values: Coluna com as células a converter (sem vazios).
+
+    Returns:
+        Série `datetime64` com o mesmo índice de `values`.
+    """
+    is_number = values.map(lambda value: pd.api.types.is_number(value) and not pd.api.types.is_bool(value))
+    parsed = pd.Series(pd.NaT, index=values.index, dtype="datetime64[ns]")
+    if is_number.any():
+        serials = pd.to_numeric(values[is_number], errors="coerce")
+        serials = serials.where((serials >= 1) & (serials <= _EXCEL_MAX_SERIAL))
+        parsed[is_number] = pd.to_datetime(serials, unit="D", origin=_EXCEL_EPOCH, errors="coerce")
+    if not is_number.all():
+        parsed[~is_number] = pd.to_datetime(values[~is_number], errors="coerce", dayfirst=True)
+    return parsed
 
 
 @dataclass
@@ -266,8 +296,7 @@ class ColumnDataValidator:
                 ok = ok & numeric.apply(lambda v: bool(pd.notna(v)) and float(v).is_integer())
             return ok
         if rule_type == "date":
-            parsed = pd.to_datetime(values, errors="coerce", dayfirst=True)
-            return parsed.notna()
+            return _parse_dates(values).notna()
         if rule_type == "boolean":
             return values.apply(self._is_boolean_like)
         return pd.Series(False, index=values.index)  # inalcançável: rule_type já validado em _parse_column_rules
@@ -350,7 +379,7 @@ class ColumnTypeCaster:
         if rule_type == "decimal":
             return pd.to_numeric(values, errors="coerce").astype("Float64")
         if rule_type == "date":
-            parsed = pd.to_datetime(values, errors="coerce", dayfirst=True)
+            parsed = _parse_dates(values.dropna()).reindex(values.index)
             return parsed.dt.date.astype(object).where(parsed.notna(), None)
         return values.map(self._to_boolean, na_action="ignore").astype("boolean")
 

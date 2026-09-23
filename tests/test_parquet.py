@@ -3,8 +3,9 @@
 import io
 
 import pandas as pd
+import pytest
 
-from input_arquivos.backend.ingestion.parquet import ParquetConverter
+from input_arquivos.backend.ingestion.parquet import MixedColumnTypesError, ParquetConverter
 
 
 def test_to_bytes_round_trips_dataframe_contents() -> None:
@@ -25,3 +26,11 @@ def test_to_bytes_returns_non_empty_bytes() -> None:
 
     assert isinstance(parquet_bytes, bytes)
     assert len(parquet_bytes) > 0
+
+
+def test_to_bytes_explains_mixed_type_column() -> None:
+    """Uma coluna com número e texto misturados deve gerar um erro legível que cita a coluna."""
+    dataframe = pd.DataFrame({"Data Fatura": [45000, "13/2026"]})
+
+    with pytest.raises(MixedColumnTypesError, match="'Data Fatura' mistura tipos"):
+        ParquetConverter().to_bytes(dataframe)

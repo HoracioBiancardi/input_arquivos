@@ -319,3 +319,31 @@ def test_column_type_caster_gives_same_dtype_with_or_without_blanks() -> None:
     with_blank = ColumnTypeCaster().cast(context, pd.DataFrame({"qtd": [1, np.nan]}))
 
     assert full["qtd"].dtype == with_blank["qtd"].dtype == "Int64"
+
+
+def test_date_rule_treats_numbers_as_excel_serial() -> None:
+    """Número numa coluna Data é número de série do Excel (45000 = 15/03/2023), não nanossegundos de 1970."""
+    context = _make_context(column_rules=[{"column": "data", "type": "date", "required": True}])
+    dataframe = pd.DataFrame({"data": [datetime.datetime(2026, 7, 1), 45000, "23/09/2026", "13/2026"]})
+
+    violation = ColumnDataValidator().check(context, dataframe)
+    typed = ColumnTypeCaster().cast(context, dataframe)
+
+    assert violation is not None
+    assert [(detail.reason, [sample.value for sample in detail.sample]) for detail in violation.details] == [
+        ("tipo_invalido", ["13/2026"])
+    ]
+    assert typed["data"].tolist()[:3] == [
+        datetime.date(2026, 7, 1),
+        datetime.date(2023, 3, 15),
+        datetime.date(2026, 9, 23),
+    ]
+
+
+def test_date_rule_rejects_out_of_range_serial() -> None:
+    """Um número fora da faixa de datas do Excel não deve virar data."""
+    context = _make_context(column_rules=[{"column": "data", "type": "date", "required": False}])
+
+    violation = ColumnDataValidator().check(context, pd.DataFrame({"data": [-5, 99999999]}))
+
+    assert violation is not None and violation.details[0].bad_row_count == 2
