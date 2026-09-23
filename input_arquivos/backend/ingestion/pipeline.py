@@ -22,6 +22,7 @@ from input_arquivos.backend.ingestion.readers import (
     YamlReader,
 )
 from input_arquivos.backend.models.context import Context, ImageMode, PdfMode
+from input_arquivos.backend.services.column_check import ColumnTypeCaster, text_rule_columns
 
 
 @dataclass
@@ -71,6 +72,7 @@ class IngestionPipeline:
         self._ods_reader = OdsReader()
         self._html_reader = HtmlReader()
         self._parquet_converter = ParquetConverter()
+        self._column_caster = ColumnTypeCaster()
         self._file_types = FileTypeRegistry()
 
     def process(self, file_bytes: bytes, filename: str, context: Context, uploaded_by: str) -> IngestResult:
@@ -128,7 +130,12 @@ class IngestionPipeline:
 
         dataframe = self._read(file_bytes, filename, file_type, context)
         dataframe = self._inject_tracking_columns(dataframe, context.name, uploaded_by)
-        parquet_bytes = self._parquet_converter.to_bytes(dataframe)
+        # O Parquet sai com os tipos das regras do contexto (esquema estável para a
+        # carga no SQL Server); `dataframe` segue cru para o `ColumnDataValidator`
+        # conseguir apontar as células inválidas — se houver alguma, o upload é
+        # bloqueado antes de `finalize`, então os nulos gerados na conversão nunca
+        # chegam ao destino.
+        parquet_bytes = self._parquet_converter.to_bytes(self._column_caster.cast(context, dataframe))
         page_count = int(dataframe["page_count"].iloc[0]) if "page_count" in dataframe.columns else None
 
         return IngestResult(
@@ -155,7 +162,7 @@ class IngestionPipeline:
         if file_type == FileType.EXCEL:
             return self._excel_reader.read(file_bytes)
         if file_type in (FileType.CSV, FileType.TXT):
-            return self._csv_reader.read(file_bytes)
+            return self._csv_reader.read(file_bytes, text_columns=text_rule_columns(context))
         if file_type == FileType.IMAGE:
             borderless = context.image_mode == ImageMode.TABLE_BORDERLESS
             return self._image_table_reader.read(file_bytes, borderless=borderless)

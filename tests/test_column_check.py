@@ -1,12 +1,13 @@
-"""Testes do ColumnMismatchChecker e do ColumnDataValidator."""
+"""Testes do ColumnMismatchChecker, do ColumnDataValidator e do ColumnTypeCaster."""
 
+import datetime
 import json
 
 import numpy as np
 import pandas as pd
 
 from input_arquivos.backend.models.context import Context, DestinationType, PdfMode
-from input_arquivos.backend.services.column_check import ColumnDataValidator, ColumnMismatchChecker
+from input_arquivos.backend.services.column_check import ColumnDataValidator, ColumnMismatchChecker, ColumnTypeCaster
 
 
 def _make_context(
@@ -264,3 +265,57 @@ def test_column_data_validator_ignores_malformed_json() -> None:
     dataframe = _tracked_dataframe(["produto"])
 
     assert ColumnDataValidator().check(context, dataframe) is None
+
+
+def test_column_type_caster_returns_same_dataframe_without_rules() -> None:
+    """Sem regras no contexto, o DataFrame não é tocado."""
+    dataframe = pd.DataFrame({"a": [1, 2]})
+
+    assert ColumnTypeCaster().cast(_make_context(), dataframe) is dataframe
+
+
+def test_column_type_caster_applies_rule_types() -> None:
+    """Cada coluna regrada deve sair no tipo da regra, com vazios virando nulo."""
+    context = _make_context(
+        column_rules=[
+            {"column": "codigo", "type": "text", "required": True},
+            {"column": "qtd", "type": "integer", "required": False},
+            {"column": "valor", "type": "decimal", "required": False},
+            {"column": "data", "type": "date", "required": False},
+            {"column": "ativo", "type": "boolean", "required": False},
+        ]
+    )
+    dataframe = pd.DataFrame(
+        {
+            "codigo": [123.0, "0456"],
+            "qtd": ["10", ""],
+            "valor": [1, "2.5"],
+            "data": ["23/09/2026", None],
+            "ativo": ["Sim", "não"],
+            "livre": ["x", "y"],
+        }
+    )
+
+    typed = ColumnTypeCaster().cast(context, dataframe)
+
+    assert typed["codigo"].dtype == "string"
+    assert typed["codigo"].tolist() == ["123", "0456"]
+    assert typed["qtd"].dtype == "Int64"
+    assert typed["qtd"].iloc[0] == 10 and pd.isna(typed["qtd"].iloc[1])
+    assert typed["valor"].dtype == "Float64"
+    assert typed["valor"].tolist() == [1.0, 2.5]
+    assert typed["data"].iloc[0] == datetime.date(2026, 9, 23) and typed["data"].iloc[1] is None
+    assert typed["ativo"].dtype == "boolean"
+    assert typed["ativo"].tolist() == [True, False]
+    assert typed["livre"].dtype == dataframe["livre"].dtype
+    assert dataframe["qtd"].tolist() == ["10", ""]
+
+
+def test_column_type_caster_gives_same_dtype_with_or_without_blanks() -> None:
+    """Uma coluna Inteiro deve sair `Int64` tanto num arquivo completo quanto num com célula vazia."""
+    context = _make_context(column_rules=[{"column": "qtd", "type": "integer", "required": False}])
+
+    full = ColumnTypeCaster().cast(context, pd.DataFrame({"qtd": [1, 2]}))
+    with_blank = ColumnTypeCaster().cast(context, pd.DataFrame({"qtd": [1, np.nan]}))
+
+    assert full["qtd"].dtype == with_blank["qtd"].dtype == "Int64"

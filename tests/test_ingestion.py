@@ -283,3 +283,22 @@ def test_process_raises_when_no_table_found_in_html() -> None:
     """Um HTML sem nenhuma <table> deve levantar `ValueError`."""
     with pytest.raises(ValueError, match="Nenhuma tabela"):
         IngestionPipeline().process(b"<html><body><p>sem tabela</p></body></html>", "vazio.html", _make_context(), uploaded_by="joao")
+
+
+def test_parquet_uses_context_column_rule_types() -> None:
+    """O Parquet gerado deve ter o tipo das regras do contexto, mas o `dataframe` do artefato segue cru."""
+    context = _make_context()
+    context.column_rules = json.dumps(
+        [
+            {"column": "cep", "type": "text", "required": True},
+            {"column": "qtd", "type": "integer", "required": False},
+        ]
+    )
+    csv_bytes = "cep;qtd\n01310100;5\n20040002;\n".encode()
+
+    result = IngestionPipeline().process(csv_bytes, "enderecos.csv", context, "maria")
+    typed = pd.read_parquet(io.BytesIO(result.artifact_bytes))
+
+    assert typed["cep"].tolist() == ["01310100", "20040002"]
+    assert str(typed["qtd"].dtype) == "Int64"
+    assert str(result.dataframe["qtd"].dtype) == "float64"

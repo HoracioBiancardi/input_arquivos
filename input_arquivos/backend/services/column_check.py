@@ -122,6 +122,20 @@ def _parse_column_rules(raw: str) -> list[_ParsedColumnRule]:
     return parsed
 
 
+def text_rule_columns(context: Context) -> list[str]:
+    """Lista as colunas que o contexto declara como `text`, para os leitores não inferirem número nelas.
+
+    Args:
+        context: Contexto do upload.
+
+    Returns:
+        Nomes das colunas com regra do tipo `text` (lista vazia se não houver regras).
+    """
+    if not context.column_rules:
+        return []
+    return [rule.column for rule in _parse_column_rules(context.column_rules) if rule.rule_type == "text"]
+
+
 @dataclass
 class ColumnRuleSample:
     """Uma amostra de célula que violou uma regra de validação de dados.
@@ -281,3 +295,78 @@ class ColumnDataValidator:
             bad_row_count=len(bad_positions),
             sample=sample,
         )
+
+
+class ColumnTypeCaster:
+    """Converte as colunas de um DataFrame para os tipos declarados em `context.column_rules`.
+
+    Sem isso, o tipo de cada coluna no Parquet é o que o pandas inferir em
+    cada arquivo (ex.: uma coluna Inteiro vira `float64` se tiver uma célula
+    vazia, ou um código com zero à esquerda vira `int64`), e arquivos do
+    mesmo contexto saem com esquemas diferentes — o que quebra a carga numa
+    tabela única do SQL Server. Com a conversão, todo Parquet de um contexto
+    com regras tem o mesmo esquema nas colunas regradas.
+
+    Deve ser aplicado a um DataFrame que já passou pelo `ColumnDataValidator`:
+    valores que não convertem viram nulo em vez de levantar exceção.
+    """
+
+    def cast(self, context: Context, dataframe: pd.DataFrame) -> pd.DataFrame:
+        """Retorna uma cópia do DataFrame com as colunas regradas convertidas para o tipo da regra.
+
+        Mapeamento: `text` -> string, `integer` -> Int64 (aceita nulo),
+        `decimal` -> Float64, `date` -> date (sem hora), `boolean` -> boolean.
+        Células vazias/em branco viram nulo. Colunas sem regra (ou regras cuja
+        coluna não veio no arquivo) ficam como estão.
+
+        Args:
+            context: Contexto do upload, com as regras em `column_rules`.
+            dataframe: DataFrame lido do arquivo (com as colunas de rastreabilidade).
+
+        Returns:
+            Novo DataFrame com os tipos ajustados, ou o próprio DataFrame se o
+            contexto não tiver regras.
+        """
+        if not context.column_rules:
+            return dataframe
+        rules = [rule for rule in _parse_column_rules(context.column_rules) if rule.column in dataframe.columns]
+        if not rules:
+            return dataframe
+
+        typed = dataframe.copy()
+        for rule in rules:
+            column = typed[rule.column]
+            empty_mask = column.isna() | (column.astype(str).str.strip().eq("") & column.notna())
+            typed[rule.column] = self._cast_column(column.mask(empty_mask), rule.rule_type)
+        return typed
+
+    def _cast_column(self, values: pd.Series, rule_type: str) -> pd.Series:
+        """Converte uma única coluna (já com vazios como nulo) para o tipo da regra."""
+        if rule_type == "text":
+            return values.map(self._to_text, na_action="ignore").astype("string")
+        if rule_type == "integer":
+            numeric = pd.to_numeric(values, errors="coerce")
+            return numeric.where(numeric % 1 == 0).astype("Int64")
+        if rule_type == "decimal":
+            return pd.to_numeric(values, errors="coerce").astype("Float64")
+        if rule_type == "date":
+            parsed = pd.to_datetime(values, errors="coerce", dayfirst=True)
+            return parsed.dt.date.astype(object).where(parsed.notna(), None)
+        return values.map(self._to_boolean, na_action="ignore").astype("boolean")
+
+    def _to_text(self, value: object) -> str:
+        """Converte um valor em texto, sem o `.0` que o pandas põe em números inteiros lidos como float."""
+        if isinstance(value, float) and value.is_integer():
+            return str(int(value))
+        return str(value)
+
+    def _to_boolean(self, value: object) -> bool | None:
+        """Converte um booleano nativo ou token sim/não em `bool`; qualquer outro valor vira nulo."""
+        if pd.api.types.is_bool(value):
+            return bool(value)
+        text = str(value).strip().lower()
+        if text in _BOOLEAN_TRUE_TOKENS:
+            return True
+        if text in _BOOLEAN_FALSE_TOKENS:
+            return False
+        return None

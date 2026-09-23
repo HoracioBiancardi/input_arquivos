@@ -84,11 +84,15 @@ class ExcelReader:
 class CsvReader:
     """Lê arquivos CSV e retorna seu conteúdo como DataFrame."""
 
-    def read(self, file_bytes: bytes) -> pd.DataFrame:
+    def read(self, file_bytes: bytes, text_columns: list[str] | None = None) -> pd.DataFrame:
         """Lê um arquivo CSV, detectando automaticamente o delimitador.
 
         Args:
             file_bytes: Conteúdo bruto do arquivo .csv.
+            text_columns: Colunas a ler como texto, sem inferência numérica —
+                senão um código/CEP como `01310100` vira o número `1310100`
+                na leitura e o zero à esquerda se perde antes de qualquer
+                regra de tipo do contexto ser aplicada.
 
         Returns:
             DataFrame com os dados do arquivo CSV.
@@ -97,7 +101,13 @@ class CsvReader:
         # exportados do Excel no Windows — e se comporta como "utf-8" normal quando ausente.
         # Sem isso, a primeira coluna do arquivo vira "﻿id" em vez de "id", o que
         # aparece como uma divergência de colunas falsa na comparação com uploads anteriores.
-        return pd.read_csv(io.BytesIO(file_bytes), sep=None, engine="python", encoding="utf-8-sig")
+        return pd.read_csv(
+            io.BytesIO(file_bytes),
+            sep=None,
+            engine="python",
+            encoding="utf-8-sig",
+            dtype={column: str for column in text_columns or []},
+        )
 
 
 class PdfTableReader:
