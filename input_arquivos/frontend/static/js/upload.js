@@ -196,13 +196,13 @@ async function loadHistory() {
       .map(
         (item) => `
         <tr class="border-b border-black/5 dark:border-white/10 last:border-0">
-          <td class="px-4 py-2 font-mono font-bold">${esc(item.filename)}</td>
+          <td class="px-4 py-2 font-mono font-bold" style="overflow-wrap: anywhere; min-width: 10rem">${esc(item.filename)}</td>
           <td class="px-4 py-2">${esc(item.context_name)}</td>
-          <td class="px-4 py-2">${esc(item.destination_detail) || "-"}</td>
+          <td class="px-4 py-2 hidden lg:table-cell" style="overflow-wrap: anywhere; min-width: 12rem">${esc(item.destination_detail) || "-"}</td>
           <td class="px-4 py-2 text-center">${statusBadge(item.status)}</td>
-          <td class="px-4 py-2">${esc(item.uploaded_by)}</td>
-          <td class="px-4 py-2">${formatDate(item.created_at)}</td>
-          <td class="px-4 py-2 text-right">${viewTableAction(item)}</td>
+          <td class="px-4 py-2 hidden md:table-cell">${esc(item.uploaded_by)}</td>
+          <td class="px-4 py-2 whitespace-nowrap">${formatDate(item.created_at)}</td>
+          <td class="px-4 py-2 text-right whitespace-nowrap sticky-action">${viewTableAction(item)}</td>
         </tr>`
       )
       .join("");

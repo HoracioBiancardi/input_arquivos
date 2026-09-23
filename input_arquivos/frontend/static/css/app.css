@@ -54,3 +54,15 @@ body {
   background: var(--surface-alt);
   color: var(--text-muted);
 }
+
+/* Coluna de ações fixa à direita em tabelas com rolagem horizontal: em telas
+   estreitas o botão continua visível sem precisar rolar até o fim da tabela. */
+.sticky-action {
+  position: sticky;
+  right: 0;
+  background: var(--surface);
+  box-shadow: -8px 0 8px -8px rgba(0, 0, 0, .45);
+}
+table tbody tr:hover .sticky-action {
+  background: var(--surface-hover);
+}

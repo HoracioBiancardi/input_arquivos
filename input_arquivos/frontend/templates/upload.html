@@ -65,7 +65,7 @@
     </div>
 
     <!-- Card de Histórico de Envios -->
-    <div class="modal glass surface-card shadow-xl" style="max-width:100%; border-radius: var(--r-lg);">
+    <div class="modal glass surface-card shadow-xl min-w-0" style="max-width:100%; border-radius: var(--r-lg);">
       <div class="flex items-center gap-3 mb-4">
         <div class="brand-icon" style="width: 32px; height: 32px; background: var(--surface-alt); color: var(--text);">
           <span>🕒</span>
@@ -79,11 +79,11 @@
             <tr style="background: var(--surface-alt); color: var(--text-muted); border-bottom: 1px solid var(--border);">
               <th class="px-4 py-3 font-semibold">Arquivo</th>
               <th class="px-4 py-3 font-semibold">Contexto</th>
-              <th class="px-4 py-3 font-semibold">Destino</th>
+              <th class="px-4 py-3 font-semibold hidden lg:table-cell">Destino</th>
               <th class="px-4 py-3 font-semibold text-center">Status</th>
-              <th class="px-4 py-3 font-semibold">Enviado por</th>
-              <th class="px-4 py-3 font-semibold">Data de Envio</th>
-              <th class="px-4 py-3 font-semibold text-right">Ações</th>
+              <th class="px-4 py-3 font-semibold hidden md:table-cell">Enviado por</th>
+              <th class="px-4 py-3 font-semibold whitespace-nowrap">Data de Envio</th>
+              <th class="px-4 py-3 font-semibold text-right sticky-action" style="background: var(--surface-alt);">Ações</th>
             </tr>
           </thead>
           <tbody id="history-rows" class="divide-y divide-slate-700/30">
