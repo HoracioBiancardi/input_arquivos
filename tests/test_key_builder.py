@@ -1,15 +1,32 @@
 """Testes do PartitionedKeyBuilder: sanitização de filename contra path traversal."""
 
+import re
+
 from input_arquivos.backend.destinations.key_builder import PartitionedKeyBuilder
 
 
-def test_build_key_with_normal_filename() -> None:
-    """Um filename normal deve virar uma chave particionada por data, preservando o nome."""
-    key = PartitionedKeyBuilder().build("vendas", "relatorio.csv")
+def test_build_key_names_file_after_context() -> None:
+    """O arquivo gerado deve levar o nome do contexto, não o nome original enviado."""
+    key = PartitionedKeyBuilder().build("vendas", "Relatório Final (1).csv")
 
-    assert key.startswith("vendas/")
-    assert key.endswith(".csv")
-    assert "relatorio" in key
+    assert re.fullmatch(r"vendas/\d{4}/\d{2}/\d{2}/vendas_\d{8}_\d{6}_[0-9a-f]{6}\.csv", key)
+
+
+def test_build_key_slugifies_context_name() -> None:
+    """Nomes de contexto com acento, espaço ou maiúsculas viram um slug seguro na pasta e no arquivo."""
+    key = PartitionedKeyBuilder().build("Notas Fiscais São Paulo", "x.parquet")
+
+    assert key.startswith("notas_fiscais_sao_paulo/")
+    assert "/notas_fiscais_sao_paulo_" in key
+    assert " " not in key
+
+
+def test_build_key_context_name_cannot_escape_prefix() -> None:
+    """Um nome de contexto com `../` não deve gerar componentes de diretório extras."""
+    key = PartitionedKeyBuilder().build("../../etc", "a.csv")
+
+    assert ".." not in key
+    assert key.count("/") == 4
 
 
 def test_build_key_strips_directory_traversal_from_filename() -> None:
@@ -41,3 +58,11 @@ def test_build_key_sanitizes_unsafe_characters() -> None:
 
     assert ";" not in key
     assert " " not in key
+
+
+def test_build_key_context_slug_is_sql_identifier() -> None:
+    """Pasta e nome do arquivo devem ser identificadores SQL válidos (sem `-`/`.`, sem dígito inicial)."""
+    key = PartitionedKeyBuilder().build("2024-vendas.norte", "a.csv")
+
+    assert key.startswith("t_2024_vendas_norte/")
+    assert "/t_2024_vendas_norte_" in key
