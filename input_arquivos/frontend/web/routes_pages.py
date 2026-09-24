@@ -1,5 +1,7 @@
 """Rotas de página: renderizam os templates Jinja2 servidos pelo FastAPI."""
 
+import time
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -9,6 +11,9 @@ from input_arquivos.backend.auth.session import SessionUser
 
 router = APIRouter(include_in_schema=False)
 templates = Jinja2Templates(directory="input_arquivos/frontend/templates")
+# Anexado como `?v=` aos CSS/JS nos templates. Muda a cada start do servidor (ou seja, a
+# cada deploy), forçando o navegador a baixar os arquivos novos em vez de usar o cache.
+templates.env.globals["asset_version"] = str(int(time.time()))
 
 
 @router.get("/login", response_class=HTMLResponse)

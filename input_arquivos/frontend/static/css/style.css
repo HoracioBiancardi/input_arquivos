@@ -312,7 +312,8 @@ select option {
   display: none; position: fixed; inset: 0;
   background: rgba(1,4,9,.8); backdrop-filter: blur(6px);
   align-items: center; justify-content: center;
-  z-index: 40; padding: 1rem;
+  /* Acima do .login-overlay (50), para modais abertos na tela de login (ex.: Trocar senha) receberem os cliques; abaixo dos toasts (100). */
+  z-index: 60; padding: 1rem;
 }
 .overlay.open { display: flex; animation: fadeIn .15s ease both; }
 
