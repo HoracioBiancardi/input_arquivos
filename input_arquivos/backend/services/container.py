@@ -3,6 +3,7 @@
 from input_arquivos.backend.db.session import DatabaseSessionFactory, get_session_factory
 from input_arquivos.backend.destinations.registry import DestinationWriterRegistry
 from input_arquivos.backend.ingestion.pipeline import IngestionPipeline
+from input_arquivos.backend.loaders.database_loader import DatabaseLoader
 from input_arquivos.backend.services.auth_service import AuthService
 from input_arquivos.backend.services.context_service import ContextService
 from input_arquivos.backend.services.preview_service import PreviewService
@@ -26,14 +27,15 @@ class ServiceContainer:
         self.context_service = ContextService(session_factory)
         self.user_service = UserService(session_factory, self.auth_service)
         self.user_context_service = UserContextService(session_factory, self.context_service)
+        self.system_settings_service = SystemSettingsService(session_factory)
         self.upload_service = UploadService(
             session_factory=session_factory,
             context_service=self.context_service,
             pipeline=IngestionPipeline(),
             writer_registry=DestinationWriterRegistry(),
+            database_loader=DatabaseLoader(self.system_settings_service.get_database_url),
         )
         self.preview_service = PreviewService(session_factory=session_factory)
-        self.system_settings_service = SystemSettingsService(session_factory)
 
 
 _container: ServiceContainer | None = None

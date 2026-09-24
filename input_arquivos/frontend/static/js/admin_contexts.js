@@ -90,11 +90,23 @@ const IMAGE_MODE_HELP = {
   table_borderless: "Extrai tabela via OCR local usando heurística de posição/espaçamento, para imagens sem grade visível (ex.: texto tabular solto).",
 };
 
+const LOAD_MODE_LABELS = {
+  append: "acumula",
+  replace: "substitui",
+};
+
+const LOAD_MODE_HELP = {
+  append: "Cada envio adiciona suas linhas à tabela (coluna id_envio identifica o envio). Recarregar um envio substitui só as linhas dele, sem duplicar.",
+  replace: "Cada envio apaga todo o conteúdo da tabela antes de inserir as suas linhas — a tabela sempre reflete o último arquivo enviado.",
+};
+
 const modal = document.getElementById("context-modal");
 const form = document.getElementById("context-form");
 const destinationSelect = document.getElementById("context-destination");
 const pdfModeSelect = document.getElementById("context-pdf-mode");
 const imageModeSelect = document.getElementById("context-image-mode");
+const loadToDatabaseCheckbox = document.getElementById("context-load-to-database");
+const loadModeSelect = document.getElementById("context-load-mode");
 
 // `column_rules` não é editado neste modal (ver rules-modal), mas o PUT de
 // context é um replace completo — guardamos o valor buscado do servidor
@@ -116,6 +128,7 @@ async function loadContexts() {
       <tr class="border-b border-slate-700/30 last:border-0 cursor-pointer" data-id="${context.id}">
         <td class="px-4 py-2 font-medium">${esc(context.name)}</td>
         <td class="px-4 py-2">${esc(context.destination_summary)}</td>
+        <td class="px-4 py-2">${context.load_to_database ? `${esc(context.load_summary)} <span style="color: var(--text-muted)">(${LOAD_MODE_LABELS[context.load_mode] || esc(context.load_mode)})</span>` : "—"}</td>
         <td class="px-4 py-2">${context.allowed_file_types.split(",").map((t) => FILE_TYPE_LABELS[t] || t).join(", ")}</td>
         <td class="px-4 py-2">${PDF_MODE_LABELS[context.pdf_mode] || context.pdf_mode}</td>
         <td class="px-4 py-2">${IMAGE_MODE_LABELS[context.image_mode] || context.image_mode}</td>
@@ -141,6 +154,21 @@ function toggleDestinationFields() {
   const selected = destinationSelect.value;
   document.getElementById("minio-fields").classList.toggle("hidden", selected !== "minio");
   document.getElementById("local-fields").classList.toggle("hidden", selected !== "local");
+}
+
+function toggleLoadFields() {
+  document.getElementById("load-fields").classList.toggle("hidden", !loadToDatabaseCheckbox.checked);
+  document.getElementById("load-mode-help").textContent = LOAD_MODE_HELP[loadModeSelect.value] || "";
+}
+
+// Campos de carga no banco reenviados sem alteração pelo modal de regras (PUT é replace completo).
+function loadFieldsOf(context) {
+  return {
+    load_to_database: context.load_to_database,
+    db_schema: context.db_schema,
+    db_table: context.db_table,
+    load_mode: context.load_mode,
+  };
 }
 
 function updatePdfHelp() {
@@ -174,6 +202,7 @@ function resetForm() {
   clearTestResults();
   clearFieldErrors("context");
   toggleDestinationFields();
+  toggleLoadFields();
   updatePdfHelp();
   updateImageHelp();
 }
@@ -202,7 +231,12 @@ async function openEditModal(contextId) {
   pdfModeSelect.value = context.pdf_mode;
   imageModeSelect.value = context.image_mode;
   document.getElementById("context-active").checked = context.active;
+  loadToDatabaseCheckbox.checked = context.load_to_database;
+  document.getElementById("context-db_schema").value = context.db_schema || "";
+  document.getElementById("context-db_table").value = context.db_table || "";
+  loadModeSelect.value = context.load_mode;
   toggleDestinationFields();
+  toggleLoadFields();
   updatePdfHelp();
   updateImageHelp();
   modal.classList.remove("hidden");
@@ -234,6 +268,10 @@ async function saveContext(event) {
     allowed_file_types: fileTypes.join(","),
     column_rules: currentEditContext ? currentEditContext.column_rules : [],
     active: document.getElementById("context-active").checked,
+    load_to_database: loadToDatabaseCheckbox.checked,
+    db_schema: document.getElementById("context-db_schema").value.trim() || null,
+    db_table: document.getElementById("context-db_table").value.trim() || null,
+    load_mode: loadModeSelect.value,
   };
 
   const contextId = document.getElementById("context-id").value;
@@ -289,6 +327,7 @@ async function saveRules() {
     allowed_file_types: context.allowed_file_types,
     column_rules: collectColumnRules(),
     active: context.active,
+    ...loadFieldsOf(context),
   };
   try {
     await apiFetch(`/api/contexts/${context.id}`, { method: "PUT", body: payload });
@@ -307,6 +346,8 @@ document.addEventListener("DOMContentLoaded", () => {
   destinationSelect.addEventListener("change", toggleDestinationFields);
   pdfModeSelect.addEventListener("change", updatePdfHelp);
   imageModeSelect.addEventListener("change", updateImageHelp);
+  loadToDatabaseCheckbox.addEventListener("change", toggleLoadFields);
+  loadModeSelect.addEventListener("change", toggleLoadFields);
   document.getElementById("context-add-rule-button").addEventListener("click", () => addRuleRow());
   document.getElementById("rules-cancel-button").addEventListener("click", closeRulesModal);
   document.getElementById("rules-save-button").addEventListener("click", saveRules);

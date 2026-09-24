@@ -18,6 +18,14 @@ class UploadStatus(str, enum.Enum):
     ERROR = "error"
 
 
+class LoadStatus(str, enum.Enum):
+    """Situação da carga de um upload na tabela do contexto no banco de dados de destino."""
+
+    PENDING = "pending"
+    SUCCESS = "success"
+    ERROR = "error"
+
+
 class UploadHistory(Base):
     """Registro de auditoria de um upload processado pelo sistema.
 
@@ -35,6 +43,12 @@ class UploadHistory(Base):
             `None` quando o upload falhou antes de gerar um artefato.
         row_count: Quantidade de linhas geradas, quando aplicável.
         error_message: Mensagem de erro amigável, quando `status` é ERROR.
+        load_status: Situação da carga no banco de dados de destino. `None`
+            quando o contexto não carrega no banco ou o upload não gerou um
+            Parquet (não se aplica).
+        load_detail: Tabela de destino (`schema.tabela`) da última carga.
+        load_error: Mensagem de erro da última carga, quando `load_status` é ERROR.
+        loaded_at: Data/hora da última carga bem-sucedida.
         uploaded_by: Nome de usuário de quem realizou o upload (sempre
             preenchido, pois o login é obrigatório para qualquer usuário).
         created_at: Data/hora do upload.
@@ -51,5 +65,9 @@ class UploadHistory(Base):
     artifact_kind: Mapped[str | None] = mapped_column(String(20), default=None)
     row_count: Mapped[int | None] = mapped_column(default=None)
     error_message: Mapped[str | None] = mapped_column(Text, default=None)
+    load_status: Mapped[LoadStatus | None] = mapped_column(SqlEnum(LoadStatus), default=None)
+    load_detail: Mapped[str | None] = mapped_column(String(300), default=None)
+    load_error: Mapped[str | None] = mapped_column(Text, default=None)
+    loaded_at: Mapped[datetime | None] = mapped_column(default=None)
     uploaded_by: Mapped[str] = mapped_column(String(150), index=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)

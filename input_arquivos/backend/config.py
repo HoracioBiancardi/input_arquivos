@@ -39,6 +39,11 @@ class Settings(BaseSettings):
         session_cookie_secure: Se `True`, o cookie de sessão só é enviado pelo
             navegador em conexões HTTPS. Deve ficar `True` sempre que a
             aplicação estiver atrás de TLS (direto ou via proxy reverso).
+        config_encryption_key: Chave Fernet que cifra em repouso as
+            credenciais do MinIO e do SQL Server. Gerada com
+            `uv run input-arquivos gerar-chave`. Se vazia, usa (ou cria) o
+            arquivo `data/.config_encryption_key` ao lado do banco local —
+            com a variável, a chave fica fora da pasta onde está o banco.
     """
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -60,6 +65,7 @@ class Settings(BaseSettings):
     debug: bool = False
     max_upload_size_bytes: int = 200 * 1024 * 1024
     session_cookie_secure: bool = False
+    config_encryption_key: str | None = None
 
 
 @lru_cache

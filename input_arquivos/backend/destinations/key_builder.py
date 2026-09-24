@@ -10,7 +10,7 @@ _UNSAFE_CHARS = re.compile(r"[^A-Za-z0-9._-]+")
 _NON_IDENTIFIER_CHARS = re.compile(r"[^a-z0-9_]+")
 
 
-def _slugify(value: str) -> str:
+def slugify(value: str) -> str:
     """Reduz um texto (nome de contexto) a um slug que também é um identificador SQL válido.
 
     Remove acentos (`"Relatório Vendas"` -> `"relatorio_vendas"`), passa para
@@ -63,6 +63,6 @@ class PartitionedKeyBuilder:
             evitar colisões entre uploads no mesmo segundo.
         """
         now = datetime.now(timezone.utc)
-        slug = _slugify(prefix)
+        slug = slugify(prefix)
         short_uuid = uuid.uuid4().hex[:6]
         return f"{slug}/{now:%Y}/{now:%m}/{now:%d}/{slug}_{now:%Y%m%d}_{now:%H%M%S}_{short_uuid}.{_extension(filename)}"

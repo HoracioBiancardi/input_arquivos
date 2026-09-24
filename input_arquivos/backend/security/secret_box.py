@@ -2,10 +2,15 @@
 
 Usado para cifrar em repouso as credenciais globais do MinIO cadastradas via
 `/admin/settings` (`SystemSettings.minio_access_key`/`minio_secret_key`).
-Mesma estratégia já usada para `session_secret` em `auth/session.py`: se
-nenhuma chave for configurada explicitamente, gera uma chave Fernet aleatória
-na primeira execução e persiste em disco (0600) ao lado do banco local, para
-ser reaproveitada entre reinicializações.
+A chave vem, nesta ordem, de:
+
+1. `CONFIG_ENCRYPTION_KEY` (variável de ambiente/.env), gerada com
+   `uv run input-arquivos gerar-chave` — recomendado em produção, porque tira
+   a chave da mesma pasta do banco cifrado;
+2. o arquivo `data/.config_encryption_key` ao lado do banco local, gerado
+   automaticamente (0600) na primeira execução se não existir — mesma
+   estratégia de `session_secret` em `auth/session.py`, mantida para
+   desenvolvimento local e instalações antigas.
 """
 
 from pathlib import Path
@@ -17,6 +22,19 @@ from input_arquivos.backend.config import Settings, get_settings
 _KEY_FILENAME = ".config_encryption_key"
 
 
+class InvalidEncryptionKeyError(ValueError):
+    """Erro levantado quando `CONFIG_ENCRYPTION_KEY` não é uma chave Fernet válida."""
+
+
+def generate_key() -> str:
+    """Gera uma chave Fernet nova, pronta para colar em `CONFIG_ENCRYPTION_KEY`.
+
+    Returns:
+        Chave Fernet (32 bytes em base64 url-safe), como texto.
+    """
+    return Fernet.generate_key().decode("ascii")
+
+
 def _resolve_encryption_key(settings: Settings) -> bytes:
     """Resolve a chave Fernet usada para cifrar segredos de configuração em repouso.
 
@@ -24,10 +42,24 @@ def _resolve_encryption_key(settings: Settings) -> bytes:
         settings: Configurações da aplicação.
 
     Returns:
-        Chave Fernet (32 bytes url-safe base64), lida de
-        `data/.config_encryption_key` se já existir, ou gerada e persistida
-        nesse arquivo (permissão 0600) na primeira execução.
+        Chave Fernet (32 bytes url-safe base64): a de `CONFIG_ENCRYPTION_KEY`
+        se configurada; senão a lida de `data/.config_encryption_key`, ou
+        gerada e persistida nesse arquivo (permissão 0600) na primeira execução.
+
+    Raises:
+        InvalidEncryptionKeyError: Se `CONFIG_ENCRYPTION_KEY` estiver
+            preenchida com algo que não é uma chave Fernet.
     """
+    if settings.config_encryption_key:
+        key = settings.config_encryption_key.strip()
+        try:
+            Fernet(key)
+        except ValueError as error:
+            raise InvalidEncryptionKeyError(
+                "CONFIG_ENCRYPTION_KEY não é uma chave válida. Gere uma com: uv run input-arquivos gerar-chave"
+            ) from error
+        return key.encode("ascii")
+
     key_path = Path(settings.app_config_db_path).parent / _KEY_FILENAME
     if key_path.exists():
         return key_path.read_bytes().strip()

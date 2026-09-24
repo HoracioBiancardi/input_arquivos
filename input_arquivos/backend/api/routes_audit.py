@@ -2,12 +2,13 @@
 
 from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from input_arquivos.backend.auth.dependencies import require_admin
 from input_arquivos.backend.models.upload_history import UploadStatus
 from input_arquivos.backend.schemas.upload import UploadHistoryResponse
 from input_arquivos.backend.services.container import get_container
+from input_arquivos.backend.services.upload_service import LoadNotApplicableError, UploadNotFoundError
 
 router = APIRouter(prefix="/api/audit", tags=["audit"], dependencies=[Depends(require_admin)])
 
@@ -37,3 +38,30 @@ def list_audit_log(
         context_name=context_name, status=status, start_date=start_date, end_date=end_date, limit=limit
     )
     return [UploadHistoryResponse.model_validate(item) for item in history]
+
+
+@router.post("/{upload_id}/load", response_model=UploadHistoryResponse)
+def reload_to_database(upload_id: int) -> UploadHistoryResponse:
+    """Carrega de novo um upload na tabela do seu context, lendo o Parquet do MinIO/pasta local.
+
+    Usado para refazer uma carga que falhou (banco fora do ar, tabela sem uma
+    coluna nova) ou que ficou pendente (servidor reiniciado no meio). No modo
+    append, as linhas anteriores deste upload são substituídas — nunca duplicadas.
+
+    Args:
+        upload_id: Identificador do upload.
+
+    Returns:
+        O registro de audit log com a nova situação da carga.
+
+    Raises:
+        HTTPException: 404 se o upload não existir; 409 se ele não puder ser
+            carregado (não gerou tabela, ou o context está com a carga desligada).
+    """
+    try:
+        history = get_container().upload_service.run_database_load(upload_id)
+    except UploadNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except LoadNotApplicableError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return UploadHistoryResponse.model_validate(history)

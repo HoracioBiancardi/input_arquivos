@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+from cryptography.fernet import Fernet
 
 from input_arquivos.backend.config import get_settings
 from input_arquivos.backend.security import secret_box
@@ -53,3 +54,39 @@ def test_is_valid_ciphertext_distinguishes_legacy_plaintext() -> None:
 
     assert secret_box.is_valid_ciphertext(ciphertext) is True
     assert secret_box.is_valid_ciphertext("um-valor-qualquer-em-texto-puro") is False
+
+
+def test_env_key_takes_precedence_and_no_key_file_is_created(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Com `CONFIG_ENCRYPTION_KEY`, a chave vem da variável e nenhum arquivo de chave é criado ao lado do banco."""
+    key = secret_box.generate_key()
+    monkeypatch.setenv("CONFIG_ENCRYPTION_KEY", key)
+    get_settings.cache_clear()
+
+    ciphertext = secret_box.encrypt("segredo")
+
+    assert Fernet(key.encode("ascii")).decrypt(ciphertext.encode("ascii")) == b"segredo"
+    assert not (tmp_path / ".config_encryption_key").exists()
+
+
+def test_env_key_wins_over_existing_key_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Se os dois existirem, vale a variável — o arquivo antigo é ignorado."""
+    (tmp_path / ".config_encryption_key").write_text(secret_box.generate_key())
+    env_key = secret_box.generate_key()
+    monkeypatch.setenv("CONFIG_ENCRYPTION_KEY", env_key)
+    get_settings.cache_clear()
+
+    ciphertext = secret_box.encrypt("segredo")
+
+    assert Fernet(env_key.encode("ascii")).decrypt(ciphertext.encode("ascii")) == b"segredo"
+
+
+@pytest.mark.parametrize("bad_key", ["curta", "não-é-base64-çç", "x" * 44])
+def test_invalid_env_key_raises_clear_error(monkeypatch: pytest.MonkeyPatch, bad_key: str) -> None:
+    """Uma `CONFIG_ENCRYPTION_KEY` inválida falha com mensagem que aponta o comando que gera uma chave."""
+    monkeypatch.setenv("CONFIG_ENCRYPTION_KEY", bad_key)
+    get_settings.cache_clear()
+
+    with pytest.raises(secret_box.InvalidEncryptionKeyError, match="gerar-chave"):
+        secret_box.encrypt("segredo")

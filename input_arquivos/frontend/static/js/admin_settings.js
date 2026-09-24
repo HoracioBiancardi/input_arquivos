@@ -89,8 +89,101 @@ async function clearMinioConfig() {
   }
 }
 
+const databaseForm = document.getElementById("database-settings-form");
+const databasePasswordInput = document.getElementById("database-password");
+
+async function loadDatabaseConfig() {
+  try {
+    const config = await apiFetch("/api/settings/database");
+    const badge = document.getElementById("database-status-badge");
+    badge.textContent = config.configured ? "Configurado" : "Não configurado";
+    badge.className = "status-badge " + (config.configured ? "status-badge--success" : "status-badge--muted");
+    document.getElementById("database-host").value = config.host || "";
+    document.getElementById("database-port").value = config.port || 1433;
+    document.getElementById("database-database").value = config.database || "";
+    document.getElementById("database-username").value = config.username || "";
+    databasePasswordInput.value = "";
+    document.getElementById("database-password-hint").textContent = config.password_configured
+      ? "Já configurada — deixe em branco para manter a atual."
+      : "Obrigatória na primeira configuração.";
+  } catch (err) {
+    showToast(`Falha ao carregar conexão do banco: ${err.message}`, "negative");
+  }
+}
+
+function currentDatabaseValues() {
+  return {
+    host: document.getElementById("database-host").value.trim(),
+    port: Number(document.getElementById("database-port").value) || 1433,
+    database: document.getElementById("database-database").value.trim(),
+    username: document.getElementById("database-username").value.trim(),
+    password: databasePasswordInput.value || null,
+  };
+}
+
+function toggleDatabasePasswordVis(event) {
+  const showing = databasePasswordInput.type === "text";
+  databasePasswordInput.type = showing ? "password" : "text";
+  event.currentTarget.textContent = showing ? "SHOW" : "HIDE";
+}
+
+async function testDatabaseConfig() {
+  clearFieldErrors("database");
+  const resultEl = document.getElementById("database-test-result");
+  resultEl.textContent = "Testando...";
+  resultEl.className = "text-xs";
+  try {
+    const result = await apiFetch("/api/settings/database/test", { method: "POST", body: currentDatabaseValues() });
+    resultEl.textContent = result.message;
+    resultEl.className = "text-xs " + (result.success ? "text-green-600" : "text-red-600");
+  } catch (err) {
+    resultEl.textContent = "";
+    if (applyFieldErrors("database", extractFieldErrors(err.data)) === 0) {
+      resultEl.textContent = err.message;
+      resultEl.className = "text-xs text-red-600";
+    }
+  }
+}
+
+async function saveDatabaseConfig(event) {
+  event.preventDefault();
+  clearFieldErrors("database");
+  try {
+    await apiFetch("/api/settings/database", { method: "PUT", body: currentDatabaseValues() });
+    showToast("Conexão do banco salva com sucesso.", "positive");
+    await loadDatabaseConfig();
+  } catch (err) {
+    if (applyFieldErrors("database", extractFieldErrors(err.data)) === 0) {
+      showToast(`Falha ao salvar: ${err.message}`, "negative");
+    }
+  }
+}
+
+async function clearDatabaseConfig() {
+  const confirmed = await confirmModal({
+    title: "Remover conexão do banco?",
+    body: "<p>Os contextos com carga no banco continuam gravando no MinIO, mas a carga das tabelas passa a falhar até uma nova conexão ser configurada.</p>",
+    confirmLabel: "Remover conexão",
+    cancelLabel: "Cancelar",
+    variant: "warning",
+  });
+  if (!confirmed) return;
+  try {
+    await apiFetch("/api/settings/database", { method: "DELETE" });
+    showToast("Conexão do banco removida.", "positive");
+    await loadDatabaseConfig();
+  } catch (err) {
+    showToast(`Falha ao remover: ${err.message}`, "negative");
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   loadMinioConfig();
+  loadDatabaseConfig();
+  document.getElementById("database-test-button").addEventListener("click", testDatabaseConfig);
+  document.getElementById("database-clear-button").addEventListener("click", clearDatabaseConfig);
+  document.getElementById("database-password-toggle").addEventListener("click", toggleDatabasePasswordVis);
+  databaseForm.addEventListener("submit", saveDatabaseConfig);
   document.getElementById("minio-test-button").addEventListener("click", testMinioConfig);
   document.getElementById("minio-clear-button").addEventListener("click", clearMinioConfig);
   minioForm.addEventListener("submit", saveMinioConfig);

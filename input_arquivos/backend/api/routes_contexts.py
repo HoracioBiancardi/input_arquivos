@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from input_arquivos.backend.auth.dependencies import require_admin, require_login
 from input_arquivos.backend.auth.session import SessionUser
 from input_arquivos.backend.ingestion.file_types import FileTypeRegistry
+from input_arquivos.backend.loaders.database_loader import describe_target_table
 from input_arquivos.backend.models.context import Context, DestinationType
 from input_arquivos.backend.schemas.context import (
     AccessibleContextResponse,
@@ -64,6 +65,7 @@ def _to_response(context: Context) -> ContextResponse:
     """
     response = ContextResponse.model_validate(context)
     response.destination_summary = _describe_destination(context)
+    response.load_summary = describe_target_table(context) if context.load_to_database else ""
     return response
 
 
@@ -170,6 +172,10 @@ def create_context(payload: ContextCreateRequest) -> ContextResponse:
             local_path=payload.local_path,
             allowed_file_types=payload.allowed_file_types,
             column_rules=_serialize_column_rules(payload.column_rules),
+            load_to_database=payload.load_to_database,
+            db_schema=payload.db_schema,
+            db_table=payload.db_table,
+            load_mode=payload.load_mode,
         )
     except DuplicateNameError as error:
         raise HTTPException(
@@ -209,6 +215,10 @@ def update_context(context_id: int, payload: ContextUpdateRequest) -> ContextRes
             local_path=payload.local_path,
             allowed_file_types=payload.allowed_file_types,
             column_rules=_serialize_column_rules(payload.column_rules),
+            load_to_database=payload.load_to_database,
+            db_schema=payload.db_schema,
+            db_table=payload.db_table,
+            load_mode=payload.load_mode,
             active=payload.active,
         )
     except DuplicateNameError as error:

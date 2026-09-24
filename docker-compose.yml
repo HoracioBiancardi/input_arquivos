@@ -2,13 +2,13 @@ services:
   input-arquivos:
     build: .
     container_name: input-arquivos
-    env_file: .env
+    env_file: .env   # inclui CONFIG_ENCRYPTION_KEY (gere com `uv run input-arquivos gerar-chave`)
     environment:
       APP_CONFIG_DB_PATH: /app/data/app_config.db
     ports:
       - "8004:8004"   # exposto direto na rede interna (HTTP) enquanto o Caddy está desativado — ver abaixo
     volumes:
-      - ./data:/app/data   # SQLite, chave de sessão e chave de cifra persistem aqui
+      - ./data:/app/data   # SQLite e chave de sessão (e a chave de cifra, só se CONFIG_ENCRYPTION_KEY estiver vazia)
     restart: unless-stopped
 
   # Caddy (proxy reverso HTTPS) desativado enquanto o app está em teste na rede

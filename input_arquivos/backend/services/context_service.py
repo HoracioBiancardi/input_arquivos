@@ -8,7 +8,7 @@ from sqlalchemy import select
 
 from input_arquivos.backend.db.session import DatabaseSessionFactory
 from input_arquivos.backend.destinations.minio_client import build_minio_client
-from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, PdfMode
+from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, LoadMode, PdfMode
 
 
 class DuplicateNameError(ValueError):
@@ -99,6 +99,10 @@ class ContextService:
         local_path: str | None = None,
         allowed_file_types: str = "excel,csv,pdf",
         column_rules: str | None = None,
+        load_to_database: bool = False,
+        db_schema: str | None = None,
+        db_table: str | None = None,
+        load_mode: LoadMode = LoadMode.APPEND,
     ) -> Context:
         """Cria um novo context.
 
@@ -113,6 +117,10 @@ class ContextService:
                 separados por vírgula, ex. "excel,csv").
             column_rules: Regras de validação de tipo/obrigatoriedade por
                 coluna, já serializadas como JSON.
+            load_to_database: Se os uploads também são carregados no banco de destino.
+            db_schema: Schema da tabela de destino (`None` = padrão da conexão).
+            db_table: Tabela de destino (`None` = slug do nome do context).
+            load_mode: Modo de carga na tabela (append ou replace).
 
         Returns:
             O context recém-criado.
@@ -135,6 +143,10 @@ class ContextService:
             local_path=local_path,
             allowed_file_types=allowed_file_types,
             column_rules=column_rules,
+            load_to_database=load_to_database,
+            db_schema=db_schema,
+            db_table=db_table,
+            load_mode=load_mode,
         )
         with self._session_factory.session() as db_session:
             db_session.add(context)

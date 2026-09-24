@@ -6,9 +6,11 @@ automática para **Parquet** e envio para
 "vendas"). Cada envio grava `data_envio`, `contexto` e `enviado_por` como as três primeiras colunas
 do resultado. Cada contexto pode ter **regras de validação de dados por coluna** (tipo esperado e
 obrigatoriedade), que rejeitam o arquivo inteiro se alguma célula estiver fora do esperado — ver
-seção [Validação de dados por coluna](#validação-de-dados-por-coluna) abaixo. Uma área administrativa
+seção [Validação de dados por coluna](#validação-de-dados-por-coluna) abaixo. Contextos marcados
+com "Carregar no banco" também viram uma **tabela no SQL Server** — ver
+[Carga em tabela no banco](#carga-em-tabela-no-banco-sql-server). Uma área administrativa
 (`/admin`, protegida por login) gerencia os contexts, os usuários do sistema, a configuração do MinIO
-e o audit log de uploads.
+e do banco de destino, e o audit log de uploads.
 
 ## Requisitos
 
@@ -27,6 +29,23 @@ uv sync
 cp .env.example .env
 # edite o .env: SESSION_SECRET, credenciais do admin bootstrap e do MinIO
 ```
+
+## Chave de cifra das credenciais
+
+As credenciais do MinIO e do SQL Server salvas em `/admin/settings` ficam cifradas no banco local.
+Em produção, gere a chave **antes do primeiro deploy** e passe por variável de ambiente, para ela
+não ficar na mesma pasta do banco cifrado:
+
+```bash
+uv run input-arquivos gerar-chave
+# CONFIG_ENCRYPTION_KEY=...   ← cole no .env do servidor (ou num secret do Docker)
+```
+
+O comando só imprime a chave: não sobe o app nem cria arquivo. Sem `CONFIG_ENCRYPTION_KEY`, o app
+usa (ou cria na primeira execução) `data/.config_encryption_key`, o que é prático para rodar
+localmente. **Instalação que já existe:** copie o conteúdo de `data/.config_encryption_key` para
+`CONFIG_ENCRYPTION_KEY`. Não gere uma chave nova, senão as credenciais salvas deixam de poder ser
+decifradas.
 
 ## Executar (Comando Padronizado Universal)
 
@@ -77,6 +96,31 @@ coluna) não bater, **o arquivo inteiro é rejeitado** (nada é gravado no desti
 mostra quais colunas e quantas linhas tiveram problema; a rejeição também fica registrada em
 `/admin/audit`.
 
+## Carga em tabela no banco (SQL Server)
+
+O MinIO continua sendo a fonte da verdade: todo upload grava o Parquet lá primeiro. Um context com
+**"Carregar no banco de dados"** ligado (em `/admin/contexts`) ganha uma segunda etapa — o mesmo
+Parquet é inserido numa tabela do SQL Server configurado em `/admin/settings` — servidor, porta,
+banco, usuário e senha em campos separados (usuário e senha cifrados em repouso; a senha nunca volta
+pela API). A URL de conexão é montada no servidor com `sqlalchemy.URL.create`, então caracteres como
+`@`, `/` e `:` na senha não quebram nada. Driver `pymssql`, sem precisar de ODBC no servidor;
+timeout de login de 10s.
+
+- **1 contexto = 1 tabela.** Tabela padrão = slug do nome do context (o mesmo da pasta no MinIO);
+  schema padrão = o da conexão (`dbo`). Os dois podem ser trocados no context.
+- **Tabela criada no primeiro upload**, com os tipos das regras de coluna (`BIGINT`, `FLOAT`, `DATE`,
+  `BIT`, `NVARCHAR(MAX)`; `data_envio` em `DATETIME2`, UTC) e a coluna extra `id_envio` (id do
+  registro no audit log).
+- **Modo de carga por context**: *acumular* (cada envio soma linhas; recarregar um envio apaga só as
+  linhas do mesmo `id_envio` antes, então nunca duplica) ou *substituir* (cada envio apaga todo o
+  conteúdo da tabela via `DELETE` — sem `DROP`, preservando índices/permissões).
+- **Falha no banco não desfaz o upload**: pela tela de upload a carga roda em background e o
+  histórico mostra `Banco: pendente/carregado/erro`; via `POST /api/upload` ela roda antes da
+  resposta. Um envio com erro de carga (banco fora do ar, coluna nova que a tabela não tem) pode ser
+  recarregado em `/admin/audit` → "Recarregar", que lê o Parquet de volta do MinIO.
+- **Coluna nova no arquivo** que a tabela não tem é recusada com mensagem clara — adicione a coluna
+  na tabela (`ALTER TABLE`) e recarregue.
+
 ## Testando sem MinIO (destino "Pasta local")
 
 Além de MinIO, um context pode usar `destination_type = local`: em vez de subir para
@@ -126,6 +170,7 @@ input_arquivos/
 │   ├── schemas/               # schemas Pydantic da API REST
 │   ├── ingestion/             # leitores de arquivo, conversão Parquet e orquestração do pipeline
 │   ├── destinations/          # writers de destino (MinIO, pasta local) + registry
+│   ├── loaders/                # carga do Parquet em tabela no banco de destino (SQL Server)
 │   ├── services/               # camada de serviços (contexts, usuários, upload, auth) + container de DI
 │   ├── api/                    # rotas REST (/api/auth, /api/contexts, /api/users, /api/upload(s), /api/audit, /api/system)
 │   └── auth/                    # sessão via cookie assinado (session.py) + dependencies do FastAPI
@@ -153,6 +198,9 @@ acessam serviços/banco diretamente.
 - **MinIO**: endpoint e credenciais são globais, compartilhados por todos os contexts — cada
   context define apenas o bucket a usar nesse mesmo servidor. Configuráveis via `/admin/settings`
   (cifrados em repouso, sobrepõe o `.env`) ou diretamente no `.env` como fallback.
+- **Banco de destino**: uma conexão global de SQL Server em `/admin/settings` (campos separados,
+  driver fixo `mssql+pymssql` — não há como apontar para outro tipo de banco); cada context com carga
+  ligada define só schema/tabela/modo.
 - **Autenticação**: sessão via cookie assinado (`SESSION_SECRET`, ver `backend/auth/session.py`), tanto
   para as páginas quanto para a API REST — toda rota sob `/api/*` (exceto `/api/auth/login`) exige
   login, e as rotas administrativas exigem papel `admin`.

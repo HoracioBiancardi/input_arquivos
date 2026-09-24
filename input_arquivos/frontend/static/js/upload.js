@@ -111,6 +111,15 @@ function statusBadge(status) {
   return `<span class="badge ${isSuccess ? "badge-success" : "badge-danger"}">${isSuccess ? "Sucesso" : "Erro"}</span>`;
 }
 
+const LOAD_STATUS_LABELS = { pending: "Banco: pendente", success: "Banco: carregado", error: "Banco: erro" };
+
+// Situação da carga no banco, abaixo do status do envio (só para contextos que carregam no banco).
+function loadStatusLine(item) {
+  if (!item.load_status) return "";
+  const title = item.load_status === "error" ? item.load_error : item.load_detail;
+  return `<div class="text-xs mt-1" style="color: var(--text-muted)" title="${esc(title || "")}">${LOAD_STATUS_LABELS[item.load_status] || esc(item.load_status)}</div>`;
+}
+
 function formatDate(isoString) {
   if (!isoString) return "–";
   const date = new Date(isoString);
@@ -199,7 +208,7 @@ async function loadHistory() {
           <td class="px-4 py-2 font-mono font-bold" style="overflow-wrap: anywhere; min-width: 10rem">${esc(item.filename)}</td>
           <td class="px-4 py-2">${esc(item.context_name)}</td>
           <td class="px-4 py-2 hidden lg:table-cell" style="overflow-wrap: anywhere; min-width: 12rem">${esc(item.destination_detail) || "-"}</td>
-          <td class="px-4 py-2 text-center">${statusBadge(item.status)}</td>
+          <td class="px-4 py-2 text-center">${statusBadge(item.status)}${loadStatusLine(item)}</td>
           <td class="px-4 py-2 hidden md:table-cell">${esc(item.uploaded_by)}</td>
           <td class="px-4 py-2 whitespace-nowrap">${formatDate(item.created_at)}</td>
           <td class="px-4 py-2 text-right whitespace-nowrap sticky-action">${viewTableAction(item)}</td>

@@ -1,11 +1,12 @@
 """Rotas da API REST de upload: envio programático (headless) e o fluxo interativo da tela de upload."""
 
-from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
 from input_arquivos.backend.auth.dependencies import require_login
 from input_arquivos.backend.auth.session import SessionUser
 from input_arquivos.backend.config import get_settings
+from input_arquivos.backend.models.upload_history import LoadStatus
 from input_arquivos.backend.models.user import UserRole
 from input_arquivos.backend.schemas.upload import UploadHistoryResponse, UploadPreviewResponse
 from input_arquivos.backend.services.container import ServiceContainer, get_container
@@ -70,7 +71,8 @@ async def upload_file(
     """Processa um arquivo enviado via API, usando o mesmo pipeline da tela de upload.
 
     Não pede confirmação em caso de divergência de colunas: usado para envio
-    programático, onde não há um humano para decidir.
+    programático, onde não há um humano para decidir. A carga no banco (se o
+    context pedir) roda antes da resposta, que já traz o `load_status` final.
 
     Args:
         file: Arquivo enviado (Excel, CSV ou PDF).
@@ -104,6 +106,7 @@ async def upload_file(
 
 @router.post("/uploads", response_model=UploadHistoryResponse)
 async def upload_interactive(
+    background_tasks: BackgroundTasks,
     file: UploadFile,
     context_name: str = Form(...),
     confirm_mismatch: bool = Form(default=False),
@@ -119,7 +122,12 @@ async def upload_interactive(
     ou com `cancelled=true` (usuário cancelou, registra o cancelamento como
     erro no audit log).
 
+    Se o context carrega no banco, a carga roda em background depois da
+    resposta (o registro volta com `load_status=pending`), para a tela não
+    ficar presa esperando o banco.
+
     Args:
+        background_tasks: Tarefas executadas pelo FastAPI após enviar a resposta.
         file: Arquivo enviado (Excel, CSV ou PDF).
         context_name: Nome do context de destino.
         confirm_mismatch: Se o usuário já confirmou o envio apesar da divergência de colunas.
@@ -206,6 +214,8 @@ async def upload_interactive(
     history = await run_in_threadpool(container.upload_service.finalize, artifact, context, filename, username)
     if history.status.value == "success":
         container.user_service.set_last_context(user.user_id, context.name)
+    if history.load_status == LoadStatus.PENDING:
+        background_tasks.add_task(container.upload_service.run_database_load, history.id, artifact.artifact_bytes)
     return UploadHistoryResponse.model_validate(history)
 
 

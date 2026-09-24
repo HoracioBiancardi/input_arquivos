@@ -6,8 +6,7 @@ from dataclasses import dataclass
 import pandas as pd
 
 from input_arquivos.backend.db.session import DatabaseSessionFactory
-from input_arquivos.backend.destinations.minio_client import build_minio_client
-from input_arquivos.backend.models.context import DestinationType
+from input_arquivos.backend.destinations.artifact_reader import read_artifact_bytes
 from input_arquivos.backend.models.upload_history import UploadHistory, UploadStatus
 
 
@@ -133,15 +132,4 @@ class PreviewService:
         Returns:
             DataFrame lido de volta do destino.
         """
-        if history.destination_type == DestinationType.LOCAL:
-            return pd.read_parquet(history.destination_detail)
-
-        bucket, key = history.destination_detail.split("/", 1)
-        client = build_minio_client()
-        response = client.get_object(bucket, key)
-        try:
-            data = response.read()
-        finally:
-            response.close()
-            response.release_conn()
-        return pd.read_parquet(io.BytesIO(data))
+        return pd.read_parquet(io.BytesIO(read_artifact_bytes(history)))

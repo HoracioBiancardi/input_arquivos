@@ -5,7 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict
 
 from input_arquivos.backend.models.context import DestinationType
-from input_arquivos.backend.models.upload_history import UploadStatus
+from input_arquivos.backend.models.upload_history import LoadStatus, UploadStatus
 
 
 class UploadHistoryResponse(BaseModel):
@@ -23,6 +23,10 @@ class UploadHistoryResponse(BaseModel):
             de visualização da tabela. `None` se o upload falhou.
         row_count: Quantidade de linhas geradas, quando aplicável.
         error_message: Mensagem de erro, quando `status` é ERROR.
+        load_status: Situação da carga no banco de destino (`None` = não se aplica).
+        load_detail: Tabela de destino da última carga bem-sucedida.
+        load_error: Erro da última carga, quando `load_status` é ERROR.
+        loaded_at: Data/hora da última carga bem-sucedida.
         uploaded_by: Nome do usuário que realizou o upload.
         created_at: Data/hora do upload.
     """
@@ -38,6 +42,10 @@ class UploadHistoryResponse(BaseModel):
     artifact_kind: str | None
     row_count: int | None
     error_message: str | None
+    load_status: LoadStatus | None = None
+    load_detail: str | None = None
+    load_error: str | None = None
+    loaded_at: datetime | None = None
     uploaded_by: str
     created_at: datetime
 

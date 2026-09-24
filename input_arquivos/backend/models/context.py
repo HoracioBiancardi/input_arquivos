@@ -34,6 +34,13 @@ class ImageMode(str, enum.Enum):
     TABLE_BORDERLESS = "table_borderless"
 
 
+class LoadMode(str, enum.Enum):
+    """Como cada upload entra na tabela do contexto no banco de dados de destino."""
+
+    APPEND = "append"
+    REPLACE = "replace"
+
+
 class ColumnRuleType(str, enum.Enum):
     """Tipo de dado esperado para uma coluna, usado em `Context.column_rules`."""
 
@@ -70,6 +77,18 @@ class Context(Base):
             rejeita o upload direto, sem opção de confirmar. Uma regra com
             `required=True` cobre tanto a ausência da coluna no arquivo
             quanto células vazias nela quando presente.
+        load_to_database: Se `True`, além de gravar o Parquet no MinIO/pasta
+            local, cada upload bem-sucedido é carregado como linhas na tabela
+            do contexto no banco de dados de destino (conexão global em
+            `/admin/settings`). `None` (contexts anteriores ao campo) equivale a `False`.
+        db_schema: Schema da tabela de destino. Vazio usa o schema padrão da
+            conexão (ex.: `dbo` no SQL Server).
+        db_table: Nome da tabela de destino. Vazio usa o slug do nome do
+            contexto (o mesmo da pasta no MinIO).
+        load_mode: `APPEND` acumula as linhas de todos os uploads (cada linha
+            leva `id_envio`, e recarregar um upload não duplica); `REPLACE`
+            apaga todo o conteúdo da tabela antes de inserir o upload.
+            `None` equivale a `APPEND`.
         active: Indica se o contexto aparece como opção na tela de upload.
         created_at: Data de criação do registro.
         updated_at: Data da última atualização do registro.
@@ -87,6 +106,10 @@ class Context(Base):
     allowed_file_types: Mapped[str] = mapped_column(String(50), default="excel,csv,pdf")
     expected_columns: Mapped[str | None] = mapped_column(Text, default=None)
     column_rules: Mapped[str | None] = mapped_column(Text, default=None)
+    load_to_database: Mapped[bool | None] = mapped_column(default=False)
+    db_schema: Mapped[str | None] = mapped_column(String(128), default=None)
+    db_table: Mapped[str | None] = mapped_column(String(128), default=None)
+    load_mode: Mapped[LoadMode | None] = mapped_column(SqlEnum(LoadMode), default=LoadMode.APPEND)
     active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(

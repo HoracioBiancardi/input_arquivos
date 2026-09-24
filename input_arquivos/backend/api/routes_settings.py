@@ -1,16 +1,22 @@
-"""Rotas da API REST para a configuração global do MinIO (admin-only)."""
+"""Rotas da API REST para a configuração global do MinIO e do SQL Server de destino (admin-only)."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from input_arquivos.backend.auth.dependencies import require_admin
 from input_arquivos.backend.schemas.context import ConnectionTestResponse
+from input_arquivos.backend.loaders.database_loader import check_database_connection
 from input_arquivos.backend.schemas.system_settings import (
+    DatabaseConfigRequest,
+    DatabaseConfigResponse,
     MinioConfigResponse,
     MinioConfigTestRequest,
     MinioConfigUpdateRequest,
 )
 from input_arquivos.backend.services.container import get_container
-from input_arquivos.backend.services.system_settings_service import MinioConfigIncompleteError
+from input_arquivos.backend.services.system_settings_service import (
+    DatabaseConfigIncompleteError,
+    MinioConfigIncompleteError,
+)
 
 router = APIRouter(prefix="/api/settings", tags=["settings"], dependencies=[Depends(require_admin)])
 
@@ -77,3 +83,72 @@ def test_minio_config(payload: MinioConfigTestRequest) -> ConnectionTestResponse
         secure=payload.secure,
     )
     return ConnectionTestResponse(success=result.success, message=result.message)
+
+
+@router.get("/database", response_model=DatabaseConfigResponse)
+def get_database_config() -> DatabaseConfigResponse:
+    """Retorna a conexão do SQL Server de destino da carga de tabelas, sem expor a senha.
+
+    Returns:
+        Campos da conexão salva e se a senha já está configurada.
+    """
+    return DatabaseConfigResponse(**get_container().system_settings_service.get_database_config_for_display())
+
+
+@router.put("/database", response_model=DatabaseConfigResponse)
+def update_database_config(payload: DatabaseConfigRequest) -> DatabaseConfigResponse:
+    """Salva a conexão do SQL Server de destino, usada por todos os contexts com carga no banco ligada.
+
+    Args:
+        payload: Servidor, porta, banco, usuário e senha (em branco mantém a salva).
+
+    Returns:
+        Conexão já atualizada, sem a senha.
+
+    Raises:
+        HTTPException: 422 se não houver senha informada nem uma já salva.
+    """
+    service = get_container().system_settings_service
+    try:
+        service.update_database_config(
+            host=payload.host,
+            port=payload.port,
+            database=payload.database,
+            username=payload.username,
+            password=payload.password,
+        )
+    except DatabaseConfigIncompleteError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail={"field": "password", "message": str(error)}
+        ) from error
+    return DatabaseConfigResponse(**service.get_database_config_for_display())
+
+
+@router.delete("/database", status_code=status.HTTP_204_NO_CONTENT)
+def clear_database_config() -> None:
+    """Remove a conexão do SQL Server de destino."""
+    get_container().system_settings_service.clear_database_config()
+
+
+@router.post("/database/test", response_model=ConnectionTestResponse)
+def test_database_config(payload: DatabaseConfigRequest) -> ConnectionTestResponse:
+    """Testa a conexão com o SQL Server (`SELECT 1`) usando os valores do formulário, antes de salvar.
+
+    Args:
+        payload: Servidor, porta, banco, usuário e senha (em branco usa a salva).
+
+    Returns:
+        Resultado do teste de conectividade.
+    """
+    try:
+        config = get_container().system_settings_service.resolve_database_config(
+            host=payload.host,
+            port=payload.port,
+            database=payload.database,
+            username=payload.username,
+            password=payload.password,
+        )
+        check_database_connection(config.to_url())
+    except Exception as error:  # noqa: BLE001 - erro de conectividade externo, reportado ao admin
+        return ConnectionTestResponse(success=False, message=f"Falha ao conectar no banco: {error}")
+    return ConnectionTestResponse(success=True, message=f"Conectado com sucesso em {payload.host}/{payload.database}.")

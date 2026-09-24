@@ -7,7 +7,7 @@
 
     <div>
       <h1 class="text-xl font-bold" style="color: var(--text);">Configurações do Sistema</h1>
-      <p class="text-xs" style="color: var(--text-muted);">Endpoint e credenciais globais do MinIO, cifrados em repouso — usados por todos os contextos do tipo MinIO</p>
+      <p class="text-xs" style="color: var(--text-muted);">Conexões globais do MinIO e do banco de dados de destino, cifradas em repouso</p>
     </div>
 
     <div class="modal glass surface-card shadow-xl flex flex-col gap-4 p-6" style="max-width:100%; border-radius: var(--r-lg);">
@@ -45,6 +45,60 @@
         <div class="modal-footer" style="padding-top:0">
           <button type="button" id="minio-clear-button" class="btn btn-ghost">Voltar a usar o .env</button>
           <button type="submit" class="btn btn-primary">Salvar Configuração</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="modal glass surface-card shadow-xl flex flex-col gap-4 p-6" style="max-width:100%; border-radius: var(--r-lg);">
+      <div>
+        <h2 class="text-base font-bold" style="color: var(--text);">Banco de dados de destino</h2>
+        <p class="text-xs" style="color: var(--text-muted);">SQL Server onde os contextos com "Carregar no banco" gravam suas tabelas</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <span class="text-xs" style="color: var(--text-muted);">Situação:</span>
+        <span id="database-status-badge" class="status-badge status-badge--muted">—</span>
+      </div>
+
+      <form id="database-settings-form" class="flex flex-col gap-4">
+        <div class="flex gap-3">
+          <div class="form-group" style="margin-bottom:0; flex: 3">
+            <label class="form-label" for="database-host">Servidor</label>
+            <input id="database-host" required class="form-input" placeholder="sql.empresa.local ou SERVIDOR\INSTANCIA">
+          </div>
+          <div class="form-group" style="margin-bottom:0; flex: 1">
+            <label class="form-label" for="database-port">Porta</label>
+            <input id="database-port" type="number" min="1" max="65535" value="1433" required class="form-input">
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="database-database">Banco de dados</label>
+          <input id="database-database" required class="form-input" placeholder="DW_Ingestao">
+        </div>
+
+        <div class="flex gap-3">
+          <div class="form-group" style="margin-bottom:0; flex: 1">
+            <label class="form-label" for="database-username">Usuário</label>
+            <input id="database-username" required autocomplete="off" class="form-input">
+          </div>
+          <div class="form-group" style="margin-bottom:0; flex: 1">
+            <label class="form-label" for="database-password">Senha</label>
+            <div class="pw-wrap">
+              <input id="database-password" type="password" autocomplete="new-password" class="form-input">
+              <button type="button" class="pw-toggle" id="database-password-toggle" title="Mostrar/ocultar">SHOW</button>
+            </div>
+            <p id="database-password-hint" class="form-hint"></p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <button type="button" id="database-test-button" class="btn btn-ghost btn-sm">Testar conexão</button>
+          <p id="database-test-result" class="text-xs"></p>
+        </div>
+
+        <div class="modal-footer" style="padding-top:0">
+          <button type="button" id="database-clear-button" class="btn btn-ghost">Remover conexão</button>
+          <button type="submit" class="btn btn-primary">Salvar Conexão</button>
         </div>
       </form>
     </div>

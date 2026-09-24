@@ -3,6 +3,38 @@ function statusBadge(status) {
   return `<span class="status-badge ${isSuccess ? "status-badge--success" : "status-badge--error"}">${isSuccess ? "Sucesso" : "Erro"}</span>`;
 }
 
+const LOAD_STATUS_BADGES = {
+  pending: ["status-badge--muted", "Pendente"],
+  success: ["status-badge--success", "Carregado"],
+  error: ["status-badge--error", "Erro"],
+};
+
+// Carga no banco: badge + tabela/erro + botão de recarga (só para envios que têm carga).
+function loadCell(item) {
+  if (!item.load_status) return "-";
+  const [variant, label] = LOAD_STATUS_BADGES[item.load_status] || ["status-badge--muted", item.load_status];
+  const detail = item.load_status === "error" ? item.load_error : item.load_detail;
+  return `
+    <span class="status-badge ${variant}">${label}</span>
+    ${detail ? `<div class="mt-1" style="color: var(--text-muted); overflow-wrap: anywhere; max-width: 18rem">${esc(detail)}</div>` : ""}
+    <button type="button" class="btn btn-ghost btn-sm mt-1" data-reload-id="${item.id}">Recarregar</button>`;
+}
+
+async function reloadToDatabase(button) {
+  button.disabled = true;
+  button.textContent = "Carregando...";
+  try {
+    const item = await apiFetch(`/api/audit/${button.dataset.reloadId}/load`, { method: "POST" });
+    showToast(
+      item.load_status === "success" ? `Carregado em ${item.load_detail}.` : `Falha na carga: ${item.load_error}`,
+      item.load_status === "success" ? "positive" : "negative"
+    );
+  } catch (err) {
+    showToast(`Falha ao recarregar: ${err.message}`, "negative");
+  }
+  await applyFilters();
+}
+
 function formatDate(isoString) {
   const date = new Date(isoString);
   return date.toLocaleDateString("pt-BR") + " " + date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -38,12 +70,16 @@ async function applyFilters() {
         <td class="px-4 py-2">${esc(item.destination_detail) || "-"}</td>
         <td class="px-4 py-2 text-center">${statusBadge(item.status)}</td>
         <td class="px-4 py-2 text-right">${item.row_count ?? "-"}</td>
+        <td class="px-4 py-2">${loadCell(item)}</td>
         <td class="px-4 py-2">${esc(item.uploaded_by)}</td>
         <td class="px-4 py-2">${formatDate(item.created_at)}</td>
         <td class="px-4 py-2">${esc(item.error_message) || "-"}</td>
       </tr>`
     )
     .join("");
+  rows.querySelectorAll("[data-reload-id]").forEach((button) => {
+    button.addEventListener("click", () => reloadToDatabase(button));
+  });
 }
 
 document.addEventListener("DOMContentLoaded", async () => {

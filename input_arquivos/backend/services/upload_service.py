@@ -1,14 +1,16 @@
-"""Serviço que orquestra o pipeline de ingestão, o destination writer e o registro de auditoria."""
+"""Serviço que orquestra o pipeline de ingestão, o destination writer, a carga no banco e o registro de auditoria."""
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 from sqlalchemy import select
 
 from input_arquivos.backend.db.session import DatabaseSessionFactory
+from input_arquivos.backend.destinations.artifact_reader import read_artifact_bytes
 from input_arquivos.backend.destinations.registry import DestinationWriterRegistry
 from input_arquivos.backend.ingestion.pipeline import IngestionPipeline, IngestResult
+from input_arquivos.backend.loaders.database_loader import DatabaseLoader, DatabaseNotConfiguredError
 from input_arquivos.backend.models.context import Context
-from input_arquivos.backend.models.upload_history import UploadHistory, UploadStatus
+from input_arquivos.backend.models.upload_history import LoadStatus, UploadHistory, UploadStatus
 from input_arquivos.backend.services.column_check import (
     ColumnDataValidator,
     ColumnDataViolation,
@@ -22,8 +24,16 @@ class ContextNotFoundError(ValueError):
     """Erro levantado quando o contexto informado não existe ou está inativo."""
 
 
+class UploadNotFoundError(ValueError):
+    """Erro levantado quando o `UploadHistory` informado não existe."""
+
+
+class LoadNotApplicableError(ValueError):
+    """Erro levantado ao pedir a carga no banco de um upload que não pode ser carregado."""
+
+
 class UploadService:
-    """Processa um upload de ponta a ponta: ingestão, escrita no destino e auditoria."""
+    """Processa um upload de ponta a ponta: ingestão, escrita no destino, carga no banco e auditoria."""
 
     def __init__(
         self,
@@ -31,6 +41,7 @@ class UploadService:
         context_service: ContextService,
         pipeline: IngestionPipeline,
         writer_registry: DestinationWriterRegistry,
+        database_loader: DatabaseLoader | None = None,
     ) -> None:
         """Inicializa o serviço de upload.
 
@@ -39,11 +50,15 @@ class UploadService:
             context_service: Serviço usado para resolver o contexto pelo nome.
             pipeline: Pipeline de ingestão (leitura + conversão para Parquet).
             writer_registry: Registro de destination writers disponíveis.
+            database_loader: Loader que carrega o Parquet na tabela do
+                contexto no banco de destino. `None` faz toda carga pedida
+                falhar com "banco não configurado".
         """
         self._session_factory = session_factory
         self._context_service = context_service
         self._pipeline = pipeline
         self._writer_registry = writer_registry
+        self._database_loader = database_loader
         self._column_checker = ColumnMismatchChecker()
         self._column_data_validator = ColumnDataValidator()
 
@@ -146,7 +161,10 @@ class UploadService:
 
         Em caso de sucesso, também atualiza `context.expected_columns` com as
         colunas deste upload, para que os próximos envios sejam comparados
-        contra elas.
+        contra elas. Se o contexto carrega no banco e o artefato é um
+        Parquet, o registro sai com `load_status=PENDING` — a carga em si é
+        feita depois por `run_database_load`, para que uma falha no banco
+        nunca desfaça o upload já gravado no MinIO.
 
         Args:
             artifact: Artefato já construído por `build_artifact`.
@@ -169,6 +187,7 @@ class UploadService:
                 artifact_kind=artifact.artifact_kind,
                 row_count=result.row_count,
                 error_message=None,
+                load_status=LoadStatus.PENDING if self._should_load(context, artifact) else None,
                 uploaded_by=uploaded_by,
             )
             if artifact.dataframe is not None:
@@ -199,8 +218,8 @@ class UploadService:
         """Processa um arquivo enviado de ponta a ponta e registra o resultado no audit log.
 
         Usado pela API REST, onde não há um humano para confirmar divergências
-        de colunas — a leitura, a escrita no destino e a auditoria acontecem
-        em uma única chamada. Nunca propaga exceções ao chamador: qualquer
+        de colunas — a leitura, a escrita no destino, a carga no banco (se o
+        contexto pedir) e a auditoria acontecem em uma única chamada. Nunca propaga exceções ao chamador: qualquer
         falha durante a ingestão ou a escrita no destino é capturada e
         registrada como um `UploadHistory` com `status=ERROR`.
 
@@ -228,7 +247,95 @@ class UploadService:
                 context, filename, uploaded_by, self.describe_column_data_violation(violation)
             )
 
-        return self.finalize(artifact, context, filename, uploaded_by)
+        history = self.finalize(artifact, context, filename, uploaded_by)
+        if history.load_status == LoadStatus.PENDING:
+            history = self.run_database_load(history.id, artifact.artifact_bytes)
+        return history
+
+    def run_database_load(self, upload_id: int, parquet_bytes: bytes | None = None) -> UploadHistory:
+        """Carrega (ou recarrega) o Parquet de um upload na tabela do contexto e registra o resultado.
+
+        Falhas do banco (conexão, tabela incompatível, etc.) não são
+        propagadas: viram `load_status=ERROR` com a mensagem em `load_error`,
+        e o upload pode ser recarregado depois pelo Audit Log.
+
+        Args:
+            upload_id: Id do `UploadHistory` a carregar.
+            parquet_bytes: Conteúdo do Parquet, quando já está em memória (logo
+                após o upload). `None` lê de volta do MinIO/pasta local.
+
+        Returns:
+            O `UploadHistory` atualizado com a situação da carga.
+
+        Raises:
+            UploadNotFoundError: Se o upload não existir.
+            LoadNotApplicableError: Se o upload não gerou um Parquet, se o
+                contexto não existir mais ou estiver com a carga desligada.
+        """
+        history = self._get_history(upload_id)
+        if history.status != UploadStatus.SUCCESS or history.artifact_kind != "parquet":
+            raise LoadNotApplicableError("Só envios com sucesso que geraram uma tabela podem ser carregados no banco.")
+        context = self._context_service.get_by_name(history.context_name)
+        if context is None:
+            raise LoadNotApplicableError(f"O contexto '{history.context_name}' não existe mais.")
+        if not context.load_to_database:
+            raise LoadNotApplicableError(f"A carga no banco está desligada para o contexto '{context.name}'.")
+
+        try:
+            if self._database_loader is None:
+                raise DatabaseNotConfiguredError("Carga no banco de dados não disponível nesta instalação.")
+            data = parquet_bytes if parquet_bytes is not None else read_artifact_bytes(history)
+            result = self._database_loader.load(data, context, history.id)
+        except Exception as error:  # noqa: BLE001 - qualquer falha da carga fica registrada no audit log
+            return self._update_load(upload_id, LoadStatus.ERROR, load_error=str(error))
+        return self._update_load(upload_id, LoadStatus.SUCCESS, load_detail=result.table)
+
+    def _should_load(self, context: Context, artifact: IngestResult) -> bool:
+        """Indica se o artefato deve ser carregado no banco: contexto com carga ligada e artefato Parquet."""
+        return bool(context.load_to_database) and artifact.artifact_kind == "parquet"
+
+    def _get_history(self, upload_id: int) -> UploadHistory:
+        """Busca um `UploadHistory` pelo id, já desanexado da sessão.
+
+        Raises:
+            UploadNotFoundError: Se não existir um registro com esse id.
+        """
+        with self._session_factory.session() as db_session:
+            history = db_session.get(UploadHistory, upload_id)
+            if history is None:
+                raise UploadNotFoundError(f"Upload '{upload_id}' não encontrado.")
+            db_session.expunge(history)
+            return history
+
+    def _update_load(
+        self,
+        upload_id: int,
+        load_status: LoadStatus,
+        load_detail: str | None = None,
+        load_error: str | None = None,
+    ) -> UploadHistory:
+        """Grava a situação da carga no banco em um `UploadHistory` existente.
+
+        Args:
+            upload_id: Id do registro.
+            load_status: Nova situação da carga.
+            load_detail: Tabela de destino, em caso de sucesso.
+            load_error: Mensagem de erro, em caso de falha.
+
+        Returns:
+            O registro atualizado, já desanexado da sessão.
+        """
+        with self._session_factory.session() as db_session:
+            history = db_session.get(UploadHistory, upload_id)
+            history.load_status = load_status
+            history.load_error = load_error
+            if load_status == LoadStatus.SUCCESS:
+                history.load_detail = load_detail
+                history.loaded_at = datetime.now(timezone.utc)
+            db_session.flush()
+            db_session.refresh(history)
+            db_session.expunge(history)
+            return history
 
     def record_error(
         self, context: Context, filename: str, uploaded_by: str, error_message: str

@@ -105,3 +105,18 @@ def test_context_response_tolerates_unknown_future_fields() -> None:
     response = ContextResponse(**_context_response_kwargs(raw))
 
     assert response.column_rules == [ColumnRule(column="cpf", type="text", required=True)]
+
+
+def test_create_request_normalizes_blank_load_identifiers_to_none() -> None:
+    """Schema/tabela em branco viram `None` (usa o padrão da conexão / slug do nome)."""
+    request = ContextCreateRequest(**_base_create_kwargs(), load_to_database=True, db_schema="  ", db_table="")
+
+    assert request.db_schema is None
+    assert request.db_table is None
+
+
+@pytest.mark.parametrize("table", ["vendas; DROP TABLE x", "1vendas", "vendas-2026", "dbo.vendas"])
+def test_create_request_rejects_non_identifier_table_name(table: str) -> None:
+    """Tabela precisa ser um identificador SQL simples (sem ponto, espaço ou pontuação)."""
+    with pytest.raises(ValidationError):
+        ContextCreateRequest(**_base_create_kwargs(), load_to_database=True, db_table=table)

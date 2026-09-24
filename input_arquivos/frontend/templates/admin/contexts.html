@@ -20,6 +20,7 @@
           <tr style="background: var(--surface-alt); color: var(--text-muted); border-bottom: 1px solid var(--border);">
             <th class="px-4 py-3 font-semibold">Nome</th>
             <th class="px-4 py-3 font-semibold">Destino</th>
+            <th class="px-4 py-3 font-semibold">Banco</th>
             <th class="px-4 py-3 font-semibold">Tipos aceitos</th>
             <th class="px-4 py-3 font-semibold">Modo PDF</th>
             <th class="px-4 py-3 font-semibold">Modo Imagem</th>
@@ -91,6 +92,33 @@
         </div>
         <button type="button" id="test-local-button" class="btn btn-ghost btn-sm self-start">Testar/criar pasta local</button>
         <p id="local-test-result" class="text-xs"></p>
+      </div>
+
+      <div class="flex flex-col gap-2 p-3 rounded-lg" style="background: var(--surface-alt); border: 1px solid var(--border);">
+        <label class="flex items-center gap-2 text-xs cursor-pointer" style="color: var(--text);">
+          <input type="checkbox" id="context-load-to-database" class="accent-indigo-500"> Carregar no banco de dados (tabela)
+        </label>
+        <p class="form-hint">Além do Parquet no MinIO, cada envio com tabela vira linhas numa tabela do banco configurado em Configurações.</p>
+        <div id="load-fields" class="flex flex-col gap-2">
+          <div class="flex gap-2">
+            <div class="form-group" style="margin-bottom:0; flex: 1">
+              <label class="form-label" for="context-db_schema">Schema (opcional)</label>
+              <input id="context-db_schema" class="form-input" placeholder="padrão da conexão (dbo)">
+            </div>
+            <div class="form-group" style="margin-bottom:0; flex: 2">
+              <label class="form-label" for="context-db_table">Tabela (opcional)</label>
+              <input id="context-db_table" class="form-input" placeholder="padrão: nome do contexto">
+            </div>
+          </div>
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" for="context-load-mode">Modo de carga</label>
+            <select id="context-load-mode" class="form-input">
+              <option value="append">Acumular envios</option>
+              <option value="replace">Substituir tabela a cada envio</option>
+            </select>
+            <p id="load-mode-help" class="form-hint"></p>
+          </div>
+        </div>
       </div>
 
       <div class="form-group" style="margin-bottom:0">

@@ -1,12 +1,15 @@
 """Schemas Pydantic para as rotas da API de contexts."""
 
 import json
+import re
 from datetime import datetime
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-from input_arquivos.backend.models.context import ColumnRuleType, DestinationType, ImageMode, PdfMode
+from input_arquivos.backend.models.context import ColumnRuleType, DestinationType, ImageMode, LoadMode, PdfMode
+
+_SQL_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 
 
 class ColumnRule(BaseModel):
@@ -51,7 +54,61 @@ def _validate_unique_rule_columns(column_rules: list[ColumnRule]) -> None:
         seen.add(key)
 
 
-class ContextCreateRequest(BaseModel):
+def _normalize_sql_identifier(value: str | None, label: str) -> str | None:
+    """Valida um nome de schema/tabela informado pelo admin; vazio vira `None` (usa o padrão).
+
+    Aceita só letras, dígitos e `_` (começando por letra ou `_`), para que o
+    nome funcione no SQL Server sem colchetes.
+
+    Args:
+        value: Nome informado.
+        label: Nome do campo, para a mensagem de erro.
+
+    Returns:
+        O nome sem espaços nas pontas, ou `None` se vazio.
+
+    Raises:
+        ValueError: Se o nome tiver caracteres fora do permitido.
+    """
+    if value is None or not value.strip():
+        return None
+    stripped = value.strip()
+    if not _SQL_IDENTIFIER.match(stripped):
+        raise ValueError(f"{label} deve ter só letras, números e _, começando por letra ou _ (até 128 caracteres).")
+    return stripped
+
+
+class DatabaseLoadFields(BaseModel):
+    """Campos de carga no banco de dados de destino, comuns à criação e à edição de um context.
+
+    Attributes:
+        load_to_database: Se cada upload bem-sucedido também é carregado na
+            tabela do context no banco de destino.
+        db_schema: Schema da tabela; vazio usa o padrão da conexão.
+        db_table: Tabela de destino; vazio usa o slug do nome do context.
+        load_mode: `append` (acumula uploads) ou `replace` (cada upload
+            substitui o conteúdo da tabela).
+    """
+
+    load_to_database: bool = False
+    db_schema: str | None = None
+    db_table: str | None = None
+    load_mode: LoadMode = LoadMode.APPEND
+
+    @field_validator("db_schema")
+    @classmethod
+    def _validate_db_schema(cls, value: str | None) -> str | None:
+        """Garante que o schema é um identificador SQL simples."""
+        return _normalize_sql_identifier(value, "Schema")
+
+    @field_validator("db_table")
+    @classmethod
+    def _validate_db_table(cls, value: str | None) -> str | None:
+        """Garante que a tabela é um identificador SQL simples."""
+        return _normalize_sql_identifier(value, "Tabela")
+
+
+class ContextCreateRequest(DatabaseLoadFields):
     """Corpo da requisição para criação de um novo context.
 
     Attributes:
@@ -65,6 +122,8 @@ class ContextCreateRequest(BaseModel):
             (ex. "excel,csv"). Vazio equivale a aceitar todos os tipos.
         column_rules: Regras de validação de tipo/obrigatoriedade por coluna.
             Vazio equivale a não validar o conteúdo de nenhuma coluna.
+
+    Os campos de carga no banco vêm de `DatabaseLoadFields`.
     """
 
     name: str
@@ -83,7 +142,7 @@ class ContextCreateRequest(BaseModel):
         return self
 
 
-class ContextUpdateRequest(BaseModel):
+class ContextUpdateRequest(DatabaseLoadFields):
     """Corpo da requisição para atualização de um context existente.
 
     Attributes:
@@ -98,6 +157,8 @@ class ContextUpdateRequest(BaseModel):
         column_rules: Regras de validação de tipo/obrigatoriedade por coluna.
             Vazio equivale a não validar o conteúdo de nenhuma coluna.
         active: Se o context deve ficar ativo (visível na tela de upload).
+
+    Os campos de carga no banco vêm de `DatabaseLoadFields`.
     """
 
     name: str
@@ -171,6 +232,12 @@ class ContextResponse(BaseModel):
         destination_summary: Descrição curta e pronta para exibição do destino
             configurado (ex.: "MinIO → bucket-vendas"), computada no servidor
             para não duplicar essa lógica no front-end.
+        load_to_database: Se os uploads também são carregados no banco de destino.
+        db_schema: Schema da tabela de destino (`None` = padrão da conexão).
+        db_table: Tabela de destino informada (`None` = slug do nome).
+        load_mode: Modo de carga (`append` ou `replace`).
+        load_summary: Tabela de destino efetiva (`schema.tabela`), ou vazio
+            se a carga no banco estiver desligada.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -188,6 +255,23 @@ class ContextResponse(BaseModel):
     active: bool
     created_at: datetime
     destination_summary: str = ""
+    load_to_database: bool = False
+    db_schema: str | None = None
+    db_table: str | None = None
+    load_mode: LoadMode = LoadMode.APPEND
+    load_summary: str = ""
+
+    @field_validator("load_to_database", mode="before")
+    @classmethod
+    def _default_load_to_database(cls, value: object) -> object:
+        """Trata `load_to_database` nulo (contexts criados antes deste campo existir) como `False`."""
+        return bool(value)
+
+    @field_validator("load_mode", mode="before")
+    @classmethod
+    def _default_load_mode(cls, value: object) -> object:
+        """Trata `load_mode` nulo (contexts criados antes deste campo existir) como `APPEND`."""
+        return value or LoadMode.APPEND
 
     @field_validator("image_mode", mode="before")
     @classmethod

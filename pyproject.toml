@@ -21,6 +21,7 @@ dependencies = [
     "pillow>=11.0.0",
     "pyarrow>=25.0.0",
     "pydantic-settings>=2.14.2",
+    "pymssql>=2.4.1",
     "python-dotenv>=1.2.2",
     "python-multipart>=0.0.32",
     "pyyaml>=6.0",
@@ -37,7 +38,7 @@ dev = [
 ]
 
 [project.scripts]
-input-arquivos = "input_arquivos.main:start"
+input-arquivos = "input_arquivos.cli:main"
 
 [build-system]
 requires = ["hatchling"]
