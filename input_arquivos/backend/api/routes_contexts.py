@@ -21,7 +21,7 @@ from input_arquivos.backend.schemas.context import (
     MinioConnectionTestRequest,
 )
 from input_arquivos.backend.services.container import get_container
-from input_arquivos.backend.services.context_service import DuplicateNameError, MinioBucketError
+from input_arquivos.backend.services.context_service import DatabaseSchemaError, DuplicateNameError, MinioBucketError
 
 router = APIRouter(prefix="/api/contexts", tags=["contexts"])
 
@@ -159,7 +159,7 @@ def create_context(payload: ContextCreateRequest) -> ContextResponse:
 
     Raises:
         HTTPException: 409 se já existir um context com esse nome, ou 502 se
-            o bucket MinIO informado não puder ser criado/verificado.
+            o bucket MinIO ou o schema do banco não puderem ser criados/verificados.
     """
     context_service = get_container().context_service
     try:
@@ -185,6 +185,10 @@ def create_context(payload: ContextCreateRequest) -> ContextResponse:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail={"field": "minio_bucket", "message": str(error)}
         ) from error
+    except DatabaseSchemaError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail={"field": "db_schema", "message": str(error)}
+        ) from error
     return _to_response(context)
 
 
@@ -201,8 +205,8 @@ def update_context(context_id: int, payload: ContextUpdateRequest) -> ContextRes
 
     Raises:
         HTTPException: 404 se o context não existir, 409 se o novo nome já
-            pertencer a outro context, ou 502 se o bucket MinIO informado não
-            puder ser criado/verificado.
+            pertencer a outro context, ou 502 se o bucket MinIO ou o schema do
+            banco não puderem ser criados/verificados.
     """
     try:
         context = get_container().context_service.update(
@@ -228,6 +232,10 @@ def update_context(context_id: int, payload: ContextUpdateRequest) -> ContextRes
     except MinioBucketError as error:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY, detail={"field": "minio_bucket", "message": str(error)}
+        ) from error
+    except DatabaseSchemaError as error:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY, detail={"field": "db_schema", "message": str(error)}
         ) from error
     if context is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Context não encontrado.")

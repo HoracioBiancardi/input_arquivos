@@ -2,12 +2,12 @@
 {% block title %}Área Administrativa • Ingestão de Arquivos{% endblock %}
 
 {% block content %}
-<div class="w-full flex-1 flex flex-col items-center justify-center p-6">
+<div class="w-full flex-1 flex flex-col items-center gap-6 p-6">
   <div class="w-full max-w-4xl flex flex-col gap-6">
 
     <div>
       <h1 class="text-xl font-bold" style="color: var(--text);">Painel de Administração</h1>
-      <p class="text-xs" style="color: var(--text-muted);">Gerenciamento de contextos, usuários e registros de auditoria do sistema</p>
+      <p class="text-xs" style="color: var(--text-muted);">Gerenciamento de contextos, usuários, conexões e registros de auditoria do sistema</p>
     </div>
 
     <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
@@ -18,7 +18,7 @@
         </div>
         <div>
           <span class="text-base font-bold block mb-1" style="color: var(--text);">Contextos de Negócio</span>
-          <span class="text-xs" style="color: var(--text-muted);">Mapeamento de contextos para tabelas SQL, buckets MinIO ou armazenamento local</span>
+          <span class="text-xs" style="color: var(--text-muted);">Destino no MinIO (ou pasta local), regras de coluna e carga opcional em tabela no SQL Server</span>
         </div>
         <span class="text-xs font-semibold mt-2" style="color: var(--primary);">Gerenciar Contextos →</span>
       </a>
@@ -51,7 +51,7 @@
         </div>
         <div>
           <span class="text-base font-bold block mb-1" style="color: var(--text);">Configurações do Sistema</span>
-          <span class="text-xs" style="color: var(--text-muted);">Endpoint e credenciais do MinIO, cifrados em repouso — sobrepõe o .env</span>
+          <span class="text-xs" style="color: var(--text-muted);">Conexões do MinIO e do SQL Server de destino, com credenciais cifradas em repouso</span>
         </div>
         <span class="text-xs font-semibold mt-2" style="color: var(--primary);">Gerenciar Configurações →</span>
       </a>

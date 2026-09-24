@@ -1,13 +1,15 @@
 """Carga do Parquet de um upload como linhas na tabela do contexto, no banco de dados de destino (ex.: SQL Server)."""
 
 import io
+import re
+import unicodedata
 from collections.abc import Callable
 from dataclasses import dataclass
 
 import pandas as pd
 from sqlalchemy import MetaData, Table, create_engine, delete, inspect, text
 from sqlalchemy.dialects import mssql
-from sqlalchemy.engine import URL, Engine, make_url
+from sqlalchemy.engine import URL, Connection, Engine, make_url
 from sqlalchemy.pool import NullPool
 from sqlalchemy.types import BigInteger, Boolean, Date, DateTime, Float, TypeEngine, UnicodeText
 
@@ -18,6 +20,21 @@ UPLOAD_ID_COLUMN = "id_envio"
 # Tempo máximo (s) para abrir a conexão com o SQL Server — o padrão do pymssql (60s)
 # deixaria o "Testar conexão" e a carga presos com um servidor inalcançável.
 _LOGIN_TIMEOUT_SECONDS = 10
+_NON_IDENTIFIER_CHARS = re.compile(r"[^a-z0-9_]+")
+_MAX_IDENTIFIER_LENGTH = 128
+# `CREATE SCHEMA` precisa ser o primeiro comando do lote no SQL Server — por isso vai
+# por SQL dinâmico. O nome entra por bind param e é escapado com QUOTENAME, nunca
+# concatenado no texto da query.
+_CREATE_SCHEMA_IF_MISSING = text(
+    """
+DECLARE @schema sysname = :schema;
+IF SCHEMA_ID(@schema) IS NULL
+BEGIN
+    DECLARE @sql nvarchar(300) = N'CREATE SCHEMA ' + QUOTENAME(@schema);
+    EXEC sp_executesql @sql;
+END
+"""
+)
 
 # Tipos fixados para o SQL Server: sem a versão do servidor, o dialeto mssql cai nos
 # tipos legados (`NTEXT` para texto, `DATETIME` para data) — aqui vale sempre o moderno.
@@ -73,6 +90,27 @@ def describe_target_table(context: Context) -> str:
     return f"{context.db_schema}.{table_name}" if context.db_schema else table_name
 
 
+def sql_column_name(name: object) -> str:
+    """Converte o nome de uma coluna do arquivo num identificador SQL simples.
+
+    `"Valor Líquido"` -> `"valor_liquido"`: sem acentos, minúsculas, e
+    qualquer caractere fora de `[a-z0-9_]` vira `_` — assim a tabela pode
+    ser consultada sem colchetes. Um nome que começaria com dígito ganha o
+    prefixo `c_`; o resultado é cortado em 128 caracteres (limite do SQL Server).
+
+    Args:
+        name: Nome original da coluna no DataFrame.
+
+    Returns:
+        Identificador SQL; `"coluna"` se nada sobrar após a limpeza.
+    """
+    ascii_value = unicodedata.normalize("NFKD", str(name)).encode("ascii", "ignore").decode("ascii")
+    slug = _NON_IDENTIFIER_CHARS.sub("_", ascii_value.lower()).strip("_") or "coluna"
+    if slug[0].isdigit():
+        slug = f"c_{slug}"
+    return slug[:_MAX_IDENTIFIER_LENGTH]
+
+
 def create_target_engine(database_url: URL | str) -> Engine:
     """Cria um engine sem pool para o banco de destino (uma conexão por carga/teste).
 
@@ -109,7 +147,10 @@ def check_database_connection(database_url: URL | str) -> str:
 
 
 class DatabaseLoader:
-    """Insere o Parquet de um upload na tabela do contexto, criando a tabela no primeiro upload.
+    """Insere o Parquet de um upload na tabela do contexto, criando schema e tabela no primeiro upload.
+
+    Os nomes das colunas viram identificadores SQL simples na tabela
+    (`"Valor Líquido"` -> `valor_liquido`).
 
     Cada linha ganha a coluna `id_envio` (id do `UploadHistory`). No modo
     APPEND, as linhas do mesmo `id_envio` são apagadas antes de inserir, na
@@ -129,6 +170,48 @@ class DatabaseLoader:
         """
         self._url_provider = url_provider
 
+    def ensure_schema(self, schema: str) -> None:
+        """Cria o schema no banco de destino, se ainda não existir.
+
+        Chamado ao salvar um contexto com carga ligada e schema preenchido,
+        para o erro de permissão (se houver) aparecer já no cadastro, e não
+        só no primeiro upload.
+
+        Args:
+            schema: Nome do schema (já validado como identificador simples).
+
+        Raises:
+            DatabaseNotConfiguredError: Se a conexão global não estiver configurada.
+            Exception: Erro do driver (ex.: usuário sem permissão `CREATE SCHEMA`).
+        """
+        engine = create_target_engine(self._require_url())
+        try:
+            with engine.begin() as connection:
+                self._ensure_schema(connection, schema)
+        finally:
+            engine.dispose()
+
+    def _require_url(self) -> URL | str:
+        """Resolve a URL do banco de destino.
+
+        Raises:
+            DatabaseNotConfiguredError: Se a conexão global não estiver configurada.
+        """
+        database_url = self._url_provider()
+        if not database_url:
+            raise DatabaseNotConfiguredError(
+                "Banco de dados de destino não configurado. Configure a conexão em Admin → Configurações."
+            )
+        return database_url
+
+    def _ensure_schema(self, connection: Connection, schema: str) -> None:
+        """Executa o `CREATE SCHEMA` condicional na conexão informada.
+
+        Só no SQL Server: outros dialetos (o SQLite dos testes) não têm schemas criáveis.
+        """
+        if connection.dialect.name == "mssql":
+            connection.execute(_CREATE_SCHEMA_IF_MISSING, {"schema": schema})
+
     def load(self, parquet_bytes: bytes, context: Context, upload_id: int) -> LoadResult:
         """Carrega o Parquet de um upload na tabela do contexto.
 
@@ -145,21 +228,19 @@ class DatabaseLoader:
             TableSchemaMismatchError: Se a tabela já existir sem alguma coluna
                 do arquivo, ou sem a coluna `id_envio`.
         """
-        database_url = self._url_provider()
-        if not database_url:
-            raise DatabaseNotConfiguredError(
-                "Banco de dados de destino não configurado. Configure a conexão em Admin → Configurações."
-            )
+        database_url = self._require_url()
 
         dataframe = pd.read_parquet(io.BytesIO(parquet_bytes))
         dataframe.insert(0, UPLOAD_ID_COLUMN, upload_id)
-        dataframe = self._to_naive_utc(dataframe)
+        dataframe = self._normalize_columns(self._to_naive_utc(dataframe))
         table_name = target_table_name(context)
         schema = context.db_schema or None
 
         engine = create_target_engine(database_url)
         try:
             with engine.begin() as connection:
+                if schema:
+                    self._ensure_schema(connection, schema)
                 if inspect(connection).has_table(table_name, schema=schema):
                     table = Table(table_name, MetaData(), schema=schema, autoload_with=connection)
                     self._check_columns(table, dataframe, describe_target_table(context))
@@ -205,6 +286,35 @@ class DatabaseLoader:
                 f"A tabela '{table_label}' não tem as colunas {', '.join(missing)}, que vieram neste arquivo. "
                 "Adicione essas colunas na tabela (ALTER TABLE) e recarregue o envio pelo Audit Log."
             )
+
+    def _normalize_columns(self, dataframe: pd.DataFrame) -> pd.DataFrame:
+        """Troca os nomes das colunas por identificadores SQL simples (ver `sql_column_name`).
+
+        O Parquet no MinIO mantém os nomes originais (as regras de coluna do
+        contexto se referem a eles); só a tabela no banco usa os normalizados.
+        Dois nomes que colidem após a limpeza (ex.: `"Valor Líquido"` e
+        `"valor_liquido"`) ganham sufixo `_2`, `_3`...
+
+        Args:
+            dataframe: DataFrame com os nomes originais.
+
+        Returns:
+            Cópia com as colunas renomeadas.
+        """
+        used: set[str] = set()
+        names: list[str] = []
+        for column in dataframe.columns:
+            base = sql_column_name(column)
+            name = base
+            suffix = 2
+            while name in used:
+                name = f"{base[: _MAX_IDENTIFIER_LENGTH - 4]}_{suffix}"
+                suffix += 1
+            used.add(name)
+            names.append(name)
+        renamed = dataframe.copy()
+        renamed.columns = names
+        return renamed
 
     def _to_naive_utc(self, dataframe: pd.DataFrame) -> pd.DataFrame:
         """Converte colunas de data/hora com fuso (ex.: `data_envio`) para UTC sem fuso.

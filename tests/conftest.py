@@ -47,3 +47,17 @@ def session_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator
 
     get_settings.cache_clear()
     secret_box.reset_for_testing()
+
+
+@pytest.fixture(autouse=True)
+def _ignore_real_encryption_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Impede que a `CONFIG_ENCRYPTION_KEY` do `.env` real do projeto vaze para os testes.
+
+    `Settings` lê o `.env` da raiz; uma variável de ambiente vazia tem
+    prioridade sobre ele, então os testes caem no fallback de arquivo (num
+    `tmp_path`) a menos que definam a chave explicitamente.
+
+    Args:
+        monkeypatch: Fixture do pytest para setar variáveis de ambiente.
+    """
+    monkeypatch.setenv("CONFIG_ENCRYPTION_KEY", "")

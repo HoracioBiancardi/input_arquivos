@@ -108,9 +108,17 @@ timeout de login de 10s.
 
 - **1 contexto = 1 tabela.** Tabela padrão = slug do nome do context (o mesmo da pasta no MinIO);
   schema padrão = o da conexão (`dbo`). Os dois podem ser trocados no context.
+- **Schema criado automaticamente** ao salvar o context (e de novo na carga, se tiver sumido), caso
+  ainda não exista — o usuário do banco precisa de `CREATE SCHEMA`. Se a criação falhar (sem
+  permissão, banco fora do ar), o context não é salvo e a mensagem aparece no campo Schema.
+- **Nomes de coluna normalizados na tabela**: sem acento, minúsculos, `_` no lugar de espaço e
+  pontuação (`Valor Líquido` → `valor_liquido`, `2º Trimestre` → `c_2o_trimestre`); nomes que colidem
+  ganham `_2`, `_3`. O Parquet no MinIO mantém os nomes originais (as regras de coluna usam eles).
 - **Tabela criada no primeiro upload**, com os tipos das regras de coluna (`BIGINT`, `FLOAT`, `DATE`,
   `BIT`, `NVARCHAR(MAX)`; `data_envio` em `DATETIME2`, UTC) e a coluna extra `id_envio` (id do
-  registro no audit log).
+  registro no audit log). Permissões mínimas do usuário da carga: `CREATE SCHEMA` e `CREATE TABLE`
+  no banco (o schema criado por ele já fica sob sua posse), ou, com schema criado pelo DBA,
+  `CREATE TABLE` + `ALTER, SELECT, INSERT, DELETE` no schema.
 - **Modo de carga por context**: *acumular* (cada envio soma linhas; recarregar um envio apaga só as
   linhas do mesmo `id_envio` antes, então nunca duplica) ou *substituir* (cada envio apaga todo o
   conteúdo da tabela via `DELETE` — sem `DROP`, preservando índices/permissões).

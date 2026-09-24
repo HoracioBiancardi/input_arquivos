@@ -18,6 +18,7 @@ from input_arquivos.backend.loaders.database_loader import (
     DatabaseNotConfiguredError,
     TableSchemaMismatchError,
     describe_target_table,
+    sql_column_name,
 )
 from input_arquivos.backend.models.context import Context, DestinationType, LoadMode
 
@@ -155,3 +156,24 @@ def test_describe_target_table_includes_schema_when_set() -> None:
     """Schema informado aparece como prefixo; sem schema, só o nome da tabela."""
     assert describe_target_table(_context(db_schema="staging", db_table="vendas")) == "staging.vendas"
     assert describe_target_table(_context()) == "relatorio_vendas"
+
+
+def test_column_names_become_simple_sql_identifiers(database_url: str) -> None:
+    """Acentos e espaços somem dos nomes na tabela; nomes que colidem ganham sufixo."""
+    extra = {"Valor Líquido": [10.0], "valor_liquido": [20.0], "2º Trimestre": ["x"]}
+
+    DatabaseLoader(lambda: database_url).load(_parquet(["A"], extra=extra), _context(), upload_id=1)
+
+    table = _read_table(database_url, "relatorio_vendas")
+    assert {"valor_liquido", "valor_liquido_2", "c_2o_trimestre"} <= set(table.columns)
+    assert table.loc[0, "valor_liquido"] == 10.0
+    assert table.loc[0, "valor_liquido_2"] == 20.0
+
+
+@pytest.mark.parametrize(
+    ("original", "expected"),
+    [("Data Fatura", "data_fatura"), ("COD_SETOR", "cod_setor"), ("Ação/Área (%)", "acao_area"), ("***", "coluna")],
+)
+def test_sql_column_name(original: str, expected: str) -> None:
+    """Exemplos do que vira cada nome de coluna do arquivo na tabela."""
+    assert sql_column_name(original) == expected

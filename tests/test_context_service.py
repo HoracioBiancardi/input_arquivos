@@ -3,9 +3,14 @@
 import pytest
 
 from input_arquivos.backend.db.session import DatabaseSessionFactory
-from input_arquivos.backend.models.context import DestinationType, PdfMode
+from input_arquivos.backend.models.context import Context, DestinationType, PdfMode
 from input_arquivos.backend.services import context_service as context_service_module
-from input_arquivos.backend.services.context_service import ContextService, DuplicateNameError, MinioBucketError
+from input_arquivos.backend.services.context_service import (
+    ContextService,
+    DatabaseSchemaError,
+    DuplicateNameError,
+    MinioBucketError,
+)
 
 
 class _FakeMinioClient:
@@ -298,3 +303,68 @@ def test_set_active_does_not_require_minio_connectivity(
     updated = service.get_by_id(context.id)
     assert updated is not None
     assert updated.active is False
+
+
+class _FakeSchemaLoader:
+    """Loader falso que só registra os schemas pedidos (ou falha, se configurado)."""
+
+    def __init__(self, error: Exception | None = None) -> None:
+        self.schemas: list[str] = []
+        self._error = error
+
+    def ensure_schema(self, schema: str) -> None:
+        if self._error is not None:
+            raise self._error
+        self.schemas.append(schema)
+
+
+def _create_loading_context(service: ContextService, **overrides: object) -> Context:
+    fields = {
+        "name": "meta",
+        "destination_type": DestinationType.LOCAL,
+        "pdf_mode": PdfMode.METADATA_ONLY,
+        "local_path": "data/local",
+        "load_to_database": True,
+        "db_schema": "inputarquivos",
+    }
+    fields.update(overrides)
+    return service.create(**fields)
+
+
+def test_create_with_schema_creates_it_in_database(session_factory: DatabaseSessionFactory) -> None:
+    """Salvar um context com carga e schema cria o schema no banco na hora."""
+    loader = _FakeSchemaLoader()
+    _create_loading_context(ContextService(session_factory, loader))
+
+    assert loader.schemas == ["inputarquivos"]
+
+
+def test_create_without_load_or_schema_does_not_touch_database(session_factory: DatabaseSessionFactory) -> None:
+    """Sem carga ligada, ou sem schema (usa o padrão), nada é criado."""
+    loader = _FakeSchemaLoader()
+    service = ContextService(session_factory, loader)
+    _create_loading_context(service, name="a", load_to_database=False)
+    _create_loading_context(service, name="b", db_schema=None)
+
+    assert loader.schemas == []
+
+
+def test_update_only_recreates_schema_when_it_changes(session_factory: DatabaseSessionFactory) -> None:
+    """Salvar só regras/nome não toca no banco; trocar o schema cria o novo."""
+    loader = _FakeSchemaLoader()
+    service = ContextService(session_factory, loader)
+    context = _create_loading_context(service)
+
+    service.update(context.id, load_to_database=True, db_schema="inputarquivos", column_rules=None)
+    service.update(context.id, load_to_database=True, db_schema="staging")
+
+    assert loader.schemas == ["inputarquivos", "staging"]
+
+
+def test_schema_creation_failure_blocks_save(session_factory: DatabaseSessionFactory) -> None:
+    """Sem permissão para criar o schema, o context não é salvo e o erro sobe com o motivo."""
+    service = ContextService(session_factory, _FakeSchemaLoader(error=RuntimeError("permission denied")))
+
+    with pytest.raises(DatabaseSchemaError, match="permission denied"):
+        _create_loading_context(service)
+    assert service.get_by_name("meta") is None

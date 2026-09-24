@@ -8,6 +8,7 @@ from sqlalchemy import select
 
 from input_arquivos.backend.db.session import DatabaseSessionFactory
 from input_arquivos.backend.destinations.minio_client import build_minio_client
+from input_arquivos.backend.loaders.database_loader import DatabaseLoader
 from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, LoadMode, PdfMode
 
 
@@ -17,6 +18,10 @@ class DuplicateNameError(ValueError):
 
 class MinioBucketError(RuntimeError):
     """Erro levantado ao falhar a criação/verificação automática de um bucket no MinIO."""
+
+
+class DatabaseSchemaError(RuntimeError):
+    """Erro levantado ao falhar a criação automática do schema de destino no SQL Server."""
 
 
 @dataclass
@@ -35,13 +40,17 @@ class ConnectionTestResult:
 class ContextService:
     """Gerencia o CRUD de contexts e os testes de conectividade com seus destinos."""
 
-    def __init__(self, session_factory: DatabaseSessionFactory) -> None:
+    def __init__(self, session_factory: DatabaseSessionFactory, database_loader: DatabaseLoader | None = None) -> None:
         """Inicializa o serviço de contexts.
 
         Args:
             session_factory: Fábrica de sessões do banco de configuração local.
+            database_loader: Loader usado para criar o schema de destino ao
+                salvar um context com carga no banco. `None` pula a criação
+                (o schema é criado de qualquer forma na primeira carga).
         """
         self._session_factory = session_factory
+        self._database_loader = database_loader
 
     def list_all(self) -> list[Context]:
         """Lista todos os contexts cadastrados, ativos ou não.
@@ -133,6 +142,8 @@ class ContextService:
 
         if destination_type == DestinationType.MINIO and minio_bucket:
             self._ensure_minio_bucket(minio_bucket)
+        if load_to_database and db_schema:
+            self._ensure_db_schema(db_schema)
 
         context = Context(
             name=name,
@@ -186,6 +197,15 @@ class ContextService:
                 if effective_destination_type == DestinationType.MINIO and effective_bucket:
                     self._ensure_minio_bucket(str(effective_bucket))
 
+            # Só quando carga/schema mudam: o front reenvia o context inteiro em todo
+            # PUT (inclusive ao salvar só as regras), e um SQL Server fora do ar não
+            # deve impedir de editar o resto do context.
+            effective_load = fields.get("load_to_database", context.load_to_database)
+            effective_schema = fields.get("db_schema", context.db_schema)
+            load_settings_changed = (effective_load, effective_schema) != (context.load_to_database, context.db_schema)
+            if load_settings_changed and effective_load and effective_schema:
+                self._ensure_db_schema(str(effective_schema))
+
             for field_name, value in fields.items():
                 setattr(context, field_name, value)
             db_session.flush()
@@ -222,6 +242,27 @@ class ContextService:
                 client.make_bucket(bucket)
         except Exception as error:  # noqa: BLE001 - erro de conectividade externo, reportado ao usuário
             raise MinioBucketError(f"Falha ao criar/verificar o bucket '{bucket}' no MinIO: {error}") from error
+
+    def _ensure_db_schema(self, schema: str) -> None:
+        """Garante que o schema de destino exista no SQL Server, criando-o se necessário.
+
+        Chamado ao criar/atualizar um context com carga no banco e schema
+        preenchido — assim um schema inexistente ou sem permissão aparece já
+        no cadastro, e não como erro de carga no primeiro upload.
+
+        Args:
+            schema: Nome do schema a garantir.
+
+        Raises:
+            DatabaseSchemaError: Se o banco não estiver configurado ou o schema
+                não puder ser criado (ex.: usuário sem permissão `CREATE SCHEMA`).
+        """
+        if self._database_loader is None:
+            return
+        try:
+            self._database_loader.ensure_schema(schema)
+        except Exception as error:  # noqa: BLE001 - erro de conectividade/permissão externo, reportado ao usuário
+            raise DatabaseSchemaError(f"Falha ao criar/verificar o schema '{schema}' no banco: {error}") from error
 
     def test_minio_connection(self, bucket: str) -> ConnectionTestResult:
         """Testa a conectividade com um bucket no servidor MinIO configurado globalmente.

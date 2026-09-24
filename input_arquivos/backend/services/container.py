@@ -24,16 +24,17 @@ class ServiceContainer:
                 compartilhada por todos os serviços.
         """
         self.auth_service = AuthService(session_factory)
-        self.context_service = ContextService(session_factory)
+        self.system_settings_service = SystemSettingsService(session_factory)
+        database_loader = DatabaseLoader(self.system_settings_service.get_database_url)
+        self.context_service = ContextService(session_factory, database_loader)
         self.user_service = UserService(session_factory, self.auth_service)
         self.user_context_service = UserContextService(session_factory, self.context_service)
-        self.system_settings_service = SystemSettingsService(session_factory)
         self.upload_service = UploadService(
             session_factory=session_factory,
             context_service=self.context_service,
             pipeline=IngestionPipeline(),
             writer_registry=DestinationWriterRegistry(),
-            database_loader=DatabaseLoader(self.system_settings_service.get_database_url),
+            database_loader=database_loader,
         )
         self.preview_service = PreviewService(session_factory=session_factory)
 
