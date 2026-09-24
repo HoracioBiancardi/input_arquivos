@@ -3,6 +3,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from input_arquivos.backend.auth.dependencies import require_admin
+from input_arquivos.backend.auth.session import SessionUser
 from input_arquivos.backend.schemas.user import (
     UserContextsRequest,
     UserCreateRequest,
@@ -29,7 +30,7 @@ def list_users() -> list[UserResponse]:
 
 @router.post("", response_model=UserResponse)
 def create_user(payload: UserCreateRequest) -> UserResponse:
-    """Cria um novo usuário.
+    """Cria um novo usuário, marcado para trocar a senha inicial no primeiro acesso.
 
     Args:
         payload: Dados do usuário a ser criado.
@@ -42,7 +43,10 @@ def create_user(payload: UserCreateRequest) -> UserResponse:
     """
     try:
         user = get_container().user_service.create(
-            username=payload.username, plain_password=payload.password, role=payload.role
+            username=payload.username,
+            plain_password=payload.password,
+            role=payload.role,
+            must_change_password=True,
         )
     except DuplicateUsernameError as error:
         raise HTTPException(
@@ -73,12 +77,18 @@ def get_user(user_id: int) -> UserDetailResponse:
 
 
 @router.patch("/{user_id}", response_model=UserResponse)
-def update_user(user_id: int, payload: UserUpdateRequest) -> UserResponse:
+def update_user(
+    user_id: int, payload: UserUpdateRequest, admin: SessionUser = Depends(require_admin)
+) -> UserResponse:
     """Atualiza papel, ativação e/ou senha de um usuário existente.
+
+    Senha redefinida para outra pessoa marca a conta para troca no próximo
+    acesso (o admin conhece essa senha); redefinir a própria senha não marca.
 
     Args:
         user_id: Identificador do usuário a atualizar.
         payload: Campos a alterar (apenas os informados são aplicados).
+        admin: Admin autenticado que está fazendo a alteração.
 
     Returns:
         O usuário atualizado, convertido para `UserResponse`.
@@ -95,7 +105,9 @@ def update_user(user_id: int, payload: UserUpdateRequest) -> UserResponse:
     if payload.active is not None:
         container.user_service.set_active(user_id, payload.active)
     if payload.new_password:
-        container.user_service.reset_password(user_id, payload.new_password)
+        container.user_service.reset_password(
+            user_id, payload.new_password, must_change_password=user_id != admin.user_id
+        )
 
     return UserResponse.model_validate(container.user_service.get_by_id(user_id))
 

@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, field_validator
 from input_arquivos.backend.models.user import UserRole
 
 _USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
-_MIN_PASSWORD_LENGTH = 8
+MIN_PASSWORD_LENGTH = 8
 
 
 class UserCreateRequest(BaseModel):
@@ -36,8 +36,8 @@ class UserCreateRequest(BaseModel):
     @classmethod
     def _validate_password(cls, value: str) -> str:
         """Garante que a senha tenha o tamanho mínimo exigido."""
-        if len(value) < _MIN_PASSWORD_LENGTH:
-            raise ValueError(f"Senha deve ter ao menos {_MIN_PASSWORD_LENGTH} caracteres.")
+        if len(value) < MIN_PASSWORD_LENGTH:
+            raise ValueError(f"Senha deve ter ao menos {MIN_PASSWORD_LENGTH} caracteres.")
         return value
 
 
@@ -60,8 +60,8 @@ class UserUpdateRequest(BaseModel):
     @classmethod
     def _validate_new_password(cls, value: str | None) -> str | None:
         """Garante que a nova senha, quando informada, tenha o tamanho mínimo exigido."""
-        if value and len(value) < _MIN_PASSWORD_LENGTH:
-            raise ValueError(f"Senha deve ter ao menos {_MIN_PASSWORD_LENGTH} caracteres.")
+        if value and len(value) < MIN_PASSWORD_LENGTH:
+            raise ValueError(f"Senha deve ter ao menos {MIN_PASSWORD_LENGTH} caracteres.")
         return value
 
 

@@ -26,8 +26,17 @@ async function loadUsers() {
   });
 }
 
+// Campo de senha volta a ficar oculto ao reabrir o modal (pode ter ficado visível após "Gerar").
+function hidePasswordField(inputId) {
+  const input = document.getElementById(inputId);
+  input.type = "password";
+  const toggle = input.parentElement.querySelector(".pw-toggle");
+  if (toggle) toggle.textContent = "SHOW";
+}
+
 function openCreateModal() {
   document.getElementById("create-user-form").reset();
+  hidePasswordField("create-password");
   clearFieldErrors("create");
   createModal.classList.remove("hidden");
   createModal.classList.add("open", "flex");
@@ -77,6 +86,7 @@ async function openManageModal(userId) {
   manageRoleSelect.value = user.role;
   document.getElementById("manage-active").checked = user.active;
   document.getElementById("manage-new_password").value = "";
+  hidePasswordField("manage-new_password");
   clearFieldErrors("manage");
 
   const assignedIds = new Set(user.context_ids);

@@ -45,7 +45,12 @@
       </div>
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label" for="create-password">Senha Inicial</label>
-        <input id="create-password" type="password" required class="form-input">
+        <div class="pw-wrap">
+          <input id="create-password" type="password" required minlength="8" autocomplete="new-password" class="form-input">
+          <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('create-password', this)" title="Mostrar/ocultar">SHOW</button>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" style="margin-top:.4rem" onclick="fillGeneratedPassword(['create-password'])">🎲 Gerar senha forte</button>
+        <p class="form-hint">O usuário será avisado para trocar esta senha no primeiro acesso.</p>
       </div>
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label" for="create-role">Papel do Usuário</label>
@@ -86,7 +91,12 @@
 
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label" for="manage-new_password">Nova Senha</label>
-        <input id="manage-new_password" type="password" placeholder="Deixe em branco para não alterar" class="form-input">
+        <div class="pw-wrap">
+          <input id="manage-new_password" type="password" autocomplete="new-password" placeholder="Deixe em branco para não alterar" class="form-input">
+          <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('manage-new_password', this)" title="Mostrar/ocultar">SHOW</button>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" style="margin-top:.4rem" onclick="fillGeneratedPassword(['manage-new_password'])">🎲 Gerar senha forte</button>
+        <p class="form-hint">Senha redefinida para outra pessoa: ela será avisada para trocá-la no próximo acesso.</p>
       </div>
 
       <div id="manage-contexts-field" class="form-group" style="margin-bottom:0">

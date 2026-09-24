@@ -83,6 +83,7 @@
       <a href="/" class="btn btn-ghost btn-sm">Voltar</a>
       {% endif %}
 
+      <button type="button" class="btn btn-ghost btn-sm" data-username="{{ current_user.username }}" onclick="openChangePasswordModal(this.dataset.username)" title="Trocar minha senha">🔑 Minha senha</button>
       <button type="button" class="btn btn-ghost btn-sm" onclick="openSettingsModal()" title="Configurações">⚙️ Configurações</button>
       <button type="button" id="logout-button" class="btn btn-ghost btn-sm" title="Sair da Sessão">Sair</button>
     </div>
@@ -92,12 +93,8 @@
 
   {% if current_user and current_user.must_change_password %}
   <div class="toast warn" style="position:static;margin:0.75rem auto;max-width:64rem" role="alert">
-    ⚠️ Esta conta ainda usa a senha padrão gerada na instalação.
-    {% if current_user.role == "admin" %}
-      Troque-a em <a href="/admin/users" style="text-decoration:underline">Admin → Usuários</a> assim que possível.
-    {% else %}
-      Peça a um administrador para trocá-la.
-    {% endif %}
+    ⚠️ Sua senha foi definida por um administrador (ou é a senha padrão da instalação).
+    <a href="#" data-username="{{ current_user.username }}" onclick="event.preventDefault(); openChangePasswordModal(this.dataset.username)" style="text-decoration:underline">Troque agora</a>.
   </div>
   {% endif %}
 
@@ -136,6 +133,46 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-primary" onclick="closeSettingsModal()" style="width:100%;justify-content:center">Fechar</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal de Troca da Própria Senha (tela de login e "Minha senha" no cabeçalho) -->
+  <div class="overlay" id="change-password-overlay">
+    <div class="modal glass" style="max-width:440px">
+      <div class="modal-header">
+        <h2>Trocar Senha</h2>
+        <button type="button" class="close-btn" onclick="closeChangePasswordModal()">X</button>
+      </div>
+      <form id="change-password-form" class="modal-body" style="display:flex;flex-direction:column;gap:1rem" autocomplete="off">
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="cp-username">Usuário</label>
+          <input id="cp-username" required class="form-input" autocomplete="username">
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="cp-current_password">Senha atual</label>
+          <div class="pw-wrap">
+            <input id="cp-current_password" type="password" required class="form-input" autocomplete="current-password">
+            <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('cp-current_password', this)" title="Mostrar/ocultar">SHOW</button>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="cp-new_password">Senha nova</label>
+          <div class="pw-wrap">
+            <input id="cp-new_password" type="password" required minlength="8" class="form-input" autocomplete="new-password">
+            <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('cp-new_password', this)" title="Mostrar/ocultar">SHOW</button>
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" style="margin-top:.4rem" onclick="fillGeneratedPassword(['cp-new_password', 'cp-new_password_confirm'])">🎲 Gerar senha forte</button>
+        </div>
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label" for="cp-new_password_confirm">Confirmar senha nova</label>
+          <input id="cp-new_password_confirm" type="password" required minlength="8" class="form-input" autocomplete="new-password">
+        </div>
+        <p class="form-hint">Mínimo de 8 caracteres. Esqueceu a senha atual? Peça a um administrador para redefini-la.</p>
+        <div class="modal-footer" style="padding:0">
+          <button type="button" class="btn btn-ghost" onclick="closeChangePasswordModal()">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Trocar Senha</button>
+        </div>
+      </form>
     </div>
   </div>
 

@@ -1,12 +1,13 @@
-"""Rotas da API REST de autenticação: login, logout e usuário da sessão atual."""
+"""Rotas da API REST de autenticação: login, logout, troca da própria senha e usuário da sessão atual."""
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from input_arquivos.backend.auth.dependencies import require_login
 from input_arquivos.backend.auth.session import SessionCookie, SessionUser
-from input_arquivos.backend.schemas.auth import LoginRequest, SessionUserResponse
+from input_arquivos.backend.schemas.auth import ChangePasswordRequest, LoginRequest, SessionUserResponse
 from input_arquivos.backend.services.auth_service import AccountLockedError
 from input_arquivos.backend.services.container import get_container
+from input_arquivos.backend.services.user_service import InvalidCredentialsError, SamePasswordError
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 _session_cookie = SessionCookie()
@@ -65,3 +66,38 @@ def me(user: SessionUser = Depends(require_login)) -> SessionUserResponse:
         Dados básicos do usuário autenticado.
     """
     return SessionUserResponse(username=user.username, role=user.role, must_change_password=user.must_change_password)
+
+
+@router.post("/change-password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(payload: ChangePasswordRequest) -> None:
+    """Troca a senha de quem informar usuário e senha atual (sem exigir sessão).
+
+    Serve tanto à tela de login ("Trocar senha") quanto ao "Minha senha" do
+    cabeçalho. Zera `must_change_password`. Sessões já abertas continuam
+    válidas — a sessão é revalidada contra o banco, não guarda a senha.
+
+    Args:
+        payload: Usuário, senha atual e senha nova.
+
+    Raises:
+        HTTPException: 401 se usuário/senha atual forem inválidos ou a conta
+            estiver bloqueada (mesmo status do login, para não permitir
+            enumerar usernames); 422 se a senha nova for igual à atual.
+    """
+    try:
+        get_container().user_service.change_own_password(
+            payload.username, payload.current_password, payload.new_password
+        )
+    except AccountLockedError as error:
+        minutes = max(1, error.retry_after_seconds // 60)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Conta bloqueada temporariamente por excesso de tentativas. Tente novamente em {minutes} minuto(s).",
+        ) from error
+    except InvalidCredentialsError as error:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(error)) from error
+    except SamePasswordError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={"field": "new_password", "message": str(error)},
+        ) from error

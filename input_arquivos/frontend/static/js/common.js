@@ -96,7 +96,9 @@ async function apiFetch(path, options = {}) {
     init.body = JSON.stringify(init.body);
   }
   const response = await fetch(path, init);
-  if (response.status === 401 && path !== "/api/auth/login") {
+  // Login e troca de senha devolvem 401 para credencial errada — mostrar o erro, não redirecionar.
+  const credentialPaths = ["/api/auth/login", "/api/auth/change-password"];
+  if (response.status === 401 && !credentialPaths.includes(path)) {
     window.location.href = "/login";
     throw new Error("Sessão expirada.");
   }
@@ -253,4 +255,116 @@ document.addEventListener("DOMContentLoaded", () => {
   if (logoutButton) {
     logoutButton.addEventListener("click", logout);
   }
+});
+
+// ── Senhas: mostrar/ocultar, gerar e trocar a própria ────────────────
+// Sem caracteres ambíguos (0/O, 1/l/I) para a senha poder ser ditada/digitada sem erro.
+const PASSWORD_GROUPS = ["ABCDEFGHJKLMNPQRSTUVWXYZ", "abcdefghijkmnopqrstuvwxyz", "23456789", "!@#$%&*?"];
+
+// Índice aleatório em [0, max) sem viés de módulo (descarta bytes acima do maior múltiplo de max).
+// crypto.getRandomValues funciona também em HTTP, diferente de crypto.subtle/clipboard.
+function randomIndex(max) {
+  const limit = 256 - (256 % max);
+  const buffer = new Uint8Array(1);
+  do {
+    crypto.getRandomValues(buffer);
+  } while (buffer[0] >= limit);
+  return buffer[0] % max;
+}
+
+// Senha com ao menos um caractere de cada grupo, embaralhada (Fisher-Yates).
+function generatePassword(length = 16) {
+  const all = PASSWORD_GROUPS.join("");
+  const chars = PASSWORD_GROUPS.map((group) => group[randomIndex(group.length)]);
+  while (chars.length < length) chars.push(all[randomIndex(all.length)]);
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomIndex(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}
+
+function togglePasswordVisibility(inputId, button) {
+  const input = document.getElementById(inputId);
+  const showing = input.type === "text";
+  input.type = showing ? "password" : "text";
+  button.textContent = showing ? "SHOW" : "HIDE";
+}
+
+// Preenche os campos com uma senha gerada e deixa visível, para quem gerou conseguir anotar/repassar.
+function fillGeneratedPassword(inputIds) {
+  const password = generatePassword();
+  inputIds.forEach((id) => {
+    const input = document.getElementById(id);
+    input.value = password;
+    input.type = "text";
+    const toggle = input.parentElement.querySelector(".pw-toggle");
+    if (toggle) toggle.textContent = "HIDE";
+  });
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(password).then(
+      () => showToast("Senha gerada e copiada.", "positive"),
+      () => showToast("Senha gerada — anote antes de salvar.", "info")
+    );
+  } else {
+    showToast("Senha gerada — anote antes de salvar.", "info");
+  }
+}
+
+function openChangePasswordModal(username) {
+  const form = document.getElementById("change-password-form");
+  if (!form) return;
+  form.reset();
+  clearFieldErrors("cp");
+  ["cp-current_password", "cp-new_password", "cp-new_password_confirm"].forEach((id) => {
+    document.getElementById(id).type = "password";
+  });
+  form.querySelectorAll(".pw-toggle").forEach((button) => (button.textContent = "SHOW"));
+  document.getElementById("cp-username").value = username || "";
+  document.getElementById("change-password-overlay").classList.add("open");
+  document.getElementById(username ? "cp-current_password" : "cp-username").focus();
+}
+
+function closeChangePasswordModal() {
+  const overlay = document.getElementById("change-password-overlay");
+  if (overlay) overlay.classList.remove("open");
+}
+
+async function submitChangePassword(event) {
+  event.preventDefault();
+  clearFieldErrors("cp");
+  const username = document.getElementById("cp-username").value.trim();
+  const newPassword = document.getElementById("cp-new_password").value;
+  if (newPassword !== document.getElementById("cp-new_password_confirm").value) {
+    applyFieldErrors("cp", [{ field: "new_password_confirm", message: "As senhas não conferem." }]);
+    return;
+  }
+  try {
+    await apiFetch("/api/auth/change-password", {
+      method: "POST",
+      body: {
+        username,
+        current_password: document.getElementById("cp-current_password").value,
+        new_password: newPassword,
+      },
+    });
+    closeChangePasswordModal();
+    showToast("Senha trocada com sucesso.", "positive");
+    const loginUsername = document.getElementById("username");
+    if (loginUsername) {
+      loginUsername.value = username;
+      document.getElementById("password").focus();
+    } else {
+      setTimeout(() => window.location.reload(), 800);
+    }
+  } catch (error) {
+    if (applyFieldErrors("cp", extractFieldErrors(error.data)) === 0) {
+      showToast(error.message, "negative");
+    }
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("change-password-form");
+  if (form) form.addEventListener("submit", submitChangePassword);
 });

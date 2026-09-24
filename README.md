@@ -212,4 +212,9 @@ acessam serviços/banco diretamente.
 - **Autenticação**: sessão via cookie assinado (`SESSION_SECRET`, ver `backend/auth/session.py`), tanto
   para as páginas quanto para a API REST — toda rota sob `/api/*` (exceto `/api/auth/login`) exige
   login, e as rotas administrativas exigem papel `admin`.
+- **Senhas**: qualquer usuário troca a própria senha em "🔑 Trocar senha" (tela de login) ou "🔑 Minha
+  senha" (cabeçalho), informando a senha atual — mesma contagem de tentativas/bloqueio do login. Senha
+  criada ou redefinida pelo admin para outra pessoa marca a conta para troca no próximo acesso. Os
+  campos de senha têm mostrar/ocultar e "Gerar senha forte" (`crypto.getRandomValues`). Quem esqueceu
+  a senha pede ao admin para redefinir.
 - **Tema**: `corporate` (padrão), `green-neutral` e `cyber-dark`, trocáveis pelo modal de Configurações — mesmo sistema de tokens CSS usado nos demais projetos SwordPower.

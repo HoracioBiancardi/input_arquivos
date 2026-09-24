@@ -11,6 +11,14 @@ class DuplicateUsernameError(ValueError):
     """Erro levantado ao tentar criar um usuário com um nome de usuário já cadastrado."""
 
 
+class InvalidCredentialsError(ValueError):
+    """Erro levantado quando usuário/senha atual não conferem ao trocar a própria senha."""
+
+
+class SamePasswordError(ValueError):
+    """Erro levantado quando a senha nova é igual à atual."""
+
+
 class UserService:
     """Gerencia o CRUD de usuários usados no login geral do sistema."""
 
@@ -57,13 +65,17 @@ class UserService:
         with self._session_factory.session() as db_session:
             return db_session.execute(select(User).where(User.username == username)).scalar_one_or_none()
 
-    def create(self, username: str, plain_password: str, role: UserRole) -> User:
+    def create(
+        self, username: str, plain_password: str, role: UserRole, must_change_password: bool = False
+    ) -> User:
         """Cria um novo usuário.
 
         Args:
             username: Nome de usuário único.
             plain_password: Senha em texto puro (será convertida em hash bcrypt).
             role: Papel do usuário (admin ou comum).
+            must_change_password: Se a conta nasce marcada para trocar a senha
+                (senha inicial definida por um admin).
 
         Returns:
             O usuário recém-criado.
@@ -79,6 +91,7 @@ class UserService:
             password_hash=self._auth_service.hash_password(plain_password),
             role=role,
             active=True,
+            must_change_password=must_change_password,
         )
         with self._session_factory.session() as db_session:
             db_session.add(user)
@@ -87,22 +100,47 @@ class UserService:
             db_session.expunge(user)
         return user
 
-    def reset_password(self, user_id: int, new_plain_password: str) -> None:
+    def reset_password(self, user_id: int, new_plain_password: str, must_change_password: bool = False) -> None:
         """Redefine a senha de um usuário existente.
-
-        Também zera `must_change_password`: se a conta estava marcada como
-        usando a senha padrão do bootstrap, essa marca deixa de fazer
-        sentido assim que uma senha nova é definida.
 
         Args:
             user_id: Identificador do usuário.
             new_plain_password: Nova senha em texto puro.
+            must_change_password: `True` quando um admin define a senha de
+                outra pessoa (o admin conhece essa senha, então o usuário deve
+                trocá-la); `False` quando o próprio dono define a senha —
+                inclusive zerando a marca da senha padrão do bootstrap.
         """
         with self._session_factory.session() as db_session:
             user = db_session.get(User, user_id)
             if user is not None:
                 user.password_hash = self._auth_service.hash_password(new_plain_password)
-                user.must_change_password = False
+                user.must_change_password = must_change_password
+
+    def change_own_password(self, username: str, current_password: str, new_password: str) -> None:
+        """Troca a senha de um usuário que informou a senha atual.
+
+        A senha atual é validada por `AuthService.authenticate`, então conta
+        tentativa errada e respeita o bloqueio temporário, como o login —
+        esta rota não vira um atalho para adivinhar senhas.
+
+        Args:
+            username: Nome de usuário.
+            current_password: Senha atual.
+            new_password: Senha nova.
+
+        Raises:
+            InvalidCredentialsError: Se usuário/senha atual não conferirem
+                (ou a conta estiver inativa).
+            AccountLockedError: Se a conta estiver bloqueada por tentativas erradas.
+            SamePasswordError: Se a senha nova for igual à atual.
+        """
+        user = self._auth_service.authenticate(username, current_password)
+        if user is None:
+            raise InvalidCredentialsError("Usuário ou senha atual inválidos.")
+        if new_password == current_password:
+            raise SamePasswordError("A senha nova deve ser diferente da atual.")
+        self.reset_password(user.id, new_password)
 
     def set_active(self, user_id: int, active: bool) -> None:
         """Ativa ou desativa a conta de um usuário.
