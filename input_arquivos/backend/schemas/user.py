@@ -1,11 +1,11 @@
 """Schemas Pydantic para as rotas de CRUD de usuários e controle de acesso a contexts."""
 
 import re
-from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
 from input_arquivos.backend.models.user import UserRole
+from input_arquivos.backend.schemas.common import UtcDatetime
 
 _USERNAME_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
 MIN_PASSWORD_LENGTH = 8
@@ -94,7 +94,7 @@ class UserResponse(BaseModel):
     role: UserRole
     active: bool
     last_context_name: str | None
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class UserDetailResponse(UserResponse):

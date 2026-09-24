@@ -2,8 +2,8 @@
 {% block title %}Enviar Arquivo • Ingestão de Arquivos{% endblock %}
 
 {% block content %}
-<div class="w-full flex-1 flex flex-col items-center gap-6 p-6">
-  <div class="w-full max-w-5xl flex flex-col gap-6">
+<div class="w-full flex-1 flex flex-col items-center gap-6 p-3 sm:p-6">
+  <div class="w-full max-w-6xl flex flex-col gap-6">
 
     <!-- Card de Envio de Arquivo -->
     <div class="modal glass surface-card shadow-xl" style="max-width:100%; border-radius: var(--r-lg);">
@@ -70,18 +70,21 @@
         <div class="brand-icon" style="width: 32px; height: 32px; background: var(--surface-alt); color: var(--text);">
           <span>🕒</span>
         </div>
-        <p class="text-base font-bold" style="color: var(--text);">Últimos Envios Realizados</p>
+        <div>
+          <p class="text-base font-bold" style="color: var(--text);">Últimos Envios Realizados</p>
+          <p class="text-xs" style="color: var(--text-muted);">Horários de Brasília</p>
+        </div>
       </div>
 
       <div class="overflow-x-auto rounded-lg" style="border: 1px solid var(--border);">
-        <table class="w-full text-xs text-left" style="color: var(--text);">
+        <table class="responsive-table w-full text-xs text-left" style="color: var(--text);">
           <thead>
             <tr style="background: var(--surface-alt); color: var(--text-muted); border-bottom: 1px solid var(--border);">
               <th class="px-4 py-3 font-semibold">Arquivo</th>
               <th class="px-4 py-3 font-semibold">Contexto</th>
               <th class="px-4 py-3 font-semibold hidden lg:table-cell">Destino</th>
-              <th class="px-4 py-3 font-semibold text-center">Status</th>
-              <th class="px-4 py-3 font-semibold hidden md:table-cell">Enviado por</th>
+              <th class="px-4 py-3 font-semibold">Status</th>
+              <th class="px-4 py-3 font-semibold whitespace-nowrap hidden lg:table-cell">Enviado por</th>
               <th class="px-4 py-3 font-semibold whitespace-nowrap">Data de Envio</th>
               <th class="px-4 py-3 font-semibold text-right sticky-action" style="background: var(--surface-alt);">Ações</th>
             </tr>

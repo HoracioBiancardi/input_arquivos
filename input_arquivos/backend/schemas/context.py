@@ -2,12 +2,18 @@
 
 import json
 import re
-from datetime import datetime
 from typing import Self
 
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
-from input_arquivos.backend.models.context import ColumnRuleType, DestinationType, ImageMode, LoadMode, PdfMode
+from input_arquivos.backend.models.context import (
+    ColumnRuleType,
+    DestinationType,
+    ImageMode,
+    LoadMode,
+    PdfMode,
+)
+from input_arquivos.backend.schemas.common import UtcDatetime
 
 _SQL_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
 
@@ -253,7 +259,7 @@ class ContextResponse(BaseModel):
     pdf_mode: PdfMode
     image_mode: ImageMode
     active: bool
-    created_at: datetime
+    created_at: UtcDatetime
     destination_summary: str = ""
     load_to_database: bool = False
     db_schema: str | None = None

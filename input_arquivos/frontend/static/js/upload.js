@@ -108,22 +108,28 @@ async function loadContexts() {
 
 function statusBadge(status) {
   const isSuccess = status === "success";
-  return `<span class="badge ${isSuccess ? "badge-success" : "badge-danger"}">${isSuccess ? "Sucesso" : "Erro"}</span>`;
+  return `<span class="status-badge ${isSuccess ? "status-badge--success" : "status-badge--error"}">${isSuccess ? "Sucesso" : "Erro"}</span>`;
 }
 
-const LOAD_STATUS_LABELS = { pending: "Banco: pendente", success: "Banco: carregado", error: "Banco: erro" };
+const LOAD_STATUS_BADGES = {
+  pending: ["status-badge--muted", "Banco: pendente"],
+  success: ["status-badge--success", "Banco: carregado"],
+  error: ["status-badge--error", "Banco: erro"],
+};
 
 // Situação da carga no banco, abaixo do status do envio (só para contextos que carregam no banco).
 function loadStatusLine(item) {
   if (!item.load_status) return "";
+  const [variant, label] = LOAD_STATUS_BADGES[item.load_status] || ["status-badge--muted", item.load_status];
   const title = item.load_status === "error" ? item.load_error : item.load_detail;
-  return `<div class="text-xs mt-1" style="color: var(--text-muted)" title="${esc(title || "")}">${LOAD_STATUS_LABELS[item.load_status] || esc(item.load_status)}</div>`;
+  return `<span class="status-badge ${variant}" title="${esc(title || "")}">${esc(label)}</span>`;
 }
 
-function formatDate(isoString) {
-  if (!isoString) return "–";
-  const date = new Date(isoString);
-  return date.toLocaleDateString("pt-BR") + " " + date.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+// Só o nome do arquivo gravado (a parte mais útil); o caminho completo fica no tooltip.
+function destinationCell(detail) {
+  if (!detail) return "-";
+  const name = detail.split(/[\\/]/).pop();
+  return `<span class="font-mono" title="${esc(detail)}">${esc(name)}</span>`;
 }
 
 function viewTableAction(item) {
@@ -162,7 +168,7 @@ function showHistoryError(item) {
     title: "Detalhes do erro",
     body: `
       <p><strong>Arquivo:</strong> ${esc(item.filename)}</p>
-      <p><strong>Contexto:</strong> ${esc(item.context_name)} · <strong>Data:</strong> ${formatDate(item.created_at)}</p>
+      <p><strong>Contexto:</strong> ${esc(item.context_name)} · <strong>Data:</strong> ${formatDateTimeBR(item.created_at)}</p>
       <div class="mt-3">${errorMessageHtml(item.error_message)}</div>`,
   });
 }
@@ -204,14 +210,14 @@ async function loadHistory() {
     rows.innerHTML = history
       .map(
         (item) => `
-        <tr class="border-b border-black/5 dark:border-white/10 last:border-0">
-          <td class="px-4 py-2 font-mono font-bold" style="overflow-wrap: anywhere; min-width: 10rem">${esc(item.filename)}</td>
-          <td class="px-4 py-2">${esc(item.context_name)}</td>
-          <td class="px-4 py-2 hidden lg:table-cell" style="overflow-wrap: anywhere; min-width: 12rem">${esc(item.destination_detail) || "-"}</td>
-          <td class="px-4 py-2 text-center">${statusBadge(item.status)}${loadStatusLine(item)}</td>
-          <td class="px-4 py-2 hidden md:table-cell">${esc(item.uploaded_by)}</td>
-          <td class="px-4 py-2 whitespace-nowrap">${formatDate(item.created_at)}</td>
-          <td class="px-4 py-2 text-right whitespace-nowrap sticky-action">${viewTableAction(item)}</td>
+        <tr>
+          <td data-label="Arquivo" class="px-4 py-2 font-semibold" style="overflow-wrap: anywhere; min-width: 10rem">${esc(item.filename)}</td>
+          <td data-label="Contexto" class="px-4 py-2">${esc(item.context_name)}</td>
+          <td data-label="Destino" class="px-4 py-2 hidden lg:table-cell" style="overflow-wrap: anywhere">${destinationCell(item.destination_detail)}</td>
+          <td data-label="Status" class="px-4 py-2"><div class="status-stack">${statusBadge(item.status)}${loadStatusLine(item)}</div></td>
+          <td data-label="Enviado por" class="px-4 py-2 hidden lg:table-cell">${esc(item.uploaded_by)}</td>
+          <td data-label="Data" class="px-4 py-2 whitespace-nowrap">${formatDateTimeBR(item.created_at)}</td>
+          <td data-label="" class="px-4 py-2 text-right whitespace-nowrap sticky-action">${viewTableAction(item)}</td>
         </tr>`
       )
       .join("");

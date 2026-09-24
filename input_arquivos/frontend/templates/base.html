@@ -76,23 +76,23 @@
       <span class="text-xs text-muted hidden md:inline-block">Olá, {{ current_user.username }}</span>
 
       {% if current_user.role == "admin" %}
-      <a href="/admin" class="btn btn-ghost btn-sm">Admin</a>
+      <a href="/admin" class="btn btn-ghost btn-sm" title="Área administrativa">🛠️<span class="btn-label">Admin</span></a>
       {% endif %}
 
       {% if request.url.path != "/" %}
-      <a href="/" class="btn btn-ghost btn-sm">Voltar</a>
+      <a href="/" class="btn btn-ghost btn-sm" title="Voltar para o envio de arquivos">←<span class="btn-label">Voltar</span></a>
       {% endif %}
 
-      <button type="button" class="btn btn-ghost btn-sm" data-username="{{ current_user.username }}" onclick="openChangePasswordModal(this.dataset.username)" title="Trocar minha senha">🔑 Minha senha</button>
-      <button type="button" class="btn btn-ghost btn-sm" onclick="openSettingsModal()" title="Configurações">⚙️ Configurações</button>
-      <button type="button" id="logout-button" class="btn btn-ghost btn-sm" title="Sair da Sessão">Sair</button>
+      <button type="button" class="btn btn-ghost btn-sm" data-username="{{ current_user.username }}" onclick="openChangePasswordModal(this.dataset.username)" title="Trocar minha senha">🔑<span class="btn-label">Minha senha</span></button>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="openSettingsModal()" title="Configurações de aparência">⚙️<span class="btn-label">Configurações</span></button>
+      <button type="button" id="logout-button" class="btn btn-ghost btn-sm" title="Sair da Sessão">⏻<span class="btn-label">Sair</span></button>
     </div>
   </header>
   {% endif %}
   {% endblock %}
 
   {% if current_user and current_user.must_change_password %}
-  <div class="toast warn" style="position:static;margin:0.75rem auto;max-width:64rem" role="alert">
+  <div class="page-alert" role="alert">
     ⚠️ Sua senha foi definida por um administrador (ou é a senha padrão da instalação).
     <a href="#" data-username="{{ current_user.username }}" onclick="event.preventDefault(); openChangePasswordModal(this.dataset.username)" style="text-decoration:underline">Troque agora</a>.
   </div>

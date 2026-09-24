@@ -77,6 +77,25 @@ function initAutoLockListener() {
   resetAutoLockTimer();
 }
 
+// ── Datas ─────────────────────────────────────────────────────────────
+// A API devolve horários em UTC com fuso explícito (+00:00); a exibição é sempre no
+// horário de Brasília, independente do fuso configurado na máquina de quem acessa.
+const BR_DATETIME_FORMAT = new Intl.DateTimeFormat("pt-BR", {
+  timeZone: "America/Sao_Paulo",
+  day: "2-digit",
+  month: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+function formatDateTimeBR(isoString) {
+  if (!isoString) return "–";
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return "–";
+  return BR_DATETIME_FORMAT.format(date).replace(",", "");
+}
+
 // ── Sanitização XSS ───────────────────────────────────────────────────
 function esc(str) {
   if (str === null || str === undefined) return '';

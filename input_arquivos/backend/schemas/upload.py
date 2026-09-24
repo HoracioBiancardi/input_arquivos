@@ -1,11 +1,10 @@
 """Schemas Pydantic para as rotas da API de upload e audit log."""
 
-from datetime import datetime
-
 from pydantic import BaseModel, ConfigDict
 
 from input_arquivos.backend.models.context import DestinationType
 from input_arquivos.backend.models.upload_history import LoadStatus, UploadStatus
+from input_arquivos.backend.schemas.common import UtcDatetime
 
 
 class UploadHistoryResponse(BaseModel):
@@ -45,9 +44,9 @@ class UploadHistoryResponse(BaseModel):
     load_status: LoadStatus | None = None
     load_detail: str | None = None
     load_error: str | None = None
-    loaded_at: datetime | None = None
+    loaded_at: UtcDatetime | None = None
     uploaded_by: str
-    created_at: datetime
+    created_at: UtcDatetime
 
 
 class UploadPreviewResponse(BaseModel):
