@@ -60,9 +60,7 @@ async function saveMinioConfig(event) {
   try {
     await apiFetch("/api/settings/minio", { method: "PUT", body: values });
     showToast("Configuração do MinIO salva com sucesso.", "positive");
-    setTimeout(() => {
-      window.location.href = "/admin";
-    }, 800);
+    setTimeout(() => window.location.reload(), 800);
   } catch (err) {
     const fieldErrors = extractFieldErrors(err.data);
     if (applyFieldErrors("minio", fieldErrors) === 0) {

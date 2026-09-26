@@ -72,18 +72,19 @@ def upload_preview_page(
 def admin_dashboard_page(
     request: Request, user: SessionUser | RedirectResponse = Depends(require_admin_page)
 ) -> HTMLResponse | RedirectResponse:
-    """Renderiza o painel inicial da área administrativa.
+    """Leva à primeira tela da área administrativa (o antigo painel de atalhos saiu: a lateral
+    já lista Contextos, Usuários, Conexões e Auditoria). Mantida para links antigos.
 
     Args:
         request: Requisição HTTP recebida.
         user: Usuário autenticado como admin, ou um redirect se não for o caso.
 
     Returns:
-        Página do painel administrativo renderizada, ou o redirect resolvido pela dependency.
+        Redirect para `/admin/contexts`, ou o redirect resolvido pela dependency.
     """
     if isinstance(user, RedirectResponse):
         return user
-    return templates.TemplateResponse(request, "admin/dashboard.html", {"current_user": user})
+    return RedirectResponse("/admin/contexts", status_code=303)
 
 
 @router.get("/admin/contexts", response_class=HTMLResponse, response_model=None)

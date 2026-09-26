@@ -37,17 +37,19 @@ def create_app() -> FastAPI:
     fastapi_app.mount("/static", StaticFiles(directory="input_arquivos/frontend/static"), name="static")
 
     @fastapi_app.exception_handler(IntegrityError)
-    def _handle_integrity_error(_request: Request, _error: IntegrityError) -> JSONResponse:
+    def _handle_integrity_error(_request: Request, error: IntegrityError) -> JSONResponse:
         """Converte violações de constraint do banco (ex.: nome duplicado) numa resposta amigável.
 
         Rede de segurança para o caso raro de duas requisições concorrentes
         passarem pela checagem de duplicidade da camada de serviço ao mesmo
         tempo — o banco ainda impede a duplicidade via `unique=True`.
         """
-        return JSONResponse(
-            status_code=status.HTTP_409_CONFLICT,
-            content={"detail": "Já existe um registro com esses dados."},
-        )
+        # Só UNIQUE é duplicidade; outra restrição (ex.: NOT NULL) é problema do banco, não do usuário.
+        if "UNIQUE" in str(error.orig).upper():
+            detalhe = "Já existe um registro com esses dados."
+        else:
+            detalhe = "O banco local recusou o registro (restrição de coluna). Reinicie o app para ele ajustar o banco."
+        return JSONResponse(status_code=status.HTTP_409_CONFLICT, content={"detail": detalhe})
 
     fastapi_app.include_router(auth_router)
     fastapi_app.include_router(contexts_router)

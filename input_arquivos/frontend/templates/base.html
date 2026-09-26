@@ -58,9 +58,6 @@
     <nav class="activity-bar" aria-label="Navegação principal">
       <a class="activity-btn{% if path == '/' or path.startswith('/uploads/') %} active{% endif %}" href="/" title="Enviar arquivos"><span class="ms" aria-hidden="true">upload_file</span><span class="activity-label">Envio</span></a>
       {% if current_user.role == "admin" %}
-      <a class="activity-btn{% if path == '/admin' %} active{% endif %}" href="/admin" title="Painel administrativo"><span class="ms" aria-hidden="true">dashboard</span><span class="activity-label">Painel</span></a>
-      {% endif %}
-      {% if current_user.role == "admin" %}
       <a class="activity-btn{% if path.startswith('/admin/contexts') %} active{% endif %}" href="/admin/contexts" title="Contextos de negócio"><span class="ms" aria-hidden="true">account_tree</span><span class="activity-label">Contextos</span></a>
       {% endif %}
       {% if current_user.role == "admin" %}
@@ -85,9 +82,6 @@
       </div>
       <div class="sidebar-tree">
         <a class="tree-item{% if path == '/' or path.startswith('/uploads/') %} active{% endif %}" href="/"><span class="tree-icon ms" aria-hidden="true">upload_file</span> Enviar arquivos</a>
-      {% if current_user.role == "admin" %}
-        <a class="tree-item{% if path == '/admin' %} active{% endif %}" href="/admin"><span class="tree-icon ms" aria-hidden="true">dashboard</span> Painel administrativo</a>
-      {% endif %}
       {% if current_user.role == "admin" %}
         <a class="tree-item{% if path.startswith('/admin/contexts') %} active{% endif %}" href="/admin/contexts"><span class="tree-icon ms" aria-hidden="true">account_tree</span> Contextos de negócio</a>
       {% endif %}

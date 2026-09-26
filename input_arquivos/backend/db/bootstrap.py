@@ -29,6 +29,7 @@ class DatabaseBootstrapper:
     def run(self) -> None:
         """Cria as tabelas (se não existirem), adiciona colunas novas às existentes e semeia o admin."""
         Base.metadata.create_all(self._session_factory.engine)
+        self._drop_legacy_required_columns()
         self._sync_missing_columns()
         self._seed_first_admin()
 
@@ -54,6 +55,45 @@ class DatabaseBootstrapper:
                         continue
                     column_type = column.type.compile(dialect=engine.dialect)
                     connection.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {column_type}'))
+
+    def _drop_legacy_required_columns(self) -> None:
+        """Reconstrói tabelas que ainda têm colunas antigas obrigatórias que o código não conhece mais.
+
+        Bancos criados por versões antigas guardam colunas removidas do modelo (ex.: `contexts.
+        db_schema_name`, `default_write_mode`) como `NOT NULL` sem valor padrão: todo INSERT novo
+        falha (o app mostrava "Já existe um registro com esses dados"). O SQLite não altera nem
+        remove coluna com restrição, então a tabela é recriada pelo modelo atual e os dados das
+        colunas em comum são copiados. `legacy_alter_table` evita que o RENAME reescreva as chaves
+        estrangeiras das outras tabelas para a cópia temporária.
+        """
+        engine = self._session_factory.engine
+        inspector = inspect(engine)
+        for table in Base.metadata.sorted_tables:
+            if not inspector.has_table(table.name):
+                continue
+            known = {column.name for column in table.columns}
+            existing = inspector.get_columns(table.name)
+            blocking = [
+                c["name"] for c in existing
+                if c["name"] not in known and not c.get("nullable", True) and c.get("default") is None
+            ]
+            if not blocking:
+                continue
+            common = [c["name"] for c in existing if c["name"] in known]
+            cols = ", ".join(f'"{name}"' for name in common)
+            old = f"{table.name}__antiga"
+            indexes = [i["name"] for i in inspector.get_indexes(table.name) if i.get("name")]
+            with engine.begin() as connection:
+                connection.execute(text("PRAGMA foreign_keys=OFF"))
+                for name in indexes:  # recriados com o mesmo nome pelo modelo
+                    connection.execute(text(f'DROP INDEX IF EXISTS "{name}"'))
+                connection.execute(text("PRAGMA legacy_alter_table=ON"))
+                connection.execute(text(f'ALTER TABLE "{table.name}" RENAME TO "{old}"'))
+                table.create(connection)
+                connection.execute(text(f'INSERT INTO "{table.name}" ({cols}) SELECT {cols} FROM "{old}"'))
+                connection.execute(text(f'DROP TABLE "{old}"'))
+                connection.execute(text("PRAGMA legacy_alter_table=OFF"))
+                connection.execute(text("PRAGMA foreign_keys=ON"))
 
     def _seed_first_admin(self) -> None:
         """Cria o primeiro usuário admin a partir das variáveis de ambiente, se a tabela estiver vazia."""
