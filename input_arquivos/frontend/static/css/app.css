@@ -15,10 +15,10 @@ a.activity-btn, a.tree-item, a.brand-icon, .tab-view a.btn { text-decoration: no
 a.activity-btn.active, a.tree-item.active { color: var(--primary); }
 /* Modais longos (contexto, regras, usuário): altura menor que a tela, centralizados com folga,
    rolando só o meio — cabeçalho e rodapé (botões) ficam sempre à vista. */
-.overlay > .modal { overflow-y: auto; max-height: min(82vh, calc(100vh - 7rem)); padding-top: 0; padding-bottom: 0; }
+.overlay:not(.login-overlay) > .modal { overflow-y: auto; max-height: min(82vh, calc(100vh - 7rem)); padding-top: 0; padding-bottom: 0; }
 .modal > form { flex-shrink: 0; }
-.overlay > .modal > .modal-header { position: sticky; top: 0; z-index: 2; background: var(--surface); padding-top: 1.25rem; margin-top: 0; }
-.overlay > .modal .modal-footer { position: sticky; bottom: 0; z-index: 2; background: var(--surface); padding-top: .75rem; padding-bottom: 1.25rem; margin-top: .5rem; border-top: 1px solid var(--border-muted); }
+.overlay:not(.login-overlay) > .modal > .modal-header { position: sticky; top: 0; z-index: 2; background: var(--surface); padding-top: 1.25rem; margin-top: 0; }
+.overlay:not(.login-overlay) > .modal .modal-footer { position: sticky; bottom: 0; z-index: 2; background: var(--surface); padding-top: .75rem; padding-bottom: 1.25rem; margin-top: .5rem; border-top: 1px solid var(--border-muted); }
 /* Toast com caminho longo quebra a linha em vez de vazar da tela */
 .toasts .toast { max-width: min(460px, calc(100vw - 40px)); overflow-wrap: anywhere; }
 .page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; flex-wrap: wrap; }
