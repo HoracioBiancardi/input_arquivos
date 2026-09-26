@@ -37,8 +37,9 @@ a.activity-btn.active, a.tree-item.active { color: var(--primary); }
 .status-badge--success { background: rgba(34, 197, 94, .15); color: var(--success); }
 .status-badge--error { background: rgba(239, 68, 68, .15); color: var(--danger); }
 .status-badge--muted { background: var(--surface-alt); color: var(--text-muted); }
-.sticky-action { position: sticky; right: 0; background: var(--surface); box-shadow: -8px 0 8px -8px rgba(0, 0, 0, .45); }
+.sticky-action { position: sticky; right: 0; background: var(--surface); }  /* fixa ao rolar a tabela na horizontal; sem sombra (aparecia mesmo sem rolagem) */
 table tbody tr:hover .sticky-action { background: var(--surface-hover); }
+.data-table th.sticky-action { background: var(--surface-alt); }
 .status-stack, .load-cell { display: flex; flex-direction: column; align-items: flex-start; gap: .3rem; }
 .drop-zone { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem;
   border: 2px dashed var(--border); border-radius: var(--r-lg); background: var(--surface-alt); cursor: pointer; transition: border-color var(--t), background var(--t); }
