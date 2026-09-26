@@ -2,7 +2,7 @@
 
 const THEME_KEY = 'app-theme';
 const AUTOLOCK_KEY = 'app-autolock-minutes';
-const VALID_THEMES = new Set(['corporate', 'green-neutral', 'cyber-dark']);
+const VALID_THEMES = new Set(['corporate', 'green-neutral', 'cyber-dark', 'blau']);
 
 function getTheme() {
   const saved = localStorage.getItem(THEME_KEY);
@@ -63,10 +63,7 @@ function resetAutoLockTimer() {
 
   _autolockTimer = setTimeout(() => {
     // Redireciona/desloga por inatividade se houver sessão ativa
-    if (window.location.pathname !== '/login') {
-      showToast('Sessão bloqueada por inatividade.', 'warning');
-      setTimeout(() => logout(), 1000);
-    }
+    if (window.location.pathname !== '/login') logout('inatividade');
   }, minutes * 60 * 1000);
 }
 
@@ -118,7 +115,7 @@ async function apiFetch(path, options = {}) {
   // Login e troca de senha devolvem 401 para credencial errada — mostrar o erro, não redirecionar.
   const credentialPaths = ["/api/auth/login", "/api/auth/change-password"];
   if (response.status === 401 && !credentialPaths.includes(path)) {
-    window.location.href = "/login";
+    window.location.href = "/login?motivo=expirou";
     throw new Error("Sessão expirada.");
   }
   if (response.status === 204) {
@@ -169,26 +166,22 @@ function applyFieldErrors(prefix, errors) {
   return applied;
 }
 
-function showToast(message, variant = "info") {
-  const root = document.getElementById("toast-root") || document.body;
-  const toast = document.createElement("div");
-  
-  // Mapeamento de variantes para compatibilidade
-  let typeClass = variant;
-  if (variant === "positive") typeClass = "success";
-  if (variant === "negative") typeClass = "error";
-  if (variant === "warning") typeClass = "warn";
+// Toast do app_template: empilha no canto, faixa colorida por tipo, some sozinho.
+const TOAST_CLASSE = {
+  success: "", positive: "",
+  error: "toast--erro", negative: "toast--erro",
+  warn: "toast--aviso", warning: "toast--aviso",
+  info: "toast--info",
+};
 
-  toast.className = `toast ${typeClass}`;
+function showToast(message, variant = "info") {
+  const root = document.getElementById("toasts") || document.body;
+  const toast = document.createElement("div");
+  toast.className = `toast ${TOAST_CLASSE[variant] ?? "toast--info"}`.trim();
+  toast.setAttribute("role", "status");
   toast.textContent = message;
   root.appendChild(toast);
-  
-  requestAnimationFrame(() => toast.classList.add("visible"));
-
-  setTimeout(() => {
-    toast.classList.remove("visible");
-    setTimeout(() => toast.remove(), 250);
-  }, 4000);
+  setTimeout(() => toast.remove(), 4500);
 }
 
 function confirmModal({ title, body, confirmLabel = "Confirmar", cancelLabel = "Cancelar", variant = "primary" }) {
@@ -257,22 +250,120 @@ function alertModal({ title, body, closeLabel = "Fechar", maxWidth = "560px" }) 
   });
 }
 
-async function logout() {
+// Sair (botão ou bloqueio por inatividade): a tela de login mostra o motivo no card.
+async function logout(motivo = "saiu") {
   try {
     await apiFetch("/api/auth/logout", { method: "POST" });
   } catch (e) {
     // Ignora erro se sessão já foi invalidada
   }
-  window.location.href = "/login";
+  window.location.href = `/login?motivo=${encodeURIComponent(motivo)}`;
+}
+
+// ── Lateral (= app_template): recolher, filtrar e arrastar a largura ─────────
+const LATERAL_KEY = "ia-lateral";
+const LARGURA_KEY = "ia-sidebar-width";
+const LARGURA = { padrao: 240, min: 160, max: 550 };
+
+function aplicarLargura(px) {
+  const v = Math.min(LARGURA.max, Math.max(LARGURA.min, Math.round(px)));
+  document.documentElement.style.setProperty("--sidebar-w", `${v}px`);
+  return v;
+}
+
+function toggleSidebar(forceState) {
+  const panel = document.getElementById("sidebar-panel");
+  const handle = document.getElementById("sidebar-resize-handle");
+  if (!panel) return;
+  const aberta = typeof forceState === "boolean" ? forceState : panel.classList.contains("collapsed");
+  panel.classList.toggle("collapsed", !aberta);
+  if (handle) handle.classList.toggle("collapsed", !aberta);
+  try { localStorage.setItem(LATERAL_KEY, aberta ? "1" : "0"); } catch { /* sem storage: só nesta página */ }
+}
+
+function filterSidebarItems(query) {
+  const q = (query || "").toLowerCase();
+  document.querySelectorAll(".sidebar-tree .tree-item").forEach((item) => {
+    item.style.display = item.textContent.toLowerCase().includes(q) ? "" : "none";
+  });
+}
+
+function initSidebar() {
+  const panel = document.getElementById("sidebar-panel");
+  const handle = document.getElementById("sidebar-resize-handle");
+  if (!panel || !handle) return;
+  try {
+    aplicarLargura(Number(localStorage.getItem(LARGURA_KEY)) || LARGURA.padrao);
+    if (localStorage.getItem(LATERAL_KEY) === "0") {
+      panel.classList.add("resizing");  // sem animação ao abrir a página já recolhida
+      toggleSidebar(false);
+      requestAnimationFrame(() => panel.classList.remove("resizing"));
+    }
+  } catch { /* sem storage */ }
+  let arrastando = false;
+  const mover = (x) => {
+    if (!arrastando) return;
+    const v = aplicarLargura(x - panel.getBoundingClientRect().left);
+    try { localStorage.setItem(LARGURA_KEY, String(v)); } catch { /* sem storage */ }
+  };
+  const fim = () => {
+    if (!arrastando) return;
+    arrastando = false;
+    panel.classList.remove("resizing"); handle.classList.remove("dragging");
+    document.body.style.cursor = ""; document.body.style.userSelect = "";
+  };
+  const inicio = (e) => {
+    if (panel.classList.contains("collapsed")) return;
+    arrastando = true;
+    panel.classList.add("resizing"); handle.classList.add("dragging");
+    document.body.style.cursor = "col-resize"; document.body.style.userSelect = "none";
+    e.preventDefault();
+  };
+  handle.addEventListener("mousedown", inicio);
+  handle.addEventListener("touchstart", inicio, { passive: false });
+  document.addEventListener("mousemove", (e) => mover(e.clientX));
+  document.addEventListener("touchmove", (e) => { if (arrastando) { mover(e.touches[0].clientX); e.preventDefault(); } }, { passive: false });
+  document.addEventListener("mouseup", fim);
+  document.addEventListener("touchend", fim);
+  handle.addEventListener("dblclick", () => {
+    try { localStorage.setItem(LARGURA_KEY, String(aplicarLargura(LARGURA.padrao))); } catch { /* sem storage */ }
+  });
+}
+
+// SHOW/HIDE em todo campo de senha que ainda não tem o botão (= app_template).
+function ligarMostrarSenha() {
+  document.querySelectorAll('input[type="password"]').forEach((input) => {
+    if (input.parentElement.querySelector(".pw-toggle")) return;
+    let caixa = input.parentElement;
+    if (!caixa.classList.contains("pw-wrap")) {
+      caixa = document.createElement("div");
+      caixa.className = "pw-wrap";
+      input.replaceWith(caixa);
+      caixa.append(input);
+    }
+    const botao = document.createElement("button");
+    botao.type = "button";
+    botao.className = "pw-toggle";
+    botao.title = "Mostrar/ocultar";
+    botao.textContent = "SHOW";
+    botao.addEventListener("click", () => {
+      const mostrar = input.type === "password";
+      input.type = mostrar ? "text" : "password";
+      botao.textContent = mostrar ? "HIDE" : "SHOW";
+    });
+    caixa.append(botao);
+  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   applyPrefsOnBoot();
   initAutoLockListener();
+  initSidebar();
+  ligarMostrarSenha();
 
   const logoutButton = document.getElementById("logout-button");
   if (logoutButton) {
-    logoutButton.addEventListener("click", logout);
+    logoutButton.addEventListener("click", () => logout());
   }
 });
 

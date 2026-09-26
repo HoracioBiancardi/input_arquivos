@@ -2,15 +2,13 @@
 {% block title %}Configurações • Ingestão de Arquivos{% endblock %}
 
 {% block content %}
-<div class="w-full flex-1 flex flex-col items-center gap-6 p-6">
-  <div class="w-full max-w-2xl flex flex-col gap-4">
 
     <div>
-      <h1 class="text-xl font-bold" style="color: var(--text);">Configurações do Sistema</h1>
-      <p class="text-xs" style="color: var(--text-muted);">Conexões globais do MinIO e do banco de dados de destino, cifradas em repouso</p>
+      <h1 class="page-title"><span class="page-title-icon ms" aria-hidden="true">dns</span>Configurações do Sistema</h1>
+        <p class="page-subtitle">Conexões globais do MinIO e do banco de dados de destino, cifradas em repouso</p>
     </div>
 
-    <div class="modal glass surface-card shadow-xl flex flex-col gap-4 p-6" style="max-width:100%; border-radius: var(--r-lg);">
+    <div class="card glass flex flex-col gap-4 p-6">
       <div class="flex items-center gap-2">
         <span class="text-xs" style="color: var(--text-muted);">Origem atual:</span>
         <span id="minio-source-badge" class="status-badge status-badge--muted">—</span>
@@ -49,7 +47,7 @@
       </form>
     </div>
 
-    <div class="modal glass surface-card shadow-xl flex flex-col gap-4 p-6" style="max-width:100%; border-radius: var(--r-lg);">
+    <div class="card glass flex flex-col gap-4 p-6">
       <div>
         <h2 class="text-base font-bold" style="color: var(--text);">Banco de dados de destino</h2>
         <p class="text-xs" style="color: var(--text-muted);">SQL Server onde os contextos com "Carregar no banco" gravam suas tabelas</p>
@@ -103,8 +101,8 @@
       </form>
     </div>
 
-  </div>
-</div>
+  
+
 {% endblock %}
 
 {% block scripts %}

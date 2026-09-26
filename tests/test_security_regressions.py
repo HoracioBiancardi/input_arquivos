@@ -392,3 +392,18 @@ def test_locked_account_returns_same_status_as_invalid_credentials(client: TestC
         "/api/auth/login", json={"username": "usuario-que-nao-existe", "password": "qualquer"}
     )
     assert unknown_user_response.status_code == invalid_response.status_code == 401
+
+
+def test_escrita_de_outra_origem_e_recusada(client):
+    """Outra porta/subdomínio do mesmo domínio é o mesmo "site": o SameSite não barra, o Sec-Fetch-Site sim."""
+    _login(client, "admin", "admin123")
+    for origem in ("same-site", "cross-site"):
+        r = client.post("/api/auth/logout", headers={"Sec-Fetch-Site": origem})
+        assert r.status_code == 403
+    assert client.get("/api/auth/me").status_code == 200  # a sessão continua
+
+
+def test_cabecalhos_de_seguranca(client):
+    r = client.get("/login")
+    assert r.headers["x-frame-options"] == "DENY" and r.headers["x-content-type-options"] == "nosniff"
+    assert client.get("/api/system/health").headers["cache-control"] == "no-store"

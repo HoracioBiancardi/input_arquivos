@@ -2,42 +2,40 @@
 {% block title %}Contextos • Ingestão de Arquivos{% endblock %}
 
 {% block content %}
-<div class="w-full flex-1 flex flex-col items-center gap-6 p-6">
-  <div class="w-full max-w-6xl flex flex-col gap-4">
 
-    <div class="flex justify-between items-center">
+    <div class="page-head">
       <div>
-        <h1 class="text-xl font-bold" style="color: var(--text);">Contextos de Negócio</h1>
-        <p class="text-xs" style="color: var(--text-muted);">Configure os destinos de ingestão, modos de arquivo e regras de coluna</p>
+        <h1 class="page-title"><span class="page-title-icon ms" aria-hidden="true">account_tree</span>Contextos de Negócio</h1>
+        <p class="page-subtitle">Configure os destinos de ingestão, modos de arquivo e regras de coluna</p>
       </div>
-      <button id="new-context-button" type="button" class="btn btn-primary">+ Novo Contexto</button>
+      <button id="new-context-button" type="button" class="btn btn-primary"><span class="ms" aria-hidden="true">add</span>Novo Contexto</button>
     </div>
 
     <!-- Tabela de Contextos -->
-    <div class="modal glass surface-card shadow-xl overflow-x-auto" style="max-width:100%; border-radius: var(--r-lg);">
-      <table class="w-full text-xs text-left" style="color: var(--text);">
+    <div class="card glass overflow-x-auto">
+      <table class="data-table">
         <thead>
-          <tr style="background: var(--surface-alt); color: var(--text-muted); border-bottom: 1px solid var(--border);">
-            <th class="px-4 py-3 font-semibold">Nome</th>
-            <th class="px-4 py-3 font-semibold">Destino</th>
-            <th class="px-4 py-3 font-semibold">Banco</th>
-            <th class="px-4 py-3 font-semibold">Tipos aceitos</th>
-            <th class="px-4 py-3 font-semibold">Modo PDF</th>
-            <th class="px-4 py-3 font-semibold">Modo Imagem</th>
-            <th class="px-4 py-3 font-semibold text-center">Ativo</th>
-            <th class="px-4 py-3 font-semibold text-right">Ações</th>
+          <tr>
+            <th>Nome</th>
+            <th>Destino</th>
+            <th>Banco</th>
+            <th>Tipos aceitos</th>
+            <th>Modo PDF</th>
+            <th>Modo Imagem</th>
+            <th class="text-center">Ativo</th>
+            <th class="text-right">Ações</th>
           </tr>
         </thead>
-        <tbody id="context-rows" class="divide-y divide-slate-700/30"></tbody>
+        <tbody id="context-rows"></tbody>
       </table>
     </div>
 
-  </div>
-</div>
+  
+
 
 <!-- Modal de Contexto -->
 <div id="context-modal" class="overlay">
-  <div class="modal glass shadow-2xl" style="max-width: 580px; max-height: 90vh; overflow-y: auto;">
+  <div class="modal glass" style="max-width: 580px; max-height: 90vh; overflow-y: auto;">
     <div class="modal-header">
       <h3 id="context-modal-title" class="text-base font-bold">Novo Contexto</h3>
       <button type="button" class="close-btn" id="context-close-x" onclick="window.closeModal && window.closeModal()">X</button>
@@ -157,7 +155,7 @@
 
 <!-- Modal de Regras -->
 <div id="rules-modal" class="overlay">
-  <div class="modal glass shadow-2xl" style="max-width: 680px; max-height: 90vh; overflow-y: auto;">
+  <div class="modal glass" style="max-width: 680px; max-height: 90vh; overflow-y: auto;">
     <div class="modal-header">
       <div>
         <h3 class="text-base font-bold">Regras de Validação de Dados</h3>
@@ -178,7 +176,7 @@
             <th class="py-2 px-3"></th>
           </tr>
         </thead>
-        <tbody id="context-rules-rows" class="divide-y divide-slate-700/30"></tbody>
+        <tbody id="context-rules-rows"></tbody>
       </table>
     </div>
 

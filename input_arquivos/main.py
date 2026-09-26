@@ -15,6 +15,7 @@ from input_arquivos.backend.api.routes_users import router as users_router
 from input_arquivos.backend.config import get_settings
 from input_arquivos.backend.db.bootstrap import DatabaseBootstrapper
 from input_arquivos.backend.db.session import get_session_factory
+from input_arquivos.backend.security.web_guard import WebGuardMiddleware
 from input_arquivos.backend.services.container import get_container
 from input_arquivos.frontend.web.routes_pages import router as pages_router
 
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
         redoc_url="/redoc" if settings.debug else None,
         openapi_url="/openapi.json" if settings.debug else None,
     )
+    fastapi_app.add_middleware(WebGuardMiddleware)
     fastapi_app.mount("/static", StaticFiles(directory="input_arquivos/frontend/static"), name="static")
 
     @fastapi_app.exception_handler(IntegrityError)

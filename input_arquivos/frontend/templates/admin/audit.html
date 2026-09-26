@@ -2,16 +2,14 @@
 {% block title %}Audit Log • Ingestão de Arquivos{% endblock %}
 
 {% block content %}
-<div class="w-full flex-1 flex flex-col items-center gap-6 p-3 sm:p-6">
-  <div class="w-full max-w-6xl flex flex-col gap-4">
 
     <div>
-      <h1 class="text-xl font-bold" style="color: var(--text);">Audit Log & Histórico de Processamento</h1>
-      <p class="text-xs" style="color: var(--text-muted);">Filtre e rastreie o histórico completo de uploads executados no sistema — horários de Brasília</p>
+      <h1 class="page-title"><span class="page-title-icon ms" aria-hidden="true">history</span>Audit Log & Histórico de Processamento</h1>
+        <p class="page-subtitle">Filtre e rastreie o histórico completo de uploads executados no sistema — horários de Brasília</p>
     </div>
 
     <!-- Filtros de Busca -->
-    <div class="modal glass surface-card shadow-xl p-4" style="max-width:100%; border-radius: var(--r-lg);">
+    <div class="card glass p-4">
       <div class="flex flex-wrap gap-4 items-end">
         <div>
           <label class="form-label" for="filter-context">Contexto</label>
@@ -37,32 +35,32 @@
           <input id="filter-end-date" type="date" class="form-input" style="width: 150px;">
         </div>
 
-        <button id="filter-button" type="button" class="btn btn-primary" style="padding: .55rem 1.25rem;">⚡ Filtrar</button>
+        <button id="filter-button" type="button" class="btn btn-primary" style="padding: .55rem 1.25rem;"><span class="ms" aria-hidden="true">filter_alt</span>Filtrar</button>
       </div>
     </div>
 
     <!-- Tabela de Logs de Auditoria -->
-    <div class="modal glass surface-card shadow-xl overflow-x-auto" style="max-width:100%; border-radius: var(--r-lg);">
-      <table class="responsive-table w-full text-xs text-left" style="color: var(--text);">
+    <div class="card glass overflow-x-auto">
+      <table class="data-table responsive-table">
         <thead>
-          <tr style="background: var(--surface-alt); color: var(--text-muted); border-bottom: 1px solid var(--border);">
-            <th class="px-4 py-3 font-semibold">Arquivo</th>
-            <th class="px-4 py-3 font-semibold">Contexto</th>
-            <th class="px-4 py-3 font-semibold">Destino</th>
-            <th class="px-4 py-3 font-semibold text-center">Status</th>
-            <th class="px-4 py-3 font-semibold text-right">Linhas</th>
-            <th class="px-4 py-3 font-semibold">Banco</th>
-            <th class="px-4 py-3 font-semibold">Enviado por</th>
-            <th class="px-4 py-3 font-semibold">Data de Envio</th>
-            <th class="px-4 py-3 font-semibold">Detalhes de Erro</th>
+          <tr>
+            <th>Arquivo</th>
+            <th>Contexto</th>
+            <th>Destino</th>
+            <th class="text-center">Status</th>
+            <th class="text-right">Linhas</th>
+            <th>Banco</th>
+            <th>Enviado por</th>
+            <th>Data de Envio</th>
+            <th>Detalhes de Erro</th>
           </tr>
         </thead>
-        <tbody id="audit-rows" class="divide-y divide-slate-700/30"></tbody>
+        <tbody id="audit-rows"></tbody>
       </table>
     </div>
 
-  </div>
-</div>
+  
+
 {% endblock %}
 
 {% block scripts %}

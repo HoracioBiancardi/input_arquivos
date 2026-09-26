@@ -1,4 +1,5 @@
-const DESTINATION_ICONS = { minio: "☁️", local: "📁" };
+// Ícones Material Symbols do destino (o <span> tem a classe .ms).
+const DESTINATION_ICONS = { minio: "cloud_upload", local: "folder" };
 
 let contextsByName = {};
 
@@ -14,7 +15,7 @@ function onFileSelected(input) {
   const nameEl = document.getElementById("selected-file-name");
   if (file && badge && nameEl) {
     const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
-    nameEl.textContent = `📄 ${file.name} (${sizeMb} MB)`;
+    nameEl.textContent = `${file.name} (${sizeMb} MB)`;
     badge.classList.remove("hidden");
   }
 }
@@ -56,13 +57,13 @@ function initDragAndDrop() {
 function handleContextChange() {
   const context = contextsByName[contextSelect.value];
   if (!context) {
-    destinationIcon.textContent = "📁";
-    destinationLabel.textContent = "Destino: Pasta local Parquet";
+    destinationIcon.textContent = "folder_off";
+    destinationLabel.textContent = "Escolha um contexto para ver o destino.";
     fileInput.setAttribute("accept", ".xlsx,.xls,.csv,.pdf,.json,.xml,.txt");
     return;
   }
 
-  destinationIcon.textContent = DESTINATION_ICONS[context.destination_type] || "❓";
+  destinationIcon.textContent = DESTINATION_ICONS[context.destination_type] || "help";
   if (context.destination_type === "minio") {
     destinationLabel.textContent = `MinIO → bucket "${context.minio_bucket}"`;
   } else {
@@ -85,8 +86,12 @@ async function loadContexts() {
           ? "Você ainda não tem contexts liberados. Peça a um admin para liberar acesso em /admin/users."
           : "Nenhum contexto cadastrado. Acesse /admin/contexts para criar um contexto de destino.";
         noContextsMessage.classList.remove("hidden");
-        noContextsMessage.classList.add("flex");
       }
+      // Sem contexto não há para onde enviar: select vazio e botão desligado.
+      contextSelect.innerHTML = '<option value="">Nenhum contexto disponível</option>';
+      contextSelect.disabled = true;
+      document.getElementById("upload-submit").disabled = true;
+      handleContextChange();
       return;
     }
 
@@ -306,7 +311,7 @@ async function handleSubmit(event) {
     showToast(`Falha ao processar o arquivo: ${error.message || error}`, "negative");
   } finally {
     if (submitButton) submitButton.disabled = false;
-    if (submitButtonLabel) submitButtonLabel.textContent = "⚡ Enviar Arquivo";
+    if (submitButtonLabel) submitButtonLabel.textContent = "Enviar arquivo";
   }
 }
 

@@ -2,18 +2,17 @@
 {% block title %}Visualizar Tabela • Ingestão de Arquivos{% endblock %}
 
 {% block content %}
-<div id="preview-root" data-upload-id="{{ upload_id }}" class="w-full flex-1 flex flex-col items-center gap-6 p-6">
-  <div class="w-full max-w-5xl flex flex-col gap-4">
+<div id="preview-root" data-upload-id="{{ upload_id }}" class="flex flex-col gap-4">
 
     <div class="flex items-center justify-between">
-      <a href="/" class="btn btn-ghost btn-sm">← Voltar para Envios</a>
+      <a href="/" class="btn btn-ghost btn-sm"><span class="ms" aria-hidden="true">arrow_back</span>Voltar para Envios</a>
     </div>
 
     <!-- Header Card -->
-    <div class="modal glass surface-card shadow-xl" style="max-width:100%; border-radius: var(--r-lg);">
+    <div class="card glass">
       <div class="flex items-center gap-3 mb-1">
         <div class="brand-icon" style="width: 36px; height: 36px;">
-          <span>📊</span>
+          <span class="ms" aria-hidden="true">table_view</span>
         </div>
         <div>
           <p id="preview-filename" class="text-base font-bold" style="color: var(--text);">Carregando…</p>
@@ -23,22 +22,22 @@
       <p id="preview-truncated-note" class="hidden text-xs text-amber-400 mt-2 p-2 rounded bg-amber-500/10 border border-amber-500/20"></p>
     </div>
 
-    <div id="preview-empty-state" class="hidden modal glass surface-card shadow-xl text-center p-6" style="max-width:100%;">
-      <span class="text-2xl">ℹ️</span>
+    <div id="preview-empty-state" class="hidden card glass text-center p-6">
+      <span class="ms" aria-hidden="true" style="font-size:28px;color:var(--text-muted)">info</span>
       <p id="preview-empty-message" class="mt-2 text-xs" style="color: var(--text-muted);"></p>
     </div>
 
     <!-- Data Table Card -->
-    <div id="preview-table-card" class="modal glass surface-card shadow-xl overflow-x-auto" style="max-width:100%; border-radius: var(--r-lg);">
-      <table class="w-full text-xs text-left" style="color: var(--text);">
+    <div id="preview-table-card" class="card glass overflow-x-auto">
+      <table class="data-table">
         <thead>
-          <tr id="preview-table-head" style="background: var(--surface-alt); color: var(--text-muted); border-bottom: 1px solid var(--border);"></tr>
+          <tr id="preview-table-head"></tr>
         </thead>
-        <tbody id="preview-table-body" class="divide-y divide-slate-700/30"></tbody>
+        <tbody id="preview-table-body"></tbody>
       </table>
     </div>
 
-  </div>
+  
 </div>
 {% endblock %}
 

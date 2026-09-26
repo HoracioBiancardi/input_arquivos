@@ -8,35 +8,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
-
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      darkMode: "class",
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ["Inter", "system-ui", "sans-serif"],
-            mono: ["Share Tech Mono", "monospace"]
-          },
-          colors: {
-            primary: "var(--primary)",
-            surface: "var(--surface)",
-            surfaceAlt: "var(--surface-alt)",
-            borderBright: "var(--border-bright)",
-          },
-        },
-      },
-    };
-  </script>
-
+  <!-- Ícones: Material Symbols, os mesmos do app_template -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..24,400,0..1,0&display=block">
+  <!-- style.css e theme.css: cópias do app_template (base comum do ecossistema); app.css: só o domínio -->
   <link rel="stylesheet" href="/static/css/style.css?v={{ asset_version }}">
   <link rel="stylesheet" href="/static/css/theme.css?v={{ asset_version }}">
   <link rel="stylesheet" href="/static/css/app.css?v={{ asset_version }}">
   {% block head %}{% endblock %}
 </head>
 <body class="theme-corporate">
-  <!-- Fundo Animado (Aurora) -->
   <div class="aurora">
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>
@@ -44,16 +24,13 @@
     <div class="orb orb-4"></div>
   </div>
 
-  <!-- Topbar Flutuante SwordPower -->
-  {% block header %}
   {% if current_user %}
+  {% set path = request.url.path %}
+  <!-- ── TOPBAR (= app_template) ── -->
   <header class="topbar">
-    <a href="/" class="brand">
-      <div class="brand-icon">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
+    <div class="brand">
+      <button class="icon-btn sidebar-toggle-btn" type="button" onclick="toggleSidebar()" title="Alternar Barra Lateral (Sidebar)"><span class="ms" aria-hidden="true">menu</span></button>
+      <a href="/" class="brand-icon" title="Início"><span class="ms" aria-hidden="true">upload_file</span></a>
       <div class="brand-text">
         <span class="brand-name">Ingestão de Arquivos</span>
         <span class="brand-tagline">SwordPower Web</span>
@@ -69,45 +46,86 @@
         </svg>
         <span class="brand-by-text">SwordPower</span>
       </div>
-    </a>
-
+    </div>
     <div class="topbar-right">
+      <span class="user-badge" title="Usuário logado"><span class="ms" aria-hidden="true">person</span>{{ current_user.username }}</span>
       <span id="conn-badge" class="conn-badge online">online</span>
-      <span class="text-xs text-muted hidden md:inline-block">Olá, {{ current_user.username }}</span>
-
-      {% if current_user.role == "admin" %}
-      <a href="/admin" class="btn btn-ghost btn-sm" title="Área administrativa">🛠️<span class="btn-label">Admin</span></a>
-      {% endif %}
-
-      {% if request.url.path != "/" %}
-      <a href="/" class="btn btn-ghost btn-sm" title="Voltar para o envio de arquivos">←<span class="btn-label">Voltar</span></a>
-      {% endif %}
-
-      <button type="button" class="btn btn-ghost btn-sm" data-username="{{ current_user.username }}" onclick="openChangePasswordModal(this.dataset.username)" title="Trocar minha senha">🔑<span class="btn-label">Minha senha</span></button>
-      <button type="button" class="btn btn-ghost btn-sm" onclick="openSettingsModal()" title="Configurações de aparência">⚙️<span class="btn-label">Configurações</span></button>
-      <button type="button" id="logout-button" class="btn btn-ghost btn-sm" title="Sair da Sessão">⏻<span class="btn-label">Sair</span></button>
+      <button type="button" id="logout-button" class="btn btn-ghost btn-sm btn-sair" title="Sair (encerrar a sessão)"><span class="ms" aria-hidden="true">logout</span>Sair</button>
     </div>
   </header>
-  {% endif %}
-  {% endblock %}
 
-  {% if current_user and current_user.must_change_password %}
-  <div class="page-alert" role="alert">
-    ⚠️ Sua senha foi definida por um administrador (ou é a senha padrão da instalação).
-    <a href="#" data-username="{{ current_user.username }}" onclick="event.preventDefault(); openChangePasswordModal(this.dataset.username)" style="text-decoration:underline">Troque agora</a>.
+  <div class="app-layout">
+    <nav class="activity-bar" aria-label="Navegação principal">
+      <a class="activity-btn{% if path == '/' or path.startswith('/uploads/') %} active{% endif %}" href="/" title="Enviar arquivos"><span class="ms" aria-hidden="true">upload_file</span><span class="activity-label">Envio</span></a>
+      {% if current_user.role == "admin" %}
+      <a class="activity-btn{% if path == '/admin' %} active{% endif %}" href="/admin" title="Painel administrativo"><span class="ms" aria-hidden="true">dashboard</span><span class="activity-label">Painel</span></a>
+      {% endif %}
+      {% if current_user.role == "admin" %}
+      <a class="activity-btn{% if path.startswith('/admin/contexts') %} active{% endif %}" href="/admin/contexts" title="Contextos de negócio"><span class="ms" aria-hidden="true">account_tree</span><span class="activity-label">Contextos</span></a>
+      {% endif %}
+      {% if current_user.role == "admin" %}
+      <a class="activity-btn{% if path.startswith('/admin/users') %} active{% endif %}" href="/admin/users" title="Usuários"><span class="ms" aria-hidden="true">group</span><span class="activity-label">Usuários</span></a>
+      {% endif %}
+      {% if current_user.role == "admin" %}
+      <a class="activity-btn{% if path.startswith('/admin/settings') %} active{% endif %}" href="/admin/settings" title="Conexões (MinIO e SQL Server)"><span class="ms" aria-hidden="true">dns</span><span class="activity-label">Conexões</span></a>
+      {% endif %}
+      {% if current_user.role == "admin" %}
+      <a class="activity-btn{% if path.startswith('/admin/audit') %} active{% endif %}" href="/admin/audit" title="Log de auditoria"><span class="ms" aria-hidden="true">history</span><span class="activity-label">Auditoria</span></a>
+      {% endif %}
+      <button type="button" class="activity-btn activity-settings" onclick="openSettingsModal()" title="Configurações"><span class="ms" aria-hidden="true">settings</span><span class="activity-label">Ajustes</span></button>
+    </nav>
+
+    <aside class="sidebar-panel" id="sidebar-panel">
+      <div class="panel-header">
+        <span class="panel-title">Ingestão de Arquivos</span>
+        <button class="icon-btn" type="button" onclick="toggleSidebar(false)" title="Recolher Sidebar"><span class="ms" aria-hidden="true">close</span></button>
+      </div>
+      <div class="sidebar-search">
+        <input type="text" class="form-input form-input-sm" placeholder="Filtrar telas…" aria-label="Filtrar telas" oninput="filterSidebarItems(this.value)">
+      </div>
+      <div class="sidebar-tree">
+        <a class="tree-item{% if path == '/' or path.startswith('/uploads/') %} active{% endif %}" href="/"><span class="tree-icon ms" aria-hidden="true">upload_file</span> Enviar arquivos</a>
+      {% if current_user.role == "admin" %}
+        <a class="tree-item{% if path == '/admin' %} active{% endif %}" href="/admin"><span class="tree-icon ms" aria-hidden="true">dashboard</span> Painel administrativo</a>
+      {% endif %}
+      {% if current_user.role == "admin" %}
+        <a class="tree-item{% if path.startswith('/admin/contexts') %} active{% endif %}" href="/admin/contexts"><span class="tree-icon ms" aria-hidden="true">account_tree</span> Contextos de negócio</a>
+      {% endif %}
+      {% if current_user.role == "admin" %}
+        <a class="tree-item{% if path.startswith('/admin/users') %} active{% endif %}" href="/admin/users"><span class="tree-icon ms" aria-hidden="true">group</span> Usuários</a>
+      {% endif %}
+      {% if current_user.role == "admin" %}
+        <a class="tree-item{% if path.startswith('/admin/settings') %} active{% endif %}" href="/admin/settings"><span class="tree-icon ms" aria-hidden="true">dns</span> Conexões (MinIO e SQL Server)</a>
+      {% endif %}
+      {% if current_user.role == "admin" %}
+        <a class="tree-item{% if path.startswith('/admin/audit') %} active{% endif %}" href="/admin/audit"><span class="tree-icon ms" aria-hidden="true">history</span> Log de auditoria</a>
+      {% endif %}
+      </div>
+      <div class="sidebar-footer"><span class="text-muted">{{ "Administrador" if current_user.role == "admin" else "Usuário" }} · {{ current_user.username }}</span></div>
+    </aside>
+
+    <div id="sidebar-resize-handle" class="sidebar-resize-handle" title="Arraste para redimensionar · Duplo-clique para largura padrão"></div>
+
+    <main class="content-area">
+      <div class="tab-view active">
+        {% if current_user.must_change_password %}
+        <div class="alert alert-warn" role="alert"><span class="alert-icon ms" aria-hidden="true">warning</span>
+          <div>Sua senha foi definida por um administrador (ou é a senha padrão da instalação).
+            <a href="#" data-username="{{ current_user.username }}" onclick="event.preventDefault(); openChangePasswordModal(this.dataset.username)">Troque agora</a>.</div></div>
+        {% endif %}
+        {% block content %}{% endblock %}
+      </div>
+    </main>
   </div>
+  {% else %}
+  {% block public %}{% endblock %}
   {% endif %}
-
-  <!-- Conteúdo Principal -->
-  <main class="app-layout">
-    {% block content %}{% endblock %}
-  </main>
 
   <!-- Modal de Configurações de Aparência & Segurança -->
   <div class="overlay" id="settings-overlay">
     <div class="modal glass" style="max-width:440px">
       <div class="modal-header">
-        <h2>Configurações de Aparência</h2>
+        <h2>Configurações</h2>
         <button type="button" class="close-btn" onclick="closeSettingsModal()">X</button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:1rem">
@@ -117,6 +135,7 @@
             <option value="corporate">Corporativo (Padrão)</option>
             <option value="green-neutral">Verde Escuro Neutro</option>
             <option value="cyber-dark">Cyber Dark (Neon Violeta)</option>
+            <option value="blau">Blau (marca)</option>
           </select>
         </div>
         <div class="form-group" style="margin-bottom:0">
@@ -129,6 +148,12 @@
             <option value="30">30 minutos</option>
           </select>
         </div>
+        {% if current_user %}
+        <div class="form-group" style="margin-bottom:0">
+          <label class="form-label">Minha Senha</label>
+          <button type="button" class="btn btn-secondary" data-username="{{ current_user.username }}" onclick="closeSettingsModal(); openChangePasswordModal(this.dataset.username)"><span class="ms" aria-hidden="true">key</span>Alterar minha senha</button>
+        </div>
+        {% endif %}
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-primary" onclick="closeSettingsModal()" style="width:100%;justify-content:center">Fechar</button>
@@ -140,7 +165,7 @@
   <div class="overlay" id="change-password-overlay">
     <div class="modal glass" style="max-width:440px">
       <div class="modal-header">
-        <h2>Trocar Senha</h2>
+        <h2>Alterar Senha de Acesso</h2>
         <button type="button" class="close-btn" onclick="closeChangePasswordModal()">X</button>
       </div>
       <form id="change-password-form" class="modal-body" style="display:flex;flex-direction:column;gap:1rem" autocomplete="off">
@@ -161,7 +186,7 @@
             <input id="cp-new_password" type="password" required minlength="8" class="form-input" autocomplete="new-password">
             <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('cp-new_password', this)" title="Mostrar/ocultar">SHOW</button>
           </div>
-          <button type="button" class="btn btn-ghost btn-sm" style="margin-top:.4rem" onclick="fillGeneratedPassword(['cp-new_password', 'cp-new_password_confirm'])">🎲 Gerar senha forte</button>
+          <button type="button" class="btn btn-ghost btn-sm" style="margin-top:.4rem" onclick="fillGeneratedPassword(['cp-new_password', 'cp-new_password_confirm'])"><span class="ms" aria-hidden="true">password</span>Gerar senha forte</button>
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label" for="cp-new_password_confirm">Confirmar senha nova</label>
@@ -176,8 +201,8 @@
     </div>
   </div>
 
-  <!-- Contêiner de Toasts Flutuantes -->
-  <div id="toast-root"></div>
+  <!-- Toasts empilhados (= app_template) -->
+  <div id="toasts" class="toasts" aria-live="polite"></div>
 
   <script src="/static/js/common.js?v={{ asset_version }}"></script>
   {% block scripts %}{% endblock %}

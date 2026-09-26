@@ -2,38 +2,36 @@
 {% block title %}Usuários • Ingestão de Arquivos{% endblock %}
 
 {% block content %}
-<div class="w-full flex-1 flex flex-col items-center gap-6 p-6">
-  <div class="w-full max-w-5xl flex flex-col gap-4">
 
-    <div class="flex justify-between items-center">
+    <div class="page-head">
       <div>
-        <h1 class="text-xl font-bold" style="color: var(--text);">Gerenciamento de Usuários</h1>
-        <p class="text-xs" style="color: var(--text-muted);">Cadastro de contas, papéis e permissões por contexto</p>
+        <h1 class="page-title"><span class="page-title-icon ms" aria-hidden="true">group</span>Gerenciamento de Usuários</h1>
+        <p class="page-subtitle">Cadastro de contas, papéis e permissões por contexto</p>
       </div>
-      <button id="new-user-button" type="button" class="btn btn-primary">+ Novo Usuário</button>
+      <button id="new-user-button" type="button" class="btn btn-primary"><span class="ms" aria-hidden="true">person_add</span>Novo Usuário</button>
     </div>
 
     <!-- Tabela de Usuários -->
-    <div class="modal glass surface-card shadow-xl overflow-x-auto" style="max-width:100%; border-radius: var(--r-lg);">
-      <table class="w-full text-xs text-left" style="color: var(--text);">
+    <div class="card glass overflow-x-auto">
+      <table class="data-table">
         <thead>
-          <tr style="background: var(--surface-alt); color: var(--text-muted); border-bottom: 1px solid var(--border);">
-            <th class="px-4 py-3 font-semibold">Usuário</th>
-            <th class="px-4 py-3 font-semibold">Papel</th>
-            <th class="px-4 py-3 font-semibold text-center">Ativo</th>
-            <th class="px-4 py-3 font-semibold text-right">Ações</th>
+          <tr>
+            <th>Usuário</th>
+            <th>Papel</th>
+            <th class="text-center">Ativo</th>
+            <th class="text-right">Ações</th>
           </tr>
         </thead>
-        <tbody id="user-rows" class="divide-y divide-slate-700/30"></tbody>
+        <tbody id="user-rows"></tbody>
       </table>
     </div>
 
-  </div>
-</div>
+  
+
 
 <!-- Modal Novo Usuário -->
 <div id="create-user-modal" class="overlay">
-  <div class="modal glass shadow-2xl" style="max-width: 440px;">
+  <div class="modal glass" style="max-width: 440px;">
     <div class="modal-header">
       <h3 class="text-base font-bold">Criar Novo Usuário</h3>
       <button type="button" class="close-btn" onclick="window.closeCreateModal && window.closeCreateModal()">X</button>
@@ -49,7 +47,7 @@
           <input id="create-password" type="password" required minlength="8" autocomplete="new-password" class="form-input">
           <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('create-password', this)" title="Mostrar/ocultar">SHOW</button>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm" style="margin-top:.4rem" onclick="fillGeneratedPassword(['create-password'])">🎲 Gerar senha forte</button>
+        <button type="button" class="btn btn-ghost btn-sm" style="margin-top:.4rem" onclick="fillGeneratedPassword(['create-password'])"><span class="ms" aria-hidden="true">password</span>Gerar senha forte</button>
         <p class="form-hint">O usuário será avisado para trocar esta senha no primeiro acesso.</p>
       </div>
       <div class="form-group" style="margin-bottom:0">
@@ -69,7 +67,7 @@
 
 <!-- Modal Gerenciar Usuário -->
 <div id="manage-user-modal" class="overlay">
-  <div class="modal glass shadow-2xl" style="max-width: 480px; max-height: 90vh; overflow-y: auto;">
+  <div class="modal glass" style="max-width: 480px; max-height: 90vh; overflow-y: auto;">
     <div class="modal-header">
       <h3 id="manage-user-title" class="text-base font-bold">Gerenciar Usuário</h3>
       <button type="button" class="close-btn" onclick="window.closeManageModal && window.closeManageModal()">X</button>
@@ -95,7 +93,7 @@
           <input id="manage-new_password" type="password" autocomplete="new-password" placeholder="Deixe em branco para não alterar" class="form-input">
           <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('manage-new_password', this)" title="Mostrar/ocultar">SHOW</button>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm" style="margin-top:.4rem" onclick="fillGeneratedPassword(['manage-new_password'])">🎲 Gerar senha forte</button>
+        <button type="button" class="btn btn-ghost btn-sm" style="margin-top:.4rem" onclick="fillGeneratedPassword(['manage-new_password'])"><span class="ms" aria-hidden="true">password</span>Gerar senha forte</button>
         <p class="form-hint">Senha redefinida para outra pessoa: ela será avisada para trocá-la no próximo acesso.</p>
       </div>
 

@@ -41,26 +41,23 @@
   --ease-spring:     cubic-bezier(.16,1,.3,1);
 
   --topbar-h:        52px;
+  --sidebar-w:       240px;
 
   --r-sm:            6px;
   --r-md:            8px;
   --r-lg:            12px;
 }
 
+
 /* ── Base & Fonts ─────────────────────────────────────────────────── */
-html, body {
-  min-height: 100vh;
-  background-color: var(--bg) !important;
-  background: var(--bg) !important;
-}
+html, body { height: 100%; overflow: hidden; }
 
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--bg);
   color: var(--text);
   font-size: 14px;
   line-height: 1.5;
-  display: flex;
-  flex-direction: column;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -111,6 +108,14 @@ body {
   color: var(--text);
   border-color: var(--border-bright);
 }
+
+/* não existia (o botão saía com o estilo padrão do navegador); = .botao do /kit */
+.btn-secondary {
+  background: var(--surface-alt);
+  color: var(--text);
+  border-color: var(--border-bright);
+}
+.btn-secondary:hover:not(:disabled) { background: var(--surface-hover); }
 
 .btn-danger {
   background: var(--danger-dim);
@@ -165,7 +170,7 @@ body {
   height: var(--topbar-h);
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 0 1.25rem;
+  padding: 0 1rem;
   display: flex; align-items: center; justify-content: space-between;
   position: relative; z-index: 10; flex-shrink: 0;
 }
@@ -183,7 +188,7 @@ body {
   pointer-events: none;
 }
 
-.brand { display: flex; align-items: center; gap: .625rem; text-decoration: none; }
+.brand { display: flex; align-items: center; gap: .625rem; }
 
 .brand-icon {
   width: 30px; height: 30px;
@@ -232,17 +237,39 @@ body {
   background: rgba(34,197,94,.15); color: #4ade80; border-color: rgba(34,197,94,.2);
 }
 
-/* ── Layout & Cards ─────────────────────────────────────────────── */
+/* ── Layout & Panels ─────────────────────────────────────────────── */
 .app-layout {
-  display: flex; flex-direction: column; flex: 1; min-height: 100vh;
-  background: var(--bg);
+  display: flex; height: calc(100vh - var(--topbar-h));
+  background: var(--bg); overflow: hidden;
 }
+.main-panel { flex: 1; overflow: hidden; display: flex; flex-direction: column; background: var(--bg); }
 
-.surface-card {
-  background: var(--surface) !important;
-  border: 1px solid var(--border) !important;
-  color: var(--text) !important;
+.empty-panel { flex: 1; display: flex; align-items: center; justify-content: center; }
+.empty-state { text-align: center; color: var(--text-muted); max-width: 360px; padding: 1.5rem; }
+.empty-icon  { font-size: 2.5rem; margin-bottom: 1rem; display: block; opacity: .8; }
+.empty-state p { font-size: .95rem; margin-bottom: .5rem; color: var(--text); font-weight: 600; }
+.empty-hint    { font-size: .78rem; color: var(--text-subtle); line-height: 1.5; }
+
+/* ── Overlay & Modal ─────────────────────────────────────────────── */
+.overlay {
+  display: none; position: fixed; inset: 0;
+  background: rgba(1,4,9,.8); backdrop-filter: blur(6px);
+  align-items: center; justify-content: center;
+  z-index: 40; padding: 1rem;
 }
+.overlay.open { display: flex; animation: fadeIn .15s ease both; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-top: 2px solid var(--primary);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 1.5rem; width: 100%; max-width: 420px;
+  animation: modalPop .22s var(--ease-spring) both;
+}
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.modal-header h2 { font-size: .9375rem; font-weight: 600; color: var(--text); }
 
 /* ── Painel de Login Padronizado ──────────────────────────────────── */
 .login-overlay {
@@ -251,6 +278,9 @@ body {
   align-items: center; justify-content: center;
   z-index: 50; padding: 1rem;
 }
+/* .login-overlay define display:flex e anulava o display:none do .overlay: depois do login o
+   overlay continuava cobrindo o app. Só aparece com .open (showLogin/showApp em app.js). */
+.login-overlay:not(.open) { display: none; }
 .login-modal {
   width: 100%; max-width: 440px; padding: 2rem;
   background: var(--surface); border: 1px solid var(--border);
@@ -294,42 +324,6 @@ body {
   font-size: .72rem; color: var(--text-subtle); margin-top: .4rem; line-height: 1.4;
 }
 
-/* ── Tabelas & Hover ─────────────────────────────────────────────── */
-table tbody tr {
-  transition: background var(--t-fast);
-}
-table tbody tr:hover {
-  background: var(--surface-hover) !important;
-}
-
-select option {
-  background: var(--surface);
-  color: var(--text);
-}
-
-/* ── Overlay & Modal ─────────────────────────────────────────────── */
-.overlay {
-  display: none; position: fixed; inset: 0;
-  background: rgba(1,4,9,.8); backdrop-filter: blur(6px);
-  align-items: center; justify-content: center;
-  /* Acima do .login-overlay (50), para modais abertos na tela de login (ex.: Trocar senha) receberem os cliques; abaixo dos toasts (100). */
-  z-index: 60; padding: 1rem;
-}
-.overlay.open { display: flex; animation: fadeIn .15s ease both; }
-
-.modal {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-top: 2px solid var(--primary);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-lg);
-  padding: 1.5rem; width: 100%; max-width: 420px;
-  animation: modalPop .22s var(--ease-spring) both;
-  color: var(--text);
-}
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
-.modal-header h2 { font-size: .9375rem; font-weight: 600; color: var(--text); }
-
 .close-btn {
   background: none; border: 1px solid var(--border);
   border-radius: var(--r-sm); cursor: pointer; font-size: .8rem;
@@ -340,21 +334,14 @@ select option {
 .modal-body { color: var(--text-muted); font-size: .875rem; line-height: 1.65; }
 .modal-footer { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1.25rem; }
 
-/* ── Toast ───────────────────────────────────────────────────────── */
-.toast {
-  position: fixed; bottom: 1.25rem; right: 1.25rem;
-  padding: .625rem 1rem; border-radius: var(--r-md);
-  font-size: .8125rem; font-weight: 500; max-width: 320px;
-  box-shadow: var(--shadow-md); opacity: 0;
-  transform: translateY(10px) scale(.96);
-  transition: opacity .2s, transform .22s var(--ease-spring);
-  pointer-events: none; z-index: 100; border: 1px solid transparent;
-}
-.toast.visible { opacity: 1; transform: translateY(0) scale(1); }
-.toast.success, .toast.toast--positive { background: #0d2a1a; color: var(--success); border-color: rgba(34,197,94,.25); }
-.toast.error, .toast.toast--negative   { background: #2d0b0b; color: var(--danger);  border-color: rgba(239,68,68,.25); }
-.toast.info, .toast.toast--info       { background: #0c1f3f; color: #58a6ff;        border-color: rgba(56,139,253,.25); }
-.toast.warn, .toast.toast--warning    { background: #291e0b; color: #e3b341;        border-color: rgba(245,158,11,.25); }
+/* ── Toasts = os do /kit (htmx_kit/static/app.css): empilhados, fundo neutro, faixa colorida por tipo ── */
+.toasts { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 100; }
+.toast { background: var(--surface-alt); color: var(--text); border: 1px solid var(--border-bright); border-left: 3px solid var(--success);
+  border-radius: var(--r-md); padding: 10px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.45); max-width: 360px; animation: toastEntra .2s ease-out; }
+.toast--info { border-left-color: var(--primary); }
+.toast--aviso { border-left-color: var(--warn); }
+.toast--erro { border-left-color: var(--danger); }
+@keyframes toastEntra { from { transform: translateY(8px); opacity: 0; } }
 
 /* ── Aurora Background ───────────────────────────────────────────── */
 .aurora {
@@ -385,3 +372,355 @@ select option {
   33%      { transform: translate(4%, 5%) scale(1.08); }
   66%      { transform: translate(-3%, -4%) scale(.95); }
 }
+
+/* ── Navegação por Abas (Nav Tabs) ───────────────────────────────── */
+
+/* ── Tab Views & Grid ────────────────────────────────────────────── */
+.tab-view { display: none; flex-direction: column; width: 100%; height: 100%; overflow-y: auto; padding: 1.25rem; gap: 1.25rem; }
+.tab-view.active { display: flex; animation: fadeIn .18s ease both; }
+
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; width: 100%; }
+
+/* ── Cards & Containers ─────────────────────────────────────────── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: 1.25rem;
+  box-shadow: var(--shadow-sm); display: flex; flex-direction: column;
+}
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: .8rem; }
+.card-header h3 { font-size: .9375rem; font-weight: 600; color: var(--text); }
+.card-desc { font-size: .8125rem; color: var(--text-muted); margin-bottom: 1rem; line-height: 1.5; }
+.card-divider { border: 0; height: 1px; background: var(--border-muted); margin: 1rem 0; }
+
+/* ── Badges ──────────────────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; padding: .15rem .5rem;
+  border-radius: var(--r-sm); font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .02em;
+}
+.badge-primary { background: var(--primary-dim); color: var(--primary); border: 1px solid rgba(91, 141, 239, 0.3); }
+.badge-success { background: rgba(34,197,94,.15); color: var(--success); border: 1px solid rgba(34,197,94,.3); }
+.badge-warn    { background: rgba(245,158,11,.15); color: var(--warn); border: 1px solid rgba(245,158,11,.3); }
+.badge-danger  { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(239,68,68,.3); }
+
+/* ── Progress Bar ────────────────────────────────────────────────── */
+.progress-track {
+  width: 100%; height: 8px; background: var(--surface-alt);
+  border-radius: 4px; overflow: hidden; border: 1px solid var(--border-muted);
+}
+.progress-fill {
+  height: 100%; background: linear-gradient(90deg, var(--primary), var(--primary-hover));
+  border-radius: 4px; transition: width .3s ease;
+}
+
+/* ── Terminal Box & Logs ─────────────────────────────────────────── */
+.terminal-box {
+  background: #0a0c10; border: 1px solid var(--border);
+  border-radius: var(--r-md); padding: .75rem;
+  font-family: 'Share Tech Mono', ui-monospace, monospace;
+  font-size: .78rem; line-height: 1.6; color: #c9d1d9;
+  overflow-y: auto; display: flex; flex-direction: column; gap: .2rem;
+}
+.log-time { color: var(--text-subtle); }
+.log-src  { color: var(--primary); }
+
+.code-font { font-family: 'Share Tech Mono', ui-monospace, monospace !important; font-size: .8125rem; }
+
+/* ── Formulários e Checkboxes ───────────────────────────────────── */
+.checkbox-group { display: flex; flex-direction: column; gap: .5rem; margin: 0; }  /* 16px do .form-group, igual ao /kit */
+.checkbox-label { display: flex; align-items: center; gap: .5rem; font-size: .8125rem; color: var(--text); cursor: pointer; }
+.checkbox-label input { accent-color: var(--primary); cursor: pointer; }
+
+/* ── Tabela de Dados ─────────────────────────────────────────────── */
+.table-container { width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-md); }
+.data-table { width: 100%; border-collapse: collapse; text-align: left; font-size: .8125rem; }
+.data-table th { background: var(--surface-alt); padding: .65rem .85rem; color: var(--text-muted); font-weight: 600; border-bottom: 1px solid var(--border); }
+.data-table td { padding: .65rem .85rem; border-bottom: 1px solid var(--border-muted); color: var(--text); }
+.data-table tr:hover td { background: var(--surface-hover); }
+
+/* ── Vitrine de Componentes UI ──────────────────────────────────── */
+/* ── Activity Bar (Barra de Ícones Vertical no estilo MK Manager) ───── */
+.activity-bar {
+  display: flex; flex-direction: column; align-items: center; gap: .4rem;
+  width: 48px; min-width: 48px; height: 100%;
+  background: var(--surface); border-right: 1px solid var(--border);
+  padding: .6rem 0; z-index: 10;
+}
+.activity-btn {
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-md); background: transparent; border: none;
+  color: var(--text-muted); cursor: pointer; transition: all var(--t);
+}
+.activity-btn:hover { background: var(--surface-hover); color: var(--text); }
+.activity-btn.active {
+  background: var(--primary-dim); color: var(--primary);
+  border: 1px solid rgba(91, 141, 239, 0.3);
+}
+.activity-settings { margin-top: auto; }
+
+/* ── Sidebar Panel (Barra Lateral Expansível & Redimensionável) ────── */
+.sidebar-panel {
+  width: var(--sidebar-w);
+  min-width: 140px;
+  max-width: 550px;
+  height: 100%;
+  background: var(--surface-alt);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  transition: width .2s var(--ease-spring), margin-left .2s var(--ease-spring);
+  flex-shrink: 0;
+}
+.sidebar-panel.resizing {
+  transition: none !important;
+}
+.sidebar-panel.collapsed {
+  margin-left: calc(-1 * var(--sidebar-w));
+}
+
+/* Redimensionador (Resize Handle) */
+.sidebar-resize-handle {
+  width: 5px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent;
+  transition: background var(--t);
+  z-index: 20;
+  flex-shrink: 0;
+  margin-left: -2px;
+}
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.dragging {
+  background: var(--primary);
+  box-shadow: 0 0 8px var(--primary-glow);
+}
+.sidebar-resize-handle.collapsed {
+  display: none;
+}
+
+
+.panel-header { display: flex; justify-content: space-between; align-items: center; padding: .75rem 1rem; border-bottom: 1px solid var(--border); }
+.panel-title { font-size: .8125rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
+
+.sidebar-search { padding: .5rem .75rem; border-bottom: 1px solid var(--border-muted); }
+.form-input-sm { padding: .3rem .5rem; font-size: .78rem; }
+
+.sidebar-tree { flex: 1; overflow-y: auto; padding: .5rem; display: flex; flex-direction: column; gap: .2rem; }
+.tree-item {
+  display: flex; align-items: center; gap: .5rem; padding: .45rem .65rem;
+  border-radius: var(--r-md); font-size: .8125rem; color: var(--text-muted);
+  cursor: pointer; transition: all var(--t); user-select: none;
+}
+.tree-item:hover { background: var(--surface-hover); color: var(--text); }
+.tree-item.active { background: var(--surface); color: var(--primary); font-weight: 600; border-left: 3px solid var(--primary); }
+.tree-icon { font-size: 1rem; }
+
+.sidebar-footer { padding: .65rem 1rem; border-top: 1px solid var(--border-muted); font-size: .75rem; color: var(--text-subtle); }
+
+.content-area { flex: 1; height: 100%; overflow: hidden; display: flex; flex-direction: column; }
+
+/* ── Galeria de Ícones SVG ────────────────────────────────────────── */
+.icon-gallery-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: .75rem; margin-top: .6rem;
+}
+.icon-card {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .4rem;
+  padding: .85rem .5rem; background: var(--surface-alt); border: 1px solid var(--border);
+  border-radius: var(--r-md); cursor: pointer; transition: all var(--t); color: var(--text-muted);
+}
+.icon-card:hover {
+  background: var(--surface-hover); color: var(--primary);
+  border-color: var(--primary); transform: translateY(-2px);
+  box-shadow: 0 4px 12px var(--primary-glow);
+}
+.icon-card span { font-size: .75rem; font-weight: 500; }
+
+
+
+/* =====================================================================
+   DASHBOARD KIT — componentes vindos do invest_sap
+   Métricas, alertas, selos, esqueleto de carregamento, gráficos (ECharts)
+   e tabelas (Tabulator). JS em js/format.js, js/charts.js, js/tables.js.
+   ===================================================================== */
+
+/* Paleta categórica dos gráficos: ordem fixa, validada para daltonismo (ΔE CVD ≥ 8)
+   e contraste ≥ 3:1 nos 4 fundos de tema. Nunca gerar cor nova: 9ª série vira "Outros". */
+:root {
+  --serie-1: #3987e5; --serie-2: #d95926; --serie-3: #199e70; --serie-4: #c98500;
+  --serie-5: #d55181; --serie-6: #008300; --serie-7: #9085e9; --serie-8: #e66767;
+  --grade:   rgba(255,255,255,.07);
+  --eixo:    rgba(255,255,255,.16);
+}
+
+/* ── Activity bar com rótulo sob o ícone ─────────────────────────── */
+.activity-bar { width: 64px; min-width: 64px; }
+.activity-btn { width: 56px; height: auto; min-height: 44px; flex-direction: column; gap: 2px; padding: .35rem 0; }
+.activity-label { font-size: .62rem; line-height: 1.1; font-weight: 500; letter-spacing: .01em; }
+
+/* ── Linha de métricas (stat tiles) ──────────────────────────────── */
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .9rem; }
+.metric {
+  background: var(--surface-alt); border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: .8rem .95rem; min-width: 0;
+}
+.metric-label { font-size: .78rem; color: var(--text-muted); display: flex; align-items: center; gap: .3rem; }
+.metric-value { font-size: 1.5rem; font-weight: 600; margin-top: .15rem; overflow-wrap: anywhere; }
+.metric-value.is-text { font-size: 1rem; line-height: 1.35; }
+.metric-delta { font-size: .75rem; color: var(--text-muted); margin-top: .1rem; }
+.metric-delta.good { color: var(--success); }
+.metric-delta.bad  { color: var(--danger); }
+.help-tip { color: var(--text-subtle); cursor: help; position: relative; font-size: .75rem; }
+.help-tip:hover::after, .help-tip:focus::after {
+  content: attr(data-tip); position: absolute; z-index: 40; left: 50%; top: 100%; transform: translateX(-50%);
+  margin-top: 6px; width: max-content; max-width: 300px; background: var(--surface-alt); color: var(--text);
+  border: 1px solid var(--border-bright); border-radius: var(--r-md); padding: .5rem .65rem; font-size: .78rem;
+  line-height: 1.4; box-shadow: var(--shadow-md); white-space: normal; text-transform: none; letter-spacing: normal;
+}
+
+/* ── Alertas ─────────────────────────────────────────────────────── */
+.alert { display: flex; gap: .6rem; align-items: flex-start; border-radius: var(--r-md); padding: .65rem .9rem; margin: .5rem 0; border: 1px solid; font-size: .85rem; line-height: 1.5; }
+.alert-icon { flex-shrink: 0; font-weight: 700; }
+.alert-info    { background: var(--primary-dim); border-color: color-mix(in srgb, var(--primary) 35%, transparent); }
+.alert-info .alert-icon { color: var(--primary); }
+.alert-warn    { background: color-mix(in srgb, var(--warn) 10%, transparent); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
+.alert-warn .alert-icon { color: var(--warn); }
+.alert-error   { background: var(--danger-dim); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.alert-error .alert-icon { color: var(--danger); }
+.alert-success { background: color-mix(in srgb, var(--success) 10%, transparent); border-color: color-mix(in srgb, var(--success) 40%, transparent); }
+.alert-success .alert-icon { color: var(--success); }
+
+/* ── Selos arredondados (pill) ───────────────────────────────────── */
+.pill { display: inline-block; font-size: .72rem; font-weight: 600; padding: .1rem .6rem; border-radius: 99px; border: 1px solid currentColor; }
+.pill-success { color: var(--success); } .pill-error { color: var(--danger); } .pill-warn { color: var(--warn); }
+.pill-primary { color: var(--primary); } .pill-muted { color: var(--text-muted); }
+
+/* ── Esqueleto de carregamento ───────────────────────────────────── */
+.skeleton { display: flex; flex-direction: column; gap: .75rem; }
+.skel {
+  border-radius: var(--r-md);
+  background: linear-gradient(90deg, var(--surface) 0%, var(--surface-alt) 50%, var(--surface) 100%);
+  background-size: 200% 100%; animation: skelShine 1.4s linear infinite;
+}
+.skel-title { height: 30px; width: 260px; max-width: 70%; }
+.skel-line { height: 13px; width: 90%; } .skel-line.short { width: 55%; }
+.skel-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .9rem; }
+.skel-metrics .skel { height: 78px; }
+.skel-chart { height: 260px; } .skel-table { height: 200px; }
+@keyframes skelShine { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ── Gráficos e tabelas ──────────────────────────────────────────── */
+.chart { width: 100%; min-width: 0; height: 300px; }
+.grid-table { min-width: 0; }
+.grid-table-bar { display: flex; justify-content: space-between; align-items: center; font-size: .75rem; color: var(--text-subtle); margin-bottom: .3rem; }
+.grid-table-bar button { background: none; border: 0; color: var(--text-muted); cursor: pointer; font: inherit; padding: .1rem .3rem; border-radius: var(--r-sm); }
+.grid-table-bar button:hover { color: var(--text); background: var(--surface-hover); }
+.tabulator { background: var(--surface) !important; border: 1px solid var(--border) !important; border-radius: var(--r-md); font-size: .8125rem; font-family: inherit !important; }
+.tabulator .tabulator-header { background: var(--surface-alt) !important; border-bottom: 1px solid var(--border) !important; color: var(--text-muted) !important; }
+.tabulator .tabulator-header .tabulator-col { background: var(--surface-alt) !important; border-right: 1px solid var(--border-muted) !important; }
+.tabulator .tabulator-header .tabulator-col .tabulator-header-filter input { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 2px 6px; }
+.tabulator .tabulator-tableholder .tabulator-table { background: var(--surface) !important; color: var(--text) !important; }
+.tabulator-row { background: var(--surface) !important; border-bottom: 1px solid var(--border-muted) !important; }
+.tabulator-row.tabulator-row-even { background: color-mix(in srgb, var(--surface-alt) 45%, var(--surface)) !important; }
+.tabulator-row .tabulator-cell { border-right: 1px solid var(--border-muted) !important; padding: 5px 8px !important; font-variant-numeric: tabular-nums; }
+.tabulator-row.tabulator-selectable:hover { background: var(--surface-hover) !important; cursor: pointer; }
+.tabulator-row.row-selected { background: var(--primary-dim) !important; box-shadow: inset 3px 0 0 var(--primary); }
+.cell-empty { color: var(--text-subtle); }
+
+@media (max-width: 760px) {
+  .skel-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-2 { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+
+/* ── Ajustes de layout ───────────────────────────────────────────── */
+.component-section-title { margin: 1.4rem 0 .6rem; font-size: .9rem; font-weight: 600; color: var(--text); }
+.component-row { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+
+/* ── Dashboard Kit com filtros e Formulário (espelho de /kit/p/painel e /kit/p/formulario) ── */
+.dk-filtros { display: grid; grid-template-columns: 1fr 1.4fr 1.2fr; gap: .9rem; margin: .5rem 0 1rem; }
+.dk-filtros .form-group { margin-bottom: 0; min-width: 0; }
+.dk-multi { position: relative; }
+.dk-multi summary { list-style: none; cursor: pointer; user-select: none; }
+.dk-multi summary::-webkit-details-marker { display: none; }
+.dk-multi summary::after { content: "▾"; float: right; color: var(--text-muted); }
+.dk-multi-lista { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); display: flex; flex-direction: column; gap: .35rem;
+  background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-md); padding: .6rem .75rem; box-shadow: var(--shadow-md); }
+.card-inset { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: 1.25rem; margin: 0 0 1.25rem; min-width: 0; }  /* = .card do /kit */
+.card-inset.metrics { margin-top: 0; }
+.card-label { font-size: .9375rem; font-weight: 600; color: var(--text); margin-bottom: .8rem; }  /* = .card-header h3 (e .card-rotulo do kit) */
+.dk-abas { display: flex; gap: .25rem; border-bottom: 1px solid var(--border); margin: 1rem 0 .4rem; }
+.dk-aba { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--text-muted); padding: .55rem .9rem; font: inherit; font-size: .85rem; font-weight: 500; cursor: pointer; margin-bottom: -1px; }
+.dk-aba:hover { color: var(--text); }
+.dk-aba.active { color: var(--primary); border-bottom-color: var(--primary); }
+.dk-abas-locais { margin-top: .6rem; }
+.dk-carregando { opacity: .55; transition: opacity .15s .2s; }
+.grid-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 1.25rem; align-items: stretch; }  /* cards com a mesma altura (= .colunas do /kit) */
+/* Empilha quando a área da aba tem < 780px — mesma regra do /kit (.colunas). */
+.tab-view { container-type: inline-size; }
+@container (max-width: 780px) {
+  .dk-filtros, .grid-form, .grid-2 { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── Título de página (igual ao p.title do /kit) e links ─────────────── */
+.page-title { font-size: 26px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 10px; color: var(--text); }
+.page-title-icon { font-size: 24px; }
+.tab-view > .page-title + .card-desc { margin: -.6rem 0 0; }
+.tab-view a, .modal a { color: var(--primary); }
+
+/* Topbar: sem espaço para marca + selo + abas, as abas saem primeiro (a activity bar e a sidebar
+   continuam navegando). Mesmas quebras no /kit (htmx_kit/static/app.css). */
+@media (max-width: 1599px) { .brand-divider, .brand-by { display: none; } }
+.user-badge { font-size: .8rem; color: var(--text-muted); white-space: nowrap; }
+.user-badge { display: inline-flex; align-items: center; gap: 4px; }
+.user-badge .ms { font-size: 16px; vertical-align: 0; }
+[hidden] { display: none !important; }
+/* card de login invisível até o JS saber se é "entrar" ou "criar administrador" (evita trocar o texto na cara) */
+.login-modal.login-pendente { visibility: hidden; animation: none; }  /* a animação de entrada roda quando aparece */
+.btn-sair { display: inline-flex; align-items: center; gap: .4rem; }
+
+/* ── Ícones Material Symbols (mesma fonte e classe do /kit) ───────── */
+.ms { font-family: "Material Symbols Rounded"; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1; letter-spacing: normal;
+  text-transform: none; display: inline-block; white-space: nowrap; direction: ltr; -webkit-font-smoothing: antialiased;
+  vertical-align: -4px; font-variation-settings: "opsz" 20; user-select: none; }
+/* tamanhos e cores dos ícones = os mesmos lugares no /kit (htmx_kit/static/app.css) */
+.activity-btn .ms { font-size: 19px; vertical-align: 0; }
+.tree-icon.ms { font-size: 17px; }
+.page-title-icon.ms { font-size: 28px; color: var(--primary); }
+.card-header h3 .ms, .card-label .ms { font-size: 18px; margin-right: 6px; color: var(--primary); }
+.btn .ms { font-size: 16px; vertical-align: 0; }
+.btn { gap: 6px; }
+.brand-icon .ms { font-size: 19px; vertical-align: 0; }
+.login-icon .ms { vertical-align: 0; }
+.alert-icon.ms { font-size: 20px; margin-top: 1px; }
+.help-tip .ms { font-size: 15px; vertical-align: -2px; }
+.icon-card .ms { font-size: 24px; }
+.icon-btn .ms { font-size: 18px; vertical-align: 0; }
+.grid-table-bar button { display: inline-flex; align-items: center; gap: 4px; }
+.grid-table-bar button .ms { font-size: 16px; vertical-align: 0; }
+.panel-title { white-space: nowrap; }
+.card > .btn, .card > .form-group + .btn { align-self: flex-start; }  /* largura automática, como .botao no /kit */
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+/* código inline = `code` do /kit */
+.card-desc code, .tab-view p code, .data-table code { font-family: "Share Tech Mono", ui-monospace, monospace; font-size: .92em; background: var(--surface-alt); padding: 1px 5px; border-radius: 4px; }
+.data-table code { white-space: nowrap; }  /* = .tabela-simples code do /kit */
+.icon-card { font: inherit; font-size: 12px; }                  /* <button>: sem a fonte padrão do navegador (= .icone-card) */
+
+/* COPY sobre o campo de resultado (= .copiar-caixa/.copiar-botao do /kit) */
+.copy-wrap { position: relative; }
+.copy-wrap textarea { padding-right: 4.5rem; resize: vertical; }
+.copy-btn, .pw-toggle { background: var(--surface-hover); border: 1px solid var(--border-muted); border-radius: var(--r-sm); color: var(--text-muted);
+  font-family: inherit; font-size: .65rem; font-weight: 700; padding: .25rem .5rem; cursor: pointer; }
+.copy-btn { position: absolute; right: .5rem; top: .5rem; }
+.copy-btn:hover { color: var(--text); border-color: var(--border-bright); background: var(--surface-alt); }
+
+/* tema escuro para controles nativos (setas do número, calendário, barras de rolagem) — o /kit já declara */
+:root { color-scheme: dark; }
+.checkbox-label input { width: 16px; height: 16px; margin: 0; }   /* = .check input do /kit */
+.login-msg { margin: 0 0 14px; font-size: 12.5px; }  /* = .portal-msg do /kit */
+
+/* Modal alto (ex.: Configurações com muitas opções) não passa da tela: cabeçalho e rodapé
+   fixos, só o corpo rola. Vale para todos os projetos que copiam esta base. */
+.modal { max-height: 90vh; display: flex; flex-direction: column; }
+.modal-header, .modal-footer { flex-shrink: 0; }
+.modal-body { overflow-y: auto; flex: 1; min-height: 0; }
+/* Activity bar com muitas seções rola em telas baixas, sem barra de rolagem aparente */
+.activity-bar { overflow-y: auto; scrollbar-width: none; }
+.activity-bar::-webkit-scrollbar { display: none; }

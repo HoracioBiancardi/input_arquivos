@@ -2,19 +2,17 @@
 {% block title %}Área Administrativa • Ingestão de Arquivos{% endblock %}
 
 {% block content %}
-<div class="w-full flex-1 flex flex-col items-center gap-6 p-6">
-  <div class="w-full max-w-4xl flex flex-col gap-6">
 
     <div>
-      <h1 class="text-xl font-bold" style="color: var(--text);">Painel de Administração</h1>
-      <p class="text-xs" style="color: var(--text-muted);">Gerenciamento de contextos, usuários, conexões e registros de auditoria do sistema</p>
+      <h1 class="page-title"><span class="page-title-icon ms" aria-hidden="true">dashboard</span>Painel de Administração</h1>
+        <p class="page-subtitle">Gerenciamento de contextos, usuários, conexões e registros de auditoria do sistema</p>
     </div>
 
-    <div class="grid gap-6" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+    <div class="admin-tiles">
       
-      <a href="/admin/contexts" class="modal glass surface-card shadow-xl flex flex-col gap-3 p-6 transition-all hover:scale-[1.02]" style="max-width:100%; border-radius: var(--r-lg); text-decoration:none;">
+      <a href="/admin/contexts" class="card glass admin-tile">
         <div class="brand-icon" style="width: 40px; height: 40px;">
-          <span>🔗</span>
+          <span class="ms" aria-hidden="true">account_tree</span>
         </div>
         <div>
           <span class="text-base font-bold block mb-1" style="color: var(--text);">Contextos de Negócio</span>
@@ -23,9 +21,9 @@
         <span class="text-xs font-semibold mt-2" style="color: var(--primary);">Gerenciar Contextos →</span>
       </a>
 
-      <a href="/admin/users" class="modal glass surface-card shadow-xl flex flex-col gap-3 p-6 transition-all hover:scale-[1.02]" style="max-width:100%; border-radius: var(--r-lg); text-decoration:none;">
+      <a href="/admin/users" class="card glass admin-tile">
         <div class="brand-icon" style="width: 40px; height: 40px;">
-          <span>👥</span>
+          <span class="ms" aria-hidden="true">group</span>
         </div>
         <div>
           <span class="text-base font-bold block mb-1" style="color: var(--text);">Controle de Usuários</span>
@@ -34,9 +32,9 @@
         <span class="text-xs font-semibold mt-2" style="color: var(--primary);">Gerenciar Usuários →</span>
       </a>
 
-      <a href="/admin/audit" class="modal glass surface-card shadow-xl flex flex-col gap-3 p-6 transition-all hover:scale-[1.02]" style="max-width:100%; border-radius: var(--r-lg); text-decoration:none;">
+      <a href="/admin/audit" class="card glass admin-tile">
         <div class="brand-icon" style="width: 40px; height: 40px;">
-          <span>🕒</span>
+          <span class="ms" aria-hidden="true">history</span>
         </div>
         <div>
           <span class="text-base font-bold block mb-1" style="color: var(--text);">Audit Log & Histórico</span>
@@ -45,9 +43,9 @@
         <span class="text-xs font-semibold mt-2" style="color: var(--primary);">Ver Audit Log →</span>
       </a>
 
-      <a href="/admin/settings" class="modal glass surface-card shadow-xl flex flex-col gap-3 p-6 transition-all hover:scale-[1.02]" style="max-width:100%; border-radius: var(--r-lg); text-decoration:none;">
+      <a href="/admin/settings" class="card glass admin-tile">
         <div class="brand-icon" style="width: 40px; height: 40px;">
-          <span>🔐</span>
+          <span class="ms" aria-hidden="true">dns</span>
         </div>
         <div>
           <span class="text-base font-bold block mb-1" style="color: var(--text);">Configurações do Sistema</span>
@@ -58,6 +56,6 @@
 
     </div>
 
-  </div>
-</div>
+  
+
 {% endblock %}
