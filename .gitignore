@@ -21,3 +21,6 @@ data/.config_encryption_key
 .coverage
 htmlcov/
 
+
+# Saída de envios de teste gravados em pasta local
+teste/
