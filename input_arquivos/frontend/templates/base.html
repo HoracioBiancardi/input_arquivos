@@ -7,12 +7,11 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=PT+Sans:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=PT+Sans:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <!-- Ícones: Material Symbols, os mesmos do app_template -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..24,400,0..1,0&display=block">
-  <!-- style.css e theme.css: cópias do app_template (base comum do ecossistema); app.css: só o domínio -->
+  <!-- style.css: cópia do app_template (base comum do ecossistema); app.css: só o domínio -->
   <link rel="stylesheet" href="/static/css/style.css?v={{ asset_version }}">
-  <link rel="stylesheet" href="/static/css/theme.css?v={{ asset_version }}">
   <link rel="stylesheet" href="/static/css/app.css?v={{ asset_version }}">
   <!-- blau.css: design system Blau (tema claro fiel ao site blau.com) -->
   <link rel="stylesheet" href="/static/css/blau.css?v={{ asset_version }}">
@@ -126,16 +125,6 @@
         <button type="button" class="close-btn" onclick="closeSettingsModal()">X</button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:1rem">
-        <div class="form-group" style="margin-bottom:0">
-          <label class="form-label" for="settings-theme">Tema da Interface</label>
-          <select id="settings-theme" class="form-input" onchange="changeTheme(this.value)">
-            <option value="corporate">Corporativo</option>
-            <option value="green-neutral">Verde Escuro Neutro</option>
-            <option value="cyber-dark">Cyber Dark (Neon Violeta)</option>
-            <option value="blau">Blau (marca)</option>
-            <option value="blau-claro">Blau Claro (Padrão)</option>
-          </select>
-        </div>
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label" for="settings-autolock">Bloqueio Automático por Inatividade</label>
           <select id="settings-autolock" class="form-input" onchange="changeAutoLock(this.value)">

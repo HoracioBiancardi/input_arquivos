@@ -1,22 +1,7 @@
-// Utilitários compartilhados por todas as páginas: fetch autenticado, toasts, modal de confirmação, temas SwordPower e Auto-Lock.
+// Utilitários compartilhados por todas as páginas: fetch autenticado, toasts, modal de confirmação e Auto-Lock.
+// Visual único: o design system Blau (body.theme-blau-claro, fixo no base.html) — sem troca de tema.
 
-const THEME_KEY = 'app-theme';
 const AUTOLOCK_KEY = 'app-autolock-minutes';
-const VALID_THEMES = new Set(['corporate', 'green-neutral', 'cyber-dark', 'blau', 'blau-claro']);
-
-function getTheme() {
-  const saved = localStorage.getItem(THEME_KEY);
-  return VALID_THEMES.has(saved) ? saved : 'blau-claro';
-}
-
-function setTheme(theme) {
-  const valid = VALID_THEMES.has(theme) ? theme : 'blau-claro';
-  localStorage.setItem(THEME_KEY, valid);
-  VALID_THEMES.forEach((t) => document.body.classList.remove('theme-' + t));
-  document.body.classList.add('theme-' + valid);
-  const el = document.getElementById('settings-theme');
-  if (el) el.value = valid;
-}
 
 function getAutoLockMinutes() {
   const saved = localStorage.getItem(AUTOLOCK_KEY);
@@ -31,7 +16,6 @@ function setAutoLockMinutes(minutes) {
 }
 
 function applyPrefsOnBoot() {
-  setTheme(getTheme());
   setAutoLockMinutes(getAutoLockMinutes());
 }
 
@@ -43,10 +27,6 @@ function openSettingsModal() {
 function closeSettingsModal() {
   const overlay = document.getElementById('settings-overlay');
   if (overlay) overlay.classList.remove('open');
-}
-
-function changeTheme(theme) {
-  setTheme(theme);
 }
 
 function changeAutoLock(minutes) {

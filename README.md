@@ -186,7 +186,7 @@ input_arquivos/
     ├── web/                    # rotas de página (renderizam os templates Jinja2, sem lógica de negócio)
     ├── templates/               # templates Jinja2 (login, upload, admin/*) + base.html (layout Tailwind)
     └── static/
-        ├── css/                   # theme.css (corporate/green-neutral/cyber-dark) + estilos não triviais em Tailwind
+        ├── css/                   # style.css (casca do app_template) + app.css (domínio) + blau.css (design system Blau)
         └── js/                    # interatividade de cada página (fetch para a API REST)
 tests/                    # testes automatizados (pytest)
 data/                     # SQLite local de configuração (gitignored)
