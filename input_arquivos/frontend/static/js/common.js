@@ -2,15 +2,15 @@
 
 const THEME_KEY = 'app-theme';
 const AUTOLOCK_KEY = 'app-autolock-minutes';
-const VALID_THEMES = new Set(['corporate', 'green-neutral', 'cyber-dark', 'blau']);
+const VALID_THEMES = new Set(['corporate', 'green-neutral', 'cyber-dark', 'blau', 'blau-claro']);
 
 function getTheme() {
   const saved = localStorage.getItem(THEME_KEY);
-  return VALID_THEMES.has(saved) ? saved : 'corporate';
+  return VALID_THEMES.has(saved) ? saved : 'blau-claro';
 }
 
 function setTheme(theme) {
-  const valid = VALID_THEMES.has(theme) ? theme : 'corporate';
+  const valid = VALID_THEMES.has(theme) ? theme : 'blau-claro';
   localStorage.setItem(THEME_KEY, valid);
   VALID_THEMES.forEach((t) => document.body.classList.remove('theme-' + t));
   document.body.classList.add('theme-' + valid);
