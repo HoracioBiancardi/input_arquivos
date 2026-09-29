@@ -3,6 +3,7 @@
 import io
 import json
 import re
+import zipfile
 from typing import Protocol
 
 import numpy as np
@@ -33,6 +34,15 @@ desproporcional ao tamanho do arquivo em bytes.
 """
 
 
+MAX_UNCOMPRESSED_BYTES = 500 * 1024 * 1024
+"""Teto do conteúdo descompactado de planilhas em ZIP (.xlsx/.ods).
+
+O limite de upload confere só o arquivo compactado: um .xlsx de poucos MB
+pode descompactar para GBs (zip bomb) e esgotar a memória na leitura,
+antes de `MAX_ROWS` ter chance de ser conferido.
+"""
+
+
 class UploadTooLargeError(ValueError):
     """Erro levantado quando um arquivo excede o teto de linhas/páginas que o pipeline processa.
 
@@ -41,6 +51,30 @@ class UploadTooLargeError(ValueError):
     a leitura vira um registro de auditoria com status de erro, sem travar
     a requisição nem expor um 500 genérico).
     """
+
+
+def _reject_zip_bomb(file_bytes: bytes) -> None:
+    """Recusa uma planilha em ZIP cujo conteúdo descompactado passe de `MAX_UNCOMPRESSED_BYTES`.
+
+    Soma os tamanhos declarados no índice do ZIP, sem descompactar nada.
+    Arquivos que não são ZIP (ex.: .xls antigo) passam direto.
+
+    Args:
+        file_bytes: Conteúdo bruto do arquivo enviado.
+
+    Raises:
+        UploadTooLargeError: Se o conteúdo descompactado exceder o teto.
+    """
+    buffer = io.BytesIO(file_bytes)
+    if not zipfile.is_zipfile(buffer):
+        return
+    with zipfile.ZipFile(buffer) as archive:
+        total = sum(info.file_size for info in archive.infolist())
+    if total > MAX_UNCOMPRESSED_BYTES:
+        raise UploadTooLargeError(
+            f"Esta planilha descompactada ocupa {total // (1024 * 1024)} MB, acima do limite de "
+            f"{MAX_UNCOMPRESSED_BYTES // (1024 * 1024)} MB por arquivo."
+        )
 
 
 class FileReader(Protocol):
@@ -73,10 +107,12 @@ class ExcelReader:
         Raises:
             UploadTooLargeError: Se a planilha tiver mais de `MAX_ROWS` linhas.
         """
-        dataframe = pd.read_excel(io.BytesIO(file_bytes), engine="openpyxl")
+        _reject_zip_bomb(file_bytes)
+        # `nrows` para a leitura logo depois do teto, em vez de carregar a planilha inteira.
+        dataframe = pd.read_excel(io.BytesIO(file_bytes), engine="openpyxl", nrows=MAX_ROWS + 1)
         if len(dataframe) > MAX_ROWS:
             raise UploadTooLargeError(
-                f"Esta planilha tem {len(dataframe)} linhas, acima do limite de {MAX_ROWS} linhas por arquivo."
+                f"Esta planilha tem mais de {MAX_ROWS} linhas, o limite por arquivo."
             )
         return dataframe
 
@@ -509,14 +545,15 @@ class OdsReader:
             UploadTooLargeError: Se a planilha tiver mais de `MAX_ROWS` linhas.
         """
         try:
-            dataframe = pd.read_excel(io.BytesIO(file_bytes), engine="odf")
+            _reject_zip_bomb(file_bytes)
+            dataframe = pd.read_excel(io.BytesIO(file_bytes), engine="odf", nrows=MAX_ROWS + 1)
         except ImportError as error:
             raise ValueError(
                 "Leitura de .ods indisponível: verifique se o pacote 'odfpy' está instalado no servidor."
             ) from error
         if len(dataframe) > MAX_ROWS:
             raise UploadTooLargeError(
-                f"Esta planilha tem {len(dataframe)} linhas, acima do limite de {MAX_ROWS} linhas por arquivo."
+                f"Esta planilha tem mais de {MAX_ROWS} linhas, o limite por arquivo."
             )
         return dataframe
 

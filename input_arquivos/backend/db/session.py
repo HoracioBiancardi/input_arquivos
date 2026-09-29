@@ -3,10 +3,32 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 
 from input_arquivos.backend.config import get_settings
+
+
+_SQLITE_BUSY_TIMEOUT_MS = 10_000
+
+
+def _configure_sqlite_connection(dbapi_connection, _connection_record) -> None:
+    """Prepara cada conexão SQLite para acessos simultâneos.
+
+    Sem WAL, uma gravação bloqueia as leituras, e com vários usuários ao mesmo
+    tempo o SQLite devolvia `database is locked`. `busy_timeout` faz a conexão
+    esperar a vez em vez de falhar na hora. `synchronous=NORMAL` é o par
+    recomendado para WAL (seguro contra corrupção, mais rápido que FULL).
+
+    Args:
+        dbapi_connection: Conexão sqlite3 recém-aberta.
+        _connection_record: Registro do pool (não usado).
+    """
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute(f"PRAGMA busy_timeout={_SQLITE_BUSY_TIMEOUT_MS}")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.close()
 
 
 class DatabaseSessionFactory:
@@ -23,6 +45,8 @@ class DatabaseSessionFactory:
         settings.app_config_db_path.parent.mkdir(parents=True, exist_ok=True)
         url = database_url or f"sqlite:///{settings.app_config_db_path}"
         self._engine: Engine = create_engine(url, connect_args={"check_same_thread": False})
+        if self._engine.dialect.name == "sqlite":
+            event.listen(self._engine, "connect", _configure_sqlite_connection)
         self._session_maker: sessionmaker[Session] = sessionmaker(bind=self._engine, expire_on_commit=False)
 
     @property

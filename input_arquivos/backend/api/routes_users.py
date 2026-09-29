@@ -1,9 +1,9 @@
 """Rotas da API REST para CRUD de usuários e atribuição de acesso a contexts."""
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from input_arquivos.backend.auth.dependencies import require_admin
-from input_arquivos.backend.auth.session import SessionUser
+from input_arquivos.backend.auth.session import SessionCookie, SessionUser
 from input_arquivos.backend.schemas.user import (
     UserContextsRequest,
     UserCreateRequest,
@@ -15,6 +15,7 @@ from input_arquivos.backend.services.container import get_container
 from input_arquivos.backend.services.user_service import DuplicateUsernameError
 
 router = APIRouter(prefix="/api/users", tags=["users"], dependencies=[Depends(require_admin)])
+_session_cookie = SessionCookie()
 
 
 @router.get("", response_model=list[UserResponse])
@@ -78,7 +79,7 @@ def get_user(user_id: int) -> UserDetailResponse:
 
 @router.patch("/{user_id}", response_model=UserResponse)
 def update_user(
-    user_id: int, payload: UserUpdateRequest, admin: SessionUser = Depends(require_admin)
+    user_id: int, payload: UserUpdateRequest, response: Response, admin: SessionUser = Depends(require_admin)
 ) -> UserResponse:
     """Atualiza papel, ativação e/ou senha de um usuário existente.
 
@@ -88,6 +89,7 @@ def update_user(
     Args:
         user_id: Identificador do usuário a atualizar.
         payload: Campos a alterar (apenas os informados são aplicados).
+        response: Resposta HTTP, onde o cookie é reemitido se o admin trocou a própria senha.
         admin: Admin autenticado que está fazendo a alteração.
 
     Returns:
@@ -108,6 +110,9 @@ def update_user(
         container.user_service.reset_password(
             user_id, payload.new_password, must_change_password=user_id != admin.user_id
         )
+        # A senha nova derruba as sessões da conta; quem redefiniu a própria continua logado.
+        if user_id == admin.user_id:
+            _session_cookie.issue_for(response, container.user_service.get_by_id(user_id))
 
     return UserResponse.model_validate(container.user_service.get_by_id(user_id))
 

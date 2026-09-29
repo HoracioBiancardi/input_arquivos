@@ -202,7 +202,8 @@ class UploadService:
                 destination_detail="",
                 status=UploadStatus.ERROR,
                 row_count=None,
-                error_message=str(error),
+                error_message="Não foi possível gravar o arquivo no destino do contexto. Avise o administrador.",
+                error_detail=str(error),
                 uploaded_by=uploaded_by,
             )
 

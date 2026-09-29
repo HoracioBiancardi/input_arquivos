@@ -35,7 +35,15 @@ function populateColumnDatalist(expectedColumns) {
     .split(",")
     .map((name) => name.trim())
     .filter(Boolean);
-  datalist.innerHTML = columns.map((name) => `<option value="${name}"></option>`).join("");
+  // Os nomes vêm das colunas do último arquivo enviado (texto de usuário comum que
+  // o admin abre aqui): criados como elementos, nunca como HTML.
+  datalist.replaceChildren(
+    ...columns.map((name) => {
+      const option = document.createElement("option");
+      option.value = name;
+      return option;
+    })
+  );
 }
 
 function addRuleRow(rule) {
@@ -129,9 +137,9 @@ async function loadContexts() {
         <td class="px-4 py-2 font-medium">${esc(context.name)}</td>
         <td class="px-4 py-2">${esc(context.destination_summary)}</td>
         <td class="px-4 py-2">${context.load_to_database ? `${esc(context.load_summary)} <span style="color: var(--text-muted)">(${LOAD_MODE_LABELS[context.load_mode] || esc(context.load_mode)})</span>` : "—"}</td>
-        <td class="px-4 py-2">${context.allowed_file_types.split(",").map((t) => FILE_TYPE_LABELS[t] || t).join(", ")}</td>
-        <td class="px-4 py-2">${PDF_MODE_LABELS[context.pdf_mode] || context.pdf_mode}</td>
-        <td class="px-4 py-2">${IMAGE_MODE_LABELS[context.image_mode] || context.image_mode}</td>
+        <td class="px-4 py-2">${context.allowed_file_types.split(",").map((t) => FILE_TYPE_LABELS[t] || esc(t)).join(", ")}</td>
+        <td class="px-4 py-2">${PDF_MODE_LABELS[context.pdf_mode] || esc(context.pdf_mode)}</td>
+        <td class="px-4 py-2">${IMAGE_MODE_LABELS[context.image_mode] || esc(context.image_mode)}</td>
         <td class="px-4 py-2 text-center">${statusBadge(context.active)}</td>
         <td class="px-4 py-2 text-right">
           <button type="button" class="context-rules-button text-xs px-2 py-1 rounded-lg border border-slate-300 dark:border-slate-600" data-id="${context.id}">Regras${context.column_rules.length ? ` (${context.column_rules.length})` : ""}</button>

@@ -3,11 +3,15 @@
 import secrets
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from fastapi import Request, Response
 from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 
 from input_arquivos.backend.config import Settings, get_settings
+
+if TYPE_CHECKING:
+    from input_arquivos.backend.models.user import User
 
 _DEFAULT_SESSION_SECRET = "change-me-in-production"
 
@@ -54,12 +58,15 @@ class SessionUser:
         role: Papel do usuário ("admin" ou "user").
         must_change_password: Se a conta ainda está com a senha padrão do
             bootstrap e deveria trocá-la.
+        session_version: `User.session_version` no momento do login; o cookie
+            só vale enquanto for igual ao valor atual no banco.
     """
 
     user_id: int
     username: str
     role: str
     must_change_password: bool = False
+    session_version: int = 0
 
 
 class SessionCookie:
@@ -83,7 +90,7 @@ class SessionCookie:
             user: Dados do usuário autenticado a guardar na sessão.
         """
         token = self._serializer.dumps(
-            {"user_id": user.user_id, "username": user.username, "role": user.role}
+            {"user_id": user.user_id, "username": user.username, "role": user.role, "sv": user.session_version}
         )
         response.set_cookie(
             self.COOKIE_NAME,
@@ -93,6 +100,23 @@ class SessionCookie:
             samesite="strict",
             path="/",
             secure=self._cookie_secure,
+        )
+
+    def issue_for(self, response: Response, user: "User") -> None:
+        """Emite o cookie de sessão para um usuário lido do banco, com a versão de sessão atual.
+
+        Args:
+            response: Resposta HTTP onde o cookie será definido.
+            user: Usuário autenticado (modelo do banco).
+        """
+        self.issue(
+            response,
+            SessionUser(
+                user_id=user.id,
+                username=user.username,
+                role=user.role.value,
+                session_version=user.session_version or 0,
+            ),
         )
 
     def read(self, request: Request) -> SessionUser | None:
@@ -112,7 +136,12 @@ class SessionCookie:
             payload = self._serializer.loads(token, max_age=self._max_age)
         except (BadSignature, SignatureExpired):
             return None
-        return SessionUser(user_id=payload["user_id"], username=payload["username"], role=payload["role"])
+        return SessionUser(
+            user_id=payload["user_id"],
+            username=payload["username"],
+            role=payload["role"],
+            session_version=payload.get("sv", 0),
+        )
 
     def clear(self, response: Response) -> None:
         """Remove o cookie de sessão da resposta HTTP.

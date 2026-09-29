@@ -335,7 +335,40 @@ function ligarMostrarSenha() {
   });
 }
 
+// Ações declaradas no HTML com data-* em vez de onclick="": o Content-Security-Policy
+// do servidor bloqueia JavaScript inline (é o que impede um XSS injetado de rodar).
+const CLICK_ACTIONS = {
+  "toggle-sidebar": () => toggleSidebar(),
+  "close-sidebar": () => toggleSidebar(false),
+  "open-settings": () => openSettingsModal(),
+  "close-settings": () => closeSettingsModal(),
+  "close-change-password": () => closeChangePasswordModal(),
+  "pick-file": () => document.getElementById("file-input")?.click(),
+  // Da tela de login (usuário digitado) ou do cabeçalho/Ajustes (usuário da sessão).
+  "change-password": (el) => {
+    closeSettingsModal();
+    openChangePasswordModal(el.dataset.username ?? document.getElementById("username")?.value);
+  },
+  // Fechar modais cujas funções cada tela registra em window (closeModal, closeRulesModal...).
+  call: (el) => window[el.dataset.fn]?.(),
+};
+
+document.addEventListener("click", (event) => {
+  const el = event.target.closest("[data-click], [data-toggle-pw], [data-gen-pw]");
+  if (!el) return;
+  if (el.dataset.togglePw) {
+    togglePasswordVisibility(el.dataset.togglePw, el);
+  } else if (el.dataset.genPw) {
+    fillGeneratedPassword(el.dataset.genPw.split(","));
+  } else if (CLICK_ACTIONS[el.dataset.click]) {
+    event.preventDefault();
+    CLICK_ACTIONS[el.dataset.click](el);
+  }
+});
+
 document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("sidebar-filter")?.addEventListener("input", (event) => filterSidebarItems(event.target.value));
+  document.getElementById("settings-autolock")?.addEventListener("change", (event) => changeAutoLock(event.target.value));
   applyPrefsOnBoot();
   initAutoLockListener();
   initSidebar();

@@ -5,6 +5,9 @@ services:
     env_file: .env   # inclui CONFIG_ENCRYPTION_KEY (gere com `uv run input-arquivos gerar-chave`)
     environment:
       APP_CONFIG_DB_PATH: /app/data/app_config.db
+      # Atrás do Caddy o acesso é sempre HTTPS: o cookie de login só trafega criptografado.
+      # Fixo aqui (e não só no .env) para não depender de alguém lembrar de trocar.
+      SESSION_COOKIE_SECURE: "true"
     ports:
       - "127.0.0.1:8004:8004"   # só local: o acesso pela rede passa pelo Caddy (HTTPS)
     volumes:

@@ -6,7 +6,7 @@ from fastapi.concurrency import run_in_threadpool
 from input_arquivos.backend.auth.dependencies import require_login
 from input_arquivos.backend.auth.session import SessionUser
 from input_arquivos.backend.config import get_settings
-from input_arquivos.backend.models.upload_history import LoadStatus
+from input_arquivos.backend.models.upload_history import LoadStatus, UploadHistory
 from input_arquivos.backend.models.user import UserRole
 from input_arquivos.backend.schemas.upload import UploadHistoryResponse, UploadPreviewResponse
 from input_arquivos.backend.services.container import ServiceContainer, get_container
@@ -38,6 +38,42 @@ def _accessible_context_names(container: ServiceContainer, user: SessionUser) ->
     if db_user is None:
         return set()
     return {context.name for context in container.user_context_service.list_accessible_contexts(db_user)}
+
+
+def _require_context_access(container: ServiceContainer, user: SessionUser, context_name: str) -> None:
+    """Recusa o envio para um contexto que não foi liberado para o usuário.
+
+    Sem esta checagem, qualquer usuário logado enviava para qualquer contexto
+    só trocando o `context_name` no formulário — filtrar o dropdown da tela
+    não é controle de acesso. Responde 404, igual a um contexto inexistente,
+    para não revelar os nomes de contextos de outras equipes.
+
+    Args:
+        container: Container de serviços da aplicação.
+        user: Usuário autenticado na sessão atual.
+        context_name: Nome do contexto de destino informado no formulário.
+
+    Raises:
+        HTTPException: 404 se o usuário não tiver acesso ao contexto.
+    """
+    allowed = _accessible_context_names(container, user)
+    if allowed is not None and context_name not in allowed:
+        raise HTTPException(status_code=404, detail=f"Context '{context_name}' não existe ou está inativo.")
+
+
+def _response_for(history: UploadHistory, user: SessionUser) -> UploadHistoryResponse:
+    """Converte um registro de upload para a resposta da API, sem detalhes internos para quem não é admin.
+
+    Args:
+        history: Registro de upload.
+        user: Usuário autenticado na sessão atual.
+
+    Returns:
+        O registro completo para admins; sem caminho do servidor e erros
+        técnicos para usuários comuns (ver `UploadHistoryResponse.redacted`).
+    """
+    response = UploadHistoryResponse.model_validate(history)
+    return response if user.role == UserRole.ADMIN.value else response.redacted()
 
 
 def _reject_if_too_large(file: UploadFile) -> None:
@@ -85,11 +121,14 @@ async def upload_file(
         O registro de audit log criado para este upload.
 
     Raises:
-        HTTPException: 404 se o context informado não existir ou estiver
-            inativo; 413 se o arquivo exceder o tamanho máximo permitido.
+        HTTPException: 404 se o context informado não existir, estiver
+            inativo ou não estiver liberado para o usuário; 413 se o arquivo
+            exceder o tamanho máximo permitido.
     """
     _reject_if_too_large(file)
-    upload_service = get_container().upload_service
+    container = get_container()
+    _require_context_access(container, user, context_name)
+    upload_service = container.upload_service
     file_bytes = await file.read()
     try:
         history = await run_in_threadpool(
@@ -101,7 +140,7 @@ async def upload_file(
         )
     except ContextNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    return UploadHistoryResponse.model_validate(history)
+    return _response_for(history, user)
 
 
 @router.post("/uploads", response_model=UploadHistoryResponse)
@@ -138,7 +177,8 @@ async def upload_interactive(
         O registro de audit log criado para este upload.
 
     Raises:
-        HTTPException: 404 se o context não existir/estiver inativo; 422 se
+        HTTPException: 404 se o context não existir/estiver inativo ou não
+            estiver liberado para o usuário; 422 se
             algum dado violar uma regra de validação de `column_rules`
             (inclui coluna obrigatória ausente — nesse caso, também é
             registrado um `UploadHistory` de erro antes de levantar a
@@ -147,6 +187,7 @@ async def upload_interactive(
     """
     _reject_if_too_large(file)
     container = get_container()
+    _require_context_access(container, user, context_name)
     try:
         context = container.upload_service.resolve_context(context_name)
     except ContextNotFoundError as error:
@@ -162,7 +203,7 @@ async def upload_interactive(
             username,
             "Envio cancelado pelo usuário: colunas diferentes do último arquivo aceito para este contexto.",
         )
-        return UploadHistoryResponse.model_validate(history)
+        return _response_for(history, user)
 
     file_bytes = await file.read()
 
@@ -172,7 +213,7 @@ async def upload_interactive(
         )
     except Exception as error:  # noqa: BLE001 - erro de leitura vira registro de auditoria
         history = container.upload_service.record_error(context, filename, username, str(error))
-        return UploadHistoryResponse.model_validate(history)
+        return _response_for(history, user)
 
     column_data_violation = container.upload_service.check_column_data(context, artifact)
     if column_data_violation is not None:
@@ -216,7 +257,7 @@ async def upload_interactive(
         container.user_service.set_last_context(user.user_id, context.name)
     if history.load_status == LoadStatus.PENDING:
         background_tasks.add_task(container.upload_service.run_database_load, history.id, artifact.artifact_bytes)
-    return UploadHistoryResponse.model_validate(history)
+    return _response_for(history, user)
 
 
 @router.get("/uploads/recent", response_model=list[UploadHistoryResponse])
@@ -236,7 +277,7 @@ def list_recent_uploads(limit: int = 20, user: SessionUser = Depends(require_log
     container = get_container()
     allowed_context_names = _accessible_context_names(container, user)
     history = container.upload_service.list_recent(limit=limit, allowed_context_names=allowed_context_names)
-    return [UploadHistoryResponse.model_validate(item) for item in history]
+    return [_response_for(item, user) for item in history]
 
 
 @router.get("/uploads/{upload_id}/preview", response_model=UploadPreviewResponse)

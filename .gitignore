@@ -12,6 +12,8 @@ wheels/
 # Configuração local e segredos
 .env
 data/*.db
+data/*.db-wal
+data/*.db-shm
 data/.session_secret
 data/.config_encryption_key
 certs/

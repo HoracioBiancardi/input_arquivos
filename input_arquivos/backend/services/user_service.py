@@ -1,6 +1,6 @@
 """Serviço de CRUD de usuários (contas de acesso ao sistema)."""
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 
 from input_arquivos.backend.db.session import DatabaseSessionFactory
 from input_arquivos.backend.models.user import User, UserRole
@@ -116,6 +116,21 @@ class UserService:
             if user is not None:
                 user.password_hash = self._auth_service.hash_password(new_plain_password)
                 user.must_change_password = must_change_password
+                # Senha nova derruba as sessões abertas (inclusive um cookie roubado).
+                user.session_version = (user.session_version or 0) + 1
+
+    def revoke_sessions(self, user_id: int) -> None:
+        """Invalida todos os cookies de sessão já emitidos para o usuário.
+
+        Args:
+            user_id: Identificador do usuário.
+        """
+        with self._session_factory.session() as db_session:
+            db_session.execute(
+                update(User)
+                .where(User.id == user_id)
+                .values(session_version=func.coalesce(User.session_version, 0) + 1)
+            )
 
     def change_own_password(self, username: str, current_password: str, new_password: str) -> None:
         """Troca a senha de um usuário que informou a senha atual.

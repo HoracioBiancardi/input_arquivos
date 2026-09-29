@@ -43,6 +43,9 @@ class UploadHistory(Base):
             `None` quando o upload falhou antes de gerar um artefato.
         row_count: Quantidade de linhas geradas, quando aplicável.
         error_message: Mensagem de erro amigável, quando `status` é ERROR.
+        error_detail: Detalhe técnico de uma falha interna (ex.: exceção do
+            MinIO ou do disco ao gravar), que pode citar host, bucket ou
+            caminho do servidor. Só aparece no log de auditoria do admin.
         load_status: Situação da carga no banco de dados de destino. `None`
             quando o contexto não carrega no banco ou o upload não gerou um
             Parquet (não se aplica).
@@ -65,6 +68,7 @@ class UploadHistory(Base):
     artifact_kind: Mapped[str | None] = mapped_column(String(20), default=None)
     row_count: Mapped[int | None] = mapped_column(default=None)
     error_message: Mapped[str | None] = mapped_column(Text, default=None)
+    error_detail: Mapped[str | None] = mapped_column(Text, default=None)
     load_status: Mapped[LoadStatus | None] = mapped_column(SqlEnum(LoadStatus), default=None)
     load_detail: Mapped[str | None] = mapped_column(String(300), default=None)
     load_error: Mapped[str | None] = mapped_column(Text, default=None)

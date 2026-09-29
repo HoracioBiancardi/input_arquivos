@@ -1,5 +1,7 @@
 """Schemas Pydantic para as rotas da API de upload e audit log."""
 
+from pathlib import PurePosixPath
+
 from pydantic import BaseModel, ConfigDict
 
 from input_arquivos.backend.models.context import DestinationType
@@ -22,6 +24,7 @@ class UploadHistoryResponse(BaseModel):
             de visualização da tabela. `None` se o upload falhou.
         row_count: Quantidade de linhas geradas, quando aplicável.
         error_message: Mensagem de erro, quando `status` é ERROR.
+        error_detail: Detalhe técnico de uma falha interna (só para admin).
         load_status: Situação da carga no banco de destino (`None` = não se aplica).
         load_detail: Tabela de destino da última carga bem-sucedida.
         load_error: Erro da última carga, quando `load_status` é ERROR.
@@ -41,12 +44,36 @@ class UploadHistoryResponse(BaseModel):
     artifact_kind: str | None
     row_count: int | None
     error_message: str | None
+    error_detail: str | None = None
     load_status: LoadStatus | None = None
     load_detail: str | None = None
     load_error: str | None = None
     loaded_at: UtcDatetime | None = None
     uploaded_by: str
     created_at: UtcDatetime
+
+    def redacted(self) -> "UploadHistoryResponse":
+        """Versão para usuário comum, sem detalhes internos do servidor.
+
+        Tira o caminho do servidor (ou o bucket) do destino, deixando só o nome
+        do arquivo gravado, e troca o erro técnico da carga no banco (que pode
+        trazer host, SQL e nomes de tabela) por uma mensagem genérica. O
+        detalhe completo continua no log de auditoria do admin.
+
+        Returns:
+            Cópia do registro sem os campos internos.
+        """
+        return self.model_copy(
+            update={
+                "destination_detail": PurePosixPath(self.destination_detail.replace("\\", "/")).name,
+                "error_detail": None,
+                "load_error": (
+                    "Falha ao carregar no banco. O administrador pode recarregar pelo log de auditoria."
+                    if self.load_error
+                    else None
+                ),
+            }
+        )
 
 
 class UploadPreviewResponse(BaseModel):

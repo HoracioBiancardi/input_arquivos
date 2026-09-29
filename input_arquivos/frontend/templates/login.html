@@ -23,13 +23,13 @@
       <label class="form-label" for="password">Senha</label>
       <div class="pw-wrap">
         <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Digite sua senha…" required class="form-input">
-        <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('password', this)" title="Mostrar/ocultar">SHOW</button>
+        <button type="button" class="pw-toggle" data-toggle-pw="password" title="Mostrar/ocultar">SHOW</button>
       </div>
       <p class="form-hint">Sessão com bloqueio por inatividade.</p>
     </div>
     <div class="modal-footer" style="padding-top:.25rem;flex-direction:column;gap:.6rem">
       <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:.65rem">Entrar / Desbloquear</button>
-      <button type="button" class="btn btn-ghost" onclick="openChangePasswordModal(document.getElementById('username').value)"
+      <button type="button" class="btn btn-ghost" data-click="change-password"
         style="width:100%;justify-content:center;font-size:.78rem">Alterar Senha</button>
     </div>
   </form>

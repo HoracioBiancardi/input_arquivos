@@ -38,6 +38,10 @@ class User(Base):
         must_change_password: Se `True`, a senha atual é a senha padrão gerada
             no bootstrap (ou foi marcada assim por um admin) e deve ser trocada.
             Zerado automaticamente da próxima vez que a senha for redefinida.
+        session_version: Versão das sessões da conta, gravada no cookie no
+            login. Logout e troca de senha incrementam o valor, e todo cookie
+            emitido antes deixa de valer (o cookie assinado sozinho não tem
+            como ser revogado). `NULL` em bancos antigos equivale a 0.
     """
 
     __tablename__ = "users"
@@ -52,3 +56,4 @@ class User(Base):
     failed_login_attempts: Mapped[int] = mapped_column(default=0)
     locked_until: Mapped[datetime | None] = mapped_column(default=None)
     must_change_password: Mapped[bool] = mapped_column(default=False)
+    session_version: Mapped[int | None] = mapped_column(default=0)

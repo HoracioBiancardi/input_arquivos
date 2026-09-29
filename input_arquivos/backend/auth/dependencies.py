@@ -39,12 +39,16 @@ def _resolve_session_user(request: Request) -> SessionUser | None:
     db_user = get_container().user_service.get_by_id(session_user.user_id)
     if db_user is None or not db_user.active or db_user.username != session_user.username:
         return None
+    # Logout/troca de senha incrementam a versão: cookies emitidos antes deixam de valer.
+    if (db_user.session_version or 0) != session_user.session_version:
+        return None
 
     return SessionUser(
         user_id=db_user.id,
         username=db_user.username,
         role=db_user.role.value,
         must_change_password=db_user.must_change_password,
+        session_version=db_user.session_version or 0,
     )
 
 

@@ -27,7 +27,7 @@
 
     <div class="form-group" style="margin-bottom:0">
       <label class="form-label" for="file-input">Selecione ou Arraste o Arquivo</label>
-      <div id="drop-zone" class="drop-zone" onclick="document.getElementById('file-input').click()">
+      <div id="drop-zone" class="drop-zone" data-click="pick-file">
         <span class="ms" aria-hidden="true">upload</span>
         <p class="text-sm font-semibold" style="color: var(--text);">Clique aqui ou arraste o arquivo</p>
         <p class="text-xs" style="color: var(--text-subtle); margin-top: .2rem;" id="drop-zone-formats">Suporta .xlsx, .xls, .csv, .pdf, .json, .xml, .txt</p>
@@ -35,7 +35,7 @@
           <span id="selected-file-name">arquivo.xlsx</span>
         </div>
       </div>
-      <input id="file-input" type="file" accept=".xlsx,.xls,.csv,.pdf,.json,.xml,.txt,.ods" class="hidden" onchange="onFileSelected(this)">
+      <input id="file-input" type="file" accept=".xlsx,.xls,.csv,.pdf,.json,.xml,.txt,.ods" class="hidden">
     </div>
 
     <button type="submit" id="upload-submit" class="btn btn-primary self-start">

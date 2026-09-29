@@ -10,5 +10,23 @@
 {$SITE_ADDRESS} {
 	tls /certs/cert.pem /certs/key.pem
 	encode gzip
+
+	header {
+		# HSTS: depois da primeira visita, o navegador só abre este endereço por HTTPS
+		# durante 1 ano, mesmo que alguém digite http://. Impede que alguém na mesma rede
+		# (Wi-Fi, proxy) rebaixe a conexão para HTTP e leia o cookie de login.
+		# Sem includeSubDomains: só vale para este nome, não para outros *.blau.com.
+		Strict-Transport-Security "max-age=31536000"
+
+		# CSP, nosniff, X-Frame-Options, Referrer-Policy e Permissions-Policy vêm do
+		# próprio app (input_arquivos/backend/security/web_guard.py): assim valem também
+		# rodando sem o Caddy e são cobertos pelos testes. Ver o que cada um faz lá.
+
+		# Esconde qual servidor/versão está rodando (Caddy e uvicorn), para não facilitar
+		# a busca por falhas conhecidas daquela versão.
+		-Server
+		-Via
+	}
+
 	reverse_proxy input-arquivos:8004
 }

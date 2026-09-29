@@ -30,7 +30,7 @@
   <!-- ── TOPBAR (= app_template) ── -->
   <header class="topbar">
     <div class="brand">
-      <button class="icon-btn sidebar-toggle-btn" type="button" onclick="toggleSidebar()" title="Alternar Barra Lateral (Sidebar)"><span class="ms" aria-hidden="true">menu</span></button>
+      <button class="icon-btn sidebar-toggle-btn" type="button" data-click="toggle-sidebar" title="Alternar Barra Lateral (Sidebar)"><span class="ms" aria-hidden="true">menu</span></button>
       <a href="/" class="brand-icon" title="Início"><span class="ms" aria-hidden="true">upload_file</span></a>
       <a href="/" title="Início"><img class="brand-logo" src="/static/img/logo-blau.png" alt="Blau Farmacêutica"></a>
       <div class="brand-text">
@@ -71,16 +71,16 @@
       {% if current_user.role == "admin" %}
       <a class="activity-btn{% if path.startswith('/admin/audit') %} active{% endif %}" href="/admin/audit" title="Log de auditoria"><span class="ms" aria-hidden="true">history</span><span class="activity-label">Auditoria</span></a>
       {% endif %}
-      <button type="button" class="activity-btn activity-settings" onclick="openSettingsModal()" title="Configurações"><span class="ms" aria-hidden="true">settings</span><span class="activity-label">Ajustes</span></button>
+      <button type="button" class="activity-btn activity-settings" data-click="open-settings" title="Configurações"><span class="ms" aria-hidden="true">settings</span><span class="activity-label">Ajustes</span></button>
     </nav>
 
     <aside class="sidebar-panel" id="sidebar-panel">
       <div class="panel-header">
         <span class="panel-title">Ingestão de Arquivos</span>
-        <button class="icon-btn" type="button" onclick="toggleSidebar(false)" title="Recolher Sidebar"><span class="ms" aria-hidden="true">close</span></button>
+        <button class="icon-btn" type="button" data-click="close-sidebar" title="Recolher Sidebar"><span class="ms" aria-hidden="true">close</span></button>
       </div>
       <div class="sidebar-search">
-        <input type="text" class="form-input form-input-sm" placeholder="Filtrar telas…" aria-label="Filtrar telas" oninput="filterSidebarItems(this.value)">
+        <input id="sidebar-filter" type="text" class="form-input form-input-sm" placeholder="Filtrar telas…" aria-label="Filtrar telas">
       </div>
       <div class="sidebar-tree">
         <a class="tree-item{% if path == '/' or path.startswith('/uploads/') %} active{% endif %}" href="/"><span class="tree-icon ms" aria-hidden="true">upload_file</span> Enviar arquivos</a>
@@ -107,7 +107,7 @@
         {% if current_user.must_change_password %}
         <div class="alert alert-warn" role="alert"><span class="alert-icon ms" aria-hidden="true">warning</span>
           <div>Sua senha foi definida por um administrador (ou é a senha padrão da instalação).
-            <a href="#" data-username="{{ current_user.username }}" onclick="event.preventDefault(); openChangePasswordModal(this.dataset.username)">Troque agora</a>.</div></div>
+            <a href="#" data-username="{{ current_user.username }}" data-click="change-password">Troque agora</a>.</div></div>
         {% endif %}
         {% block content %}{% endblock %}
       </div>
@@ -122,12 +122,12 @@
     <div class="modal glass" style="max-width:440px">
       <div class="modal-header">
         <h2>Configurações</h2>
-        <button type="button" class="close-btn" onclick="closeSettingsModal()">X</button>
+        <button type="button" class="close-btn" data-click="close-settings">X</button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:1rem">
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label" for="settings-autolock">Bloqueio Automático por Inatividade</label>
-          <select id="settings-autolock" class="form-input" onchange="changeAutoLock(this.value)">
+          <select id="settings-autolock" class="form-input">
             <option value="0">Desativado</option>
             <option value="1">1 minuto</option>
             <option value="5">5 minutos</option>
@@ -138,12 +138,12 @@
         {% if current_user %}
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label">Minha Senha</label>
-          <button type="button" class="btn btn-secondary" data-username="{{ current_user.username }}" onclick="closeSettingsModal(); openChangePasswordModal(this.dataset.username)"><span class="ms" aria-hidden="true">key</span>Alterar minha senha</button>
+          <button type="button" class="btn btn-secondary" data-username="{{ current_user.username }}" data-click="change-password"><span class="ms" aria-hidden="true">key</span>Alterar minha senha</button>
         </div>
         {% endif %}
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-primary" onclick="closeSettingsModal()" style="width:100%;justify-content:center">Fechar</button>
+        <button type="button" class="btn btn-primary" data-click="close-settings" style="width:100%;justify-content:center">Fechar</button>
       </div>
     </div>
   </div>
@@ -153,7 +153,7 @@
     <div class="modal glass" style="max-width:440px">
       <div class="modal-header">
         <h2>Alterar Senha de Acesso</h2>
-        <button type="button" class="close-btn" onclick="closeChangePasswordModal()">X</button>
+        <button type="button" class="close-btn" data-click="close-change-password">X</button>
       </div>
       <form id="change-password-form" class="modal-body" style="display:flex;flex-direction:column;gap:1rem" autocomplete="off">
         <div class="form-group" style="margin-bottom:0">
@@ -164,16 +164,16 @@
           <label class="form-label" for="cp-current_password">Senha atual</label>
           <div class="pw-wrap">
             <input id="cp-current_password" type="password" required class="form-input" autocomplete="current-password">
-            <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('cp-current_password', this)" title="Mostrar/ocultar">SHOW</button>
+            <button type="button" class="pw-toggle" data-toggle-pw="cp-current_password" title="Mostrar/ocultar">SHOW</button>
           </div>
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label" for="cp-new_password">Senha nova</label>
           <div class="pw-wrap">
             <input id="cp-new_password" type="password" required minlength="8" class="form-input" autocomplete="new-password">
-            <button type="button" class="pw-toggle" onclick="togglePasswordVisibility('cp-new_password', this)" title="Mostrar/ocultar">SHOW</button>
+            <button type="button" class="pw-toggle" data-toggle-pw="cp-new_password" title="Mostrar/ocultar">SHOW</button>
           </div>
-          <button type="button" class="btn btn-ghost btn-sm" style="margin-top:.4rem" onclick="fillGeneratedPassword(['cp-new_password', 'cp-new_password_confirm'])"><span class="ms" aria-hidden="true">password</span>Gerar senha forte</button>
+          <button type="button" class="btn btn-ghost btn-sm" style="margin-top:.4rem" data-gen-pw="cp-new_password,cp-new_password_confirm"><span class="ms" aria-hidden="true">password</span>Gerar senha forte</button>
         </div>
         <div class="form-group" style="margin-bottom:0">
           <label class="form-label" for="cp-new_password_confirm">Confirmar senha nova</label>
@@ -181,7 +181,7 @@
         </div>
         <p class="form-hint">Mínimo de 8 caracteres. Esqueceu a senha atual? Peça a um administrador para redefini-la.</p>
         <div class="modal-footer" style="padding:0">
-          <button type="button" class="btn btn-ghost" onclick="closeChangePasswordModal()">Cancelar</button>
+          <button type="button" class="btn btn-ghost" data-click="close-change-password">Cancelar</button>
           <button type="submit" class="btn btn-primary">Trocar Senha</button>
         </div>
       </form>

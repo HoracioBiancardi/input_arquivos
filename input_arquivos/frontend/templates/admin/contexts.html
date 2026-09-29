@@ -38,7 +38,7 @@
   <div class="modal glass" style="max-width: 580px;">
     <div class="modal-header">
       <h3 id="context-modal-title" class="text-base font-bold">Novo Contexto</h3>
-      <button type="button" class="close-btn" id="context-close-x" onclick="window.closeModal && window.closeModal()">X</button>
+      <button type="button" class="close-btn" id="context-close-x" data-click="call" data-fn="closeModal">X</button>
     </div>
 
     <form id="context-form" class="flex flex-col gap-4">
@@ -161,7 +161,7 @@
         <h3 class="text-base font-bold">Regras de Validação de Dados</h3>
         <p id="rules-modal-context-name" class="text-xs" style="color: var(--text-muted);"></p>
       </div>
-      <button type="button" class="close-btn" id="rules-close-x" onclick="window.closeRulesModal && window.closeRulesModal()">X</button>
+      <button type="button" class="close-btn" id="rules-close-x" data-click="call" data-fn="closeRulesModal">X</button>
     </div>
     
     <input type="hidden" id="rules-context-id">

@@ -15,7 +15,7 @@ function loadCell(item) {
   const [variant, label] = LOAD_STATUS_BADGES[item.load_status] || ["status-badge--muted", item.load_status];
   const detail = item.load_status === "error" ? item.load_error : item.load_detail;
   return `<div class="load-cell">
-    <span class="status-badge ${variant}">${label}</span>
+    <span class="status-badge ${variant}">${esc(label)}</span>
     ${detail ? `<div style="color: var(--text-muted); overflow-wrap: anywhere; max-width: 18rem">${esc(detail)}</div>` : ""}
     <button type="button" class="btn btn-ghost btn-sm" data-reload-id="${item.id}">Recarregar</button>
   </div>`;
@@ -69,7 +69,7 @@ async function applyFilters() {
         <td data-label="Banco" class="px-4 py-2">${loadCell(item)}</td>
         <td data-label="Enviado por" class="px-4 py-2">${esc(item.uploaded_by)}</td>
         <td data-label="Data" class="px-4 py-2 whitespace-nowrap">${formatDateTimeBR(item.created_at)}</td>
-        <td data-label="Erro" class="px-4 py-2" style="overflow-wrap: anywhere">${esc(item.error_message) || "-"}</td>
+        <td data-label="Erro" class="px-4 py-2" style="overflow-wrap: anywhere">${esc(item.error_message) || "-"}${item.error_detail ? `<br><span class="font-mono" style="color: var(--text-muted)">${esc(item.error_detail)}</span>` : ""}</td>
       </tr>`
     )
     .join("");

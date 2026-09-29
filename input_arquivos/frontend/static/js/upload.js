@@ -274,8 +274,8 @@ async function handleSubmit(event) {
           title: "Colunas diferentes do último envio",
           body: `
             <p>Este arquivo tem colunas diferentes das do último arquivo aceito para este contexto.</p>
-            ${mismatch.extra_columns?.length ? `<p class="mt-2">Novas: ${mismatch.extra_columns.join(", ")}</p>` : ""}
-            ${mismatch.missing_columns?.length ? `<p>Faltando: ${mismatch.missing_columns.join(", ")}</p>` : ""}
+            ${mismatch.extra_columns?.length ? `<p class="mt-2">Novas: ${mismatch.extra_columns.map(esc).join(", ")}</p>` : ""}
+            ${mismatch.missing_columns?.length ? `<p>Faltando: ${mismatch.missing_columns.map(esc).join(", ")}</p>` : ""}
             <p class="mt-2">Deseja enviar mesmo assim?</p>
           `,
           confirmLabel: "Enviar mesmo assim",
@@ -316,6 +316,7 @@ async function handleSubmit(event) {
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
+  fileInput?.addEventListener("change", () => onFileSelected(fileInput));
   initDragAndDrop();
   await loadContexts();
   await loadHistory();
