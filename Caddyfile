@@ -3,10 +3,12 @@
 	default_sni {$SITE_ADDRESS}
 }
 
-# Proxy reverso com HTTPS. SITE_ADDRESS vem do .env (IP ou hostname interno).
-# "tls internal" = certificado de uma CA local do Caddy (rede interna, sem Let's Encrypt).
+# Proxy reverso com HTTPS. SITE_ADDRESS vem do .env (ex.: input.blau.com).
+# Certificado da Blau em ./certs (montado em /certs, fora do git e da imagem):
+#   cert.pem = certificado + intermediários (cadeia completa), key.pem = chave privada.
+# O Caddy redireciona http:// para https:// sozinho.
 {$SITE_ADDRESS} {
-	tls internal
+	tls /certs/cert.pem /certs/key.pem
 	encode gzip
 	reverse_proxy input-arquivos:8004
 }

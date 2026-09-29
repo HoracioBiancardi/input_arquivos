@@ -14,6 +14,7 @@ wheels/
 data/*.db
 data/.session_secret
 data/.config_encryption_key
+certs/
 
 # Ferramentas
 .ruff_cache/
