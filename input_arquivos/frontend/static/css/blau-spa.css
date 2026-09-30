@@ -1,0 +1,52 @@
+/* =====================================================================
+   DESIGN SYSTEM BLAU — adaptador da casca SPA (frontend/css/style.css)
+   Carregue depois de style.css e de blau-tokens.css. Só detalhes da marca:
+   as cores de fundo claro já vêm dos tokens (a casca não tem cor fixa). Todo seletor leva
+   `.theme-blau` na frente: só vale com <body class="theme-blau">, então o
+   arquivo pode ficar carregado em projeto com seletor de tema.
+   ===================================================================== */
+
+/* ── Tipografia: títulos em azul-marinho e negrito, como no site ── */
+.theme-blau .page-title,
+.theme-blau .card-header h3,
+.theme-blau .card-title-row h3,
+.theme-blau .card-label,
+.theme-blau .modal-header h2,
+.theme-blau .login-title,
+.theme-blau .brand-name { color: var(--blau-navy); font-weight: 700; }
+.theme-blau .tab-view a:not(.btn), .theme-blau .modal a:not(.btn) { color: var(--blau-sky-text); }
+
+/* ── Botões e campos ── */
+.theme-blau .btn-primary { border-color: var(--blau-navy); }
+.theme-blau .btn-primary:hover:not(:disabled) { border-color: var(--blau-navy-700); box-shadow: 0 3px 12px rgba(1, 22, 137, .22); }
+.theme-blau .btn:focus-visible { outline-color: var(--blau-sky); }
+.theme-blau .btn-ghost { background: var(--surface); }
+
+.theme-blau .form-input { background: #fff; }
+.theme-blau .form-input:focus { border-color: var(--blau-sky); }
+
+.theme-blau .badge-primary,
+.theme-blau .activity-btn.active { border-color: rgba(54, 179, 227, .45); }
+.theme-blau .tree-item.active { border-left-color: var(--blau-sky); background: var(--blau-sky-soft); color: var(--blau-navy); }
+.theme-blau .data-table th { color: var(--blau-navy); }
+
+.theme-blau .modal,
+.theme-blau .login-modal { border-top: 3px solid var(--blau-sky); }
+.theme-blau .toast { background: var(--surface); }
+
+/* Faixa sob a topbar: azul-céu em vez do primário (o divisor de 5px do site) */
+.theme-blau .topbar::after { background: linear-gradient(90deg, var(--blau-navy) 0%, var(--blau-sky) 50%, var(--blau-navy) 100%); background-size: 200% auto; height: 2px; }
+.theme-blau .brand-by-text { text-shadow: none; }
+.theme-blau .brand-by-bg rect:last-of-type { fill: var(--text-subtle); }
+
+/* ── Login: fundo em degradê marinho → céu, card branco ── */
+.theme-blau .login-overlay { backdrop-filter: none; }   /* o degradê vem de --veu-login */
+.theme-blau .login-icon { border-color: rgba(54, 179, 227, .45); color: var(--blau-navy); }
+.theme-blau .aurora { display: none; }
+
+/* ── Logo (.brand-logo, imagem do projeto): só no tema Blau, no lugar do ícone da casca ── */
+.brand-logo { display: none; }
+.theme-blau .brand-logo { display: block; height: 28px; width: auto; }
+.theme-blau .brand:has(.brand-logo) .brand-icon { display: none; }
+.theme-blau .login-brand:has(.brand-logo) .login-icon { display: none; }
+.theme-blau .login-brand .brand-logo { height: 44px; }

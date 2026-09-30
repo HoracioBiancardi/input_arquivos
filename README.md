@@ -186,7 +186,7 @@ input_arquivos/
     ├── web/                    # rotas de página (renderizam os templates Jinja2, sem lógica de negócio)
     ├── templates/               # templates Jinja2 (login, upload, admin/*) + base.html (layout Tailwind)
     └── static/
-        ├── css/                   # style.css (casca do app_template) + app.css (domínio) + blau.css (design system Blau)
+        ├── css/                   # style.css (casca do app_template) + app.css (domínio) + blau-tokens.css/blau-spa.css (design system Blau)
         └── js/                    # interatividade de cada página (fetch para a API REST)
 tests/                    # testes automatizados (pytest)
 data/                     # SQLite local de configuração (gitignored)
@@ -217,4 +217,4 @@ acessam serviços/banco diretamente.
   criada ou redefinida pelo admin para outra pessoa marca a conta para troca no próximo acesso. Os
   campos de senha têm mostrar/ocultar e "Gerar senha forte" (`crypto.getRandomValues`). Quem esqueceu
   a senha pede ao admin para redefinir.
-- **Tema**: `corporate` (padrão), `green-neutral` e `cyber-dark`, trocáveis pelo modal de Configurações — mesmo sistema de tokens CSS usado nos demais projetos SwordPower.
+- **Tema**: visual único, o design system Blau (`blau-tokens.css` + `blau-spa.css`, cópias de `app_template/design_system/`), sem troca de tema.

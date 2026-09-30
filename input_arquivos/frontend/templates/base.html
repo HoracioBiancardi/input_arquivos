@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
   <title>{% block title %}Ingestão de Arquivos{% endblock %}</title>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -13,11 +14,12 @@
   <!-- style.css: cópia do app_template (base comum do ecossistema); app.css: só o domínio -->
   <link rel="stylesheet" href="/static/css/style.css?v={{ asset_version }}">
   <link rel="stylesheet" href="/static/css/app.css?v={{ asset_version }}">
-  <!-- blau.css: design system Blau (tema claro fiel ao site blau.com) -->
-  <link rel="stylesheet" href="/static/css/blau.css?v={{ asset_version }}">
+  <!-- design system Blau (fonte única: app_template/design_system/blau/): tokens + adaptador da casca SPA -->
+  <link rel="stylesheet" href="/static/css/blau-tokens.css?v={{ asset_version }}">
+  <link rel="stylesheet" href="/static/css/blau-spa.css?v={{ asset_version }}">
   {% block head %}{% endblock %}
 </head>
-<body class="theme-blau-claro">
+<body class="theme-blau">
   <div class="aurora">
     <div class="orb orb-1"></div>
     <div class="orb orb-2"></div>

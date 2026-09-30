@@ -1,5 +1,5 @@
 // Utilitários compartilhados por todas as páginas: fetch autenticado, toasts, modal de confirmação e Auto-Lock.
-// Visual único: o design system Blau (body.theme-blau-claro, fixo no base.html) — sem troca de tema.
+// Visual único: o design system Blau (body.theme-blau + blau-tokens.css + blau-spa.css no base.html) — sem troca de tema.
 
 const AUTOLOCK_KEY = 'app-autolock-minutes';
 
