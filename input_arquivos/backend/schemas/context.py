@@ -4,18 +4,22 @@ import json
 import re
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from input_arquivos.backend.models.context import (
     ColumnRuleType,
     DestinationType,
+    DuplicatePolicy,
     ImageMode,
     LoadMode,
     PdfMode,
+    PeriodMode,
+    PeriodSource,
 )
 from input_arquivos.backend.schemas.common import UtcDatetime
 
 _SQL_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,127}$")
+_PERIOD = re.compile(r"^\d{4}-(0[1-9]|1[0-2])$")
 
 
 class ColumnRule(BaseModel):
@@ -114,7 +118,45 @@ class DatabaseLoadFields(BaseModel):
         return _normalize_sql_identifier(value, "Tabela")
 
 
-class ContextCreateRequest(DatabaseLoadFields):
+class PeriodFields(BaseModel):
+    """Campos de controle por mês de competência, comuns à criação e à edição de um context.
+
+    Attributes:
+        period_mode: `monthly` controla os envios por mês; `none` mantém o comportamento sem mês.
+        period_source: Se o mês sai de uma coluna do arquivo (`column`) ou é
+            informado no envio (`selector`).
+        period_column: Coluna de data do arquivo; obrigatória com `column`.
+        period_start: Primeiro mês esperado (`AAAA-MM`); vazio usa o mês de criação do context.
+        duplicate_policy: O que fazer com um envio de mês que já tem envio.
+    """
+
+    period_mode: PeriodMode = PeriodMode.NONE
+    period_source: PeriodSource = PeriodSource.SELECTOR
+    period_column: str | None = Field(default=None, validate_default=True)
+    period_start: str | None = None
+    duplicate_policy: DuplicatePolicy = DuplicatePolicy.REPLACE
+
+    @field_validator("period_column")
+    @classmethod
+    def _validate_period_column(cls, value: str | None, info: ValidationInfo) -> str | None:
+        """Exige a coluna de data quando o mês sai do arquivo; vazio vira `None`."""
+        stripped = (value or "").strip() or None
+        monthly = info.data.get("period_mode") == PeriodMode.MONTHLY
+        if monthly and info.data.get("period_source") == PeriodSource.COLUMN and stripped is None:
+            raise ValueError("Informe a coluna de data de onde sai o mês.")
+        return stripped
+
+    @field_validator("period_start")
+    @classmethod
+    def _validate_period_start(cls, value: str | None) -> str | None:
+        """Aceita `AAAA-MM` (o que o `<input type="month">` envia); vazio vira `None`."""
+        stripped = (value or "").strip() or None
+        if stripped is not None and not _PERIOD.match(stripped):
+            raise ValueError("Use o formato AAAA-MM (ex.: 2026-01).")
+        return stripped
+
+
+class ContextCreateRequest(DatabaseLoadFields, PeriodFields):
     """Corpo da requisição para criação de um novo context.
 
     Attributes:
@@ -129,7 +171,7 @@ class ContextCreateRequest(DatabaseLoadFields):
         column_rules: Regras de validação de tipo/obrigatoriedade por coluna.
             Vazio equivale a não validar o conteúdo de nenhuma coluna.
 
-    Os campos de carga no banco vêm de `DatabaseLoadFields`.
+    Os campos de carga no banco vêm de `DatabaseLoadFields`; os de mês, de `PeriodFields`.
     """
 
     name: str
@@ -148,7 +190,7 @@ class ContextCreateRequest(DatabaseLoadFields):
         return self
 
 
-class ContextUpdateRequest(DatabaseLoadFields):
+class ContextUpdateRequest(DatabaseLoadFields, PeriodFields):
     """Corpo da requisição para atualização de um context existente.
 
     Attributes:
@@ -164,7 +206,7 @@ class ContextUpdateRequest(DatabaseLoadFields):
             Vazio equivale a não validar o conteúdo de nenhuma coluna.
         active: Se o context deve ficar ativo (visível na tela de upload).
 
-    Os campos de carga no banco vêm de `DatabaseLoadFields`.
+    Os campos de carga no banco vêm de `DatabaseLoadFields`; os de mês, de `PeriodFields`.
     """
 
     name: str
@@ -244,6 +286,8 @@ class ContextResponse(BaseModel):
         load_mode: Modo de carga (`append` ou `replace`).
         load_summary: Tabela de destino efetiva (`schema.tabela`), ou vazio
             se a carga no banco estiver desligada.
+        period_mode, period_source, period_column, period_start, duplicate_policy:
+            Controle por mês de competência (ver `PeriodFields`).
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -266,6 +310,22 @@ class ContextResponse(BaseModel):
     db_table: str | None = None
     load_mode: LoadMode = LoadMode.APPEND
     load_summary: str = ""
+    period_mode: PeriodMode = PeriodMode.NONE
+    period_source: PeriodSource = PeriodSource.SELECTOR
+    period_column: str | None = None
+    period_start: str | None = None
+    duplicate_policy: DuplicatePolicy = DuplicatePolicy.REPLACE
+
+    @field_validator("period_mode", "period_source", "duplicate_policy", mode="before")
+    @classmethod
+    def _default_period_fields(cls, value: object, info: ValidationInfo) -> object:
+        """Trata os campos de mês nulos (contexts anteriores a eles) como o padrão de cada um."""
+        defaults = {
+            "period_mode": PeriodMode.NONE,
+            "period_source": PeriodSource.SELECTOR,
+            "duplicate_policy": DuplicatePolicy.REPLACE,
+        }
+        return value or defaults[info.field_name]
 
     @field_validator("load_to_database", mode="before")
     @classmethod
@@ -314,6 +374,10 @@ class AccessibleContextResponse(BaseModel):
         local_path: Pasta local configurada, se aplicável.
         allowed_extensions: Extensões de arquivo aceitas (com o ponto, ex. ".csv"),
             computadas no servidor a partir de `allowed_file_types`.
+        period_mode: `monthly` se o context controla envios por mês (a tela
+            mostra a grade de meses).
+        period_source: Num context mensal, de onde vem o mês (`selector` mostra
+            o seletor de mês no formulário).
     """
 
     id: int
@@ -322,6 +386,8 @@ class AccessibleContextResponse(BaseModel):
     minio_bucket: str | None
     local_path: str | None
     allowed_extensions: list[str]
+    period_mode: PeriodMode = PeriodMode.NONE
+    period_source: PeriodSource | None = None
 
 
 class AccessibleContextsResponse(BaseModel):

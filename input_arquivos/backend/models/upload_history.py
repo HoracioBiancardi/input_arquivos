@@ -24,6 +24,7 @@ class LoadStatus(str, enum.Enum):
     PENDING = "pending"
     SUCCESS = "success"
     ERROR = "error"
+    SUPERSEDED = "superseded"
 
 
 class UploadHistory(Base):
@@ -51,7 +52,14 @@ class UploadHistory(Base):
             Parquet (não se aplica).
         load_detail: Tabela de destino (`schema.tabela`) da última carga.
         load_error: Mensagem de erro da última carga, quando `load_status` é ERROR.
+            `load_status` SUPERSEDED indica que as linhas saíram da tabela porque
+            outro envio do mesmo mês o substituiu.
         loaded_at: Data/hora da última carga bem-sucedida.
+        period: Mês de competência do envio (`AAAA-MM`), em contextos mensais.
+            `None` em contextos sem controle por mês e em envios anteriores ao campo.
+        superseded_by: Id do envio do mesmo mês que substituiu este. Um envio
+            substituído continua no histórico (e o Parquet no MinIO), mas suas
+            linhas saem da tabela do banco; `None` = envio vigente.
         uploaded_by: Nome de usuário de quem realizou o upload (sempre
             preenchido, pois o login é obrigatório para qualquer usuário).
         created_at: Data/hora do upload.
@@ -73,5 +81,7 @@ class UploadHistory(Base):
     load_detail: Mapped[str | None] = mapped_column(String(300), default=None)
     load_error: Mapped[str | None] = mapped_column(Text, default=None)
     loaded_at: Mapped[datetime | None] = mapped_column(default=None)
+    period: Mapped[str | None] = mapped_column(String(7), default=None, index=True)
+    superseded_by: Mapped[int | None] = mapped_column(default=None)
     uploaded_by: Mapped[str] = mapped_column(String(150), index=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)

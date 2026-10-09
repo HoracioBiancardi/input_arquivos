@@ -4,7 +4,7 @@ from pathlib import PurePosixPath
 
 from pydantic import BaseModel, ConfigDict
 
-from input_arquivos.backend.models.context import DestinationType
+from input_arquivos.backend.models.context import DestinationType, DuplicatePolicy, PeriodSource
 from input_arquivos.backend.models.upload_history import LoadStatus, UploadStatus
 from input_arquivos.backend.schemas.common import UtcDatetime
 
@@ -29,6 +29,8 @@ class UploadHistoryResponse(BaseModel):
         load_detail: Tabela de destino da última carga bem-sucedida.
         load_error: Erro da última carga, quando `load_status` é ERROR.
         loaded_at: Data/hora da última carga bem-sucedida.
+        period: Mês de competência (`AAAA-MM`), em contextos mensais.
+        superseded_by: Id do envio do mesmo mês que substituiu este (`None` = vigente).
         uploaded_by: Nome do usuário que realizou o upload.
         created_at: Data/hora do upload.
     """
@@ -49,6 +51,8 @@ class UploadHistoryResponse(BaseModel):
     load_detail: str | None = None
     load_error: str | None = None
     loaded_at: UtcDatetime | None = None
+    period: str | None = None
+    superseded_by: int | None = None
     uploaded_by: str
     created_at: UtcDatetime
 
@@ -95,3 +99,65 @@ class UploadPreviewResponse(BaseModel):
     rows: list[list[object]]
     total_row_count: int | None
     truncated: bool
+
+
+class PeriodUploadSummary(BaseModel):
+    """Envio vigente de um mês, como aparece na grade de competências (sem detalhes internos).
+
+    Attributes:
+        id: Identificador do envio.
+        filename: Nome original do arquivo.
+        uploaded_by: Quem enviou.
+        created_at: Data/hora do envio.
+        row_count: Quantidade de linhas.
+        load_status: Situação da carga no banco (`None` = não se aplica).
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    filename: str
+    uploaded_by: str
+    created_at: UtcDatetime
+    row_count: int | None
+    load_status: LoadStatus | None = None
+
+
+class PeriodMonthResponse(BaseModel):
+    """Um mês da grade de competências.
+
+    Attributes:
+        period: Mês (`AAAA-MM`).
+        state: `sent`, `missing`, `future` ou `not_expected` (ver `MonthStatus`).
+        uploads: Envio(s) vigente(s) do mês.
+        version_count: Total de envios do mês, contando os substituídos.
+    """
+
+    period: str
+    state: str
+    uploads: list[PeriodUploadSummary]
+    version_count: int
+
+
+class PeriodGridResponse(BaseModel):
+    """Grade de 12 meses de um contexto mensal: o que já foi enviado e o que falta.
+
+    Attributes:
+        context_name: Nome do contexto.
+        year: Ano da grade.
+        current_period: Mês corrente (`AAAA-MM`, horário de Brasília).
+        start_period: Primeiro mês esperado do contexto.
+        period_source: De onde vem o mês (`column` ou `selector`).
+        period_column: Coluna de data, quando o mês sai do arquivo.
+        duplicate_policy: O que acontece ao reenviar um mês.
+        months: Os 12 meses do ano, de janeiro a dezembro.
+    """
+
+    context_name: str
+    year: int
+    current_period: str
+    start_period: str
+    period_source: PeriodSource
+    period_column: str | None
+    duplicate_policy: DuplicatePolicy
+    months: list[PeriodMonthResponse]

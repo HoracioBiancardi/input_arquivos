@@ -1,6 +1,6 @@
 """Orquestração do pipeline de ingestão: detecta o tipo de arquivo, lê, transforma e gera o artefato final."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -23,6 +23,7 @@ from input_arquivos.backend.ingestion.readers import (
 )
 from input_arquivos.backend.models.context import Context, ImageMode, PdfMode
 from input_arquivos.backend.services.column_check import ColumnTypeCaster, text_rule_columns
+from input_arquivos.backend.services.period import with_period_column
 
 
 @dataclass
@@ -146,6 +147,29 @@ class IngestionPipeline:
             page_count=page_count,
             suggested_filename=f"{Path(filename).stem}.parquet",
         )
+
+    def with_period(self, artifact: IngestResult, context: Context, period: str) -> IngestResult:
+        """Acrescenta a coluna `competencia_envio` ao artefato e refaz o Parquet.
+
+        O mês só é conhecido depois da leitura (quando sai de uma coluna do
+        arquivo), por isso entra num segundo passo em vez de em `process`.
+
+        Args:
+            artifact: Artefato produzido por `process`.
+            context: Contexto do envio (regras de tipo aplicadas ao Parquet).
+            period: Mês de competência (`AAAA-MM`).
+
+        Returns:
+            O artefato com a coluna nova, ou o mesmo artefato se ele não tem tabela.
+
+        Raises:
+            PeriodError: Se o arquivo já tiver uma coluna `competencia_envio`.
+        """
+        if artifact.dataframe is None:
+            return artifact
+        dataframe = with_period_column(artifact.dataframe, period)
+        parquet_bytes = self._parquet_converter.to_bytes(self._column_caster.cast(context, dataframe))
+        return replace(artifact, artifact_bytes=parquet_bytes, dataframe=dataframe)
 
     def _read(self, file_bytes: bytes, filename: str, file_type: FileType, context: Context) -> pd.DataFrame:
         """Despacha a leitura do arquivo para o leitor apropriado, conforme o tipo e o contexto.

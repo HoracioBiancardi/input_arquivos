@@ -46,6 +46,28 @@ table tbody tr:hover .sticky-action { background: var(--surface-hover); }
 .drop-zone:hover, .drop-zone.dragover { border-color: var(--primary); background: var(--primary-dim); }
 .drop-zone > .ms { font-size: 32px; color: var(--primary); margin-bottom: .4rem; }
 
+/* Grade de competências (contexto mensal) na tela de envio */
+.period-panel { display: flex; flex-direction: column; gap: .6rem; padding: .75rem; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-alt); }
+.period-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.period-head h4 { margin: 0; font-size: .875rem; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: .4rem; }
+.period-head h4 .ms { font-size: 18px; color: var(--primary); }
+.period-year-nav { display: flex; align-items: center; gap: .25rem; font-weight: 600; font-size: .875rem; }
+.period-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .4rem; }
+.period-cell { display: flex; flex-direction: column; align-items: flex-start; gap: .1rem; min-width: 0; padding: .4rem .5rem;
+  border: 1px solid var(--border); border-left-width: 4px; border-radius: var(--r-sm); background: var(--surface);
+  color: var(--text); font: inherit; font-size: .75rem; line-height: 1.2; text-align: left; }
+.period-cell strong { font-size: .8125rem; text-transform: capitalize; }
+.period-cell span { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.period-cell--sent { border-left-color: var(--success); }
+.period-cell--missing { border-left-color: var(--danger); }
+.period-cell--missing span { color: var(--danger); font-weight: 600; }
+.period-cell--future, .period-cell--not_expected { border-left-color: var(--border); }
+.period-cell--future strong, .period-cell--not_expected strong { color: var(--text-muted); }
+button.period-cell { cursor: pointer; transition: background var(--t), border-color var(--t); }
+button.period-cell:hover { background: var(--surface-hover); }
+.period-cell.is-selected { outline: 2px solid var(--primary); outline-offset: 1px; }
+@media (max-width: 767px) { .period-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
 @media (max-width: 767px) {
   .responsive-table thead { display: none; }
   .responsive-table, .responsive-table tbody, .responsive-table tr { display: block; width: 100%; }
