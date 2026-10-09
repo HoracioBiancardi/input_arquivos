@@ -3,6 +3,155 @@ const DESTINATION_ICONS = { minio: "cloud_upload", local: "folder" };
 
 let contextsByName = {};
 
+// ── Competência (contexto mensal) ──
+const MONTH_NAMES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+const PERIOD_STATE_TEXT = { missing: "falta", future: "—", not_expected: "—" };
+const BR_DAY_MONTH = new Intl.DateTimeFormat("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit" });
+const periodPanel = document.getElementById("period-panel");
+const periodSelectField = document.getElementById("period-select-field");
+const periodSelect = document.getElementById("period-select");
+let periodYear = new Date().getFullYear();
+// Mês já escolhido pelo usuário (no seletor ou clicando na grade): a grade não o troca ao recarregar.
+let periodChosen = false;
+
+function periodLabel(period) {
+  const [year, month] = period.split("-");
+  return `${MONTH_NAMES[Number(month) - 1]}/${year}`;
+}
+
+function isMonthly(context) {
+  return context?.period_mode === "monthly";
+}
+
+function usesPeriodSelector(context) {
+  return isMonthly(context) && context.period_source === "selector";
+}
+
+// Opções do seletor: 2 anos para trás e 1 para frente; um mês fora disso (clicado na grade) é acrescentado.
+function fillPeriodSelect() {
+  const today = new Date();
+  const options = [];
+  for (let offset = -24; offset <= 12; offset += 1) {
+    const date = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    options.push(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
+  }
+  periodSelect.replaceChildren(
+    ...options.reverse().map((period) => {
+      const option = document.createElement("option");
+      option.value = period;
+      option.textContent = periodLabel(period);
+      return option;
+    })
+  );
+  periodSelect.value = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function selectPeriod(period) {
+  if (![...periodSelect.options].some((option) => option.value === period)) {
+    const option = document.createElement("option");
+    option.value = period;
+    option.textContent = periodLabel(period);
+    periodSelect.prepend(option);
+  }
+  periodSelect.value = period;
+  markSelectedCell();
+}
+
+function markSelectedCell() {
+  document.querySelectorAll("#period-grid .period-cell").forEach((cell) => {
+    cell.classList.toggle("is-selected", usesPeriodSelector(contextsByName[contextSelect.value]) && cell.dataset.period === periodSelect.value);
+  });
+}
+
+function periodCellTitle(month) {
+  if (month.state !== "sent") {
+    return `${periodLabel(month.period)}: ${month.state === "missing" ? "ainda não enviado" : "não esperado"}`;
+  }
+  const lines = month.uploads.map(
+    (upload) => `Enviado por ${upload.uploaded_by} em ${formatDateTimeBR(upload.created_at)} (${upload.row_count ?? 0} linha(s), arquivo ${upload.filename})`
+  );
+  if (month.version_count > month.uploads.length) {
+    lines.push(`${month.version_count - month.uploads.length} versão(ões) anterior(es) substituída(s)`);
+  }
+  return `${periodLabel(month.period)}\n${lines.join("\n")}`;
+}
+
+// Células criadas como elementos (nome de usuário e de arquivo são texto de usuário).
+function periodCell(month, clickable) {
+  const cell = document.createElement(clickable ? "button" : "div");
+  if (clickable) cell.type = "button";
+  cell.className = `period-cell period-cell--${month.state}`;
+  cell.dataset.period = month.period;
+  cell.title = periodCellTitle(month);
+  const name = document.createElement("strong");
+  name.textContent = MONTH_NAMES[Number(month.period.slice(5)) - 1].slice(0, 3);
+  const detail = document.createElement("span");
+  if (month.state === "sent") {
+    const [first] = month.uploads;
+    detail.textContent = month.uploads.length > 1
+      ? `${month.uploads.length} envios`
+      : `${first.uploaded_by} · ${BR_DAY_MONTH.format(new Date(first.created_at))}`;
+  } else {
+    detail.textContent = PERIOD_STATE_TEXT[month.state] || "";
+  }
+  cell.append(name, detail);
+  if (clickable) {
+    cell.addEventListener("click", () => {
+      periodChosen = true;
+      selectPeriod(month.period);
+    });
+  }
+  return cell;
+}
+
+function periodSummary(grid) {
+  const missing = grid.months.filter((month) => month.state === "missing").map((month) => month.period);
+  const parts = [];
+  if (grid.year <= Number(grid.current_period.slice(0, 4))) {
+    parts.push(
+      missing.length
+        ? `Faltam ${missing.length} mês(es) em ${grid.year}: ${missing.map((period) => MONTH_NAMES[Number(period.slice(5)) - 1]).join(", ")}.`
+        : `Nenhum mês pendente em ${grid.year}.`
+    );
+  }
+  if (grid.period_source === "column") {
+    parts.push(`O mês de cada arquivo sai da coluna "${grid.period_column}".`);
+  }
+  if (grid.duplicate_policy === "replace") {
+    parts.push("Reenviar um mês substitui o anterior, com confirmação.");
+  } else if (grid.duplicate_policy === "block") {
+    parts.push("Um mês já enviado não aceita outro arquivo.");
+  }
+  return parts.join(" ");
+}
+
+async function loadPeriodGrid() {
+  const context = contextsByName[contextSelect.value];
+  if (!isMonthly(context)) return;
+  const contextName = context.name;
+  document.getElementById("period-year").textContent = periodYear;
+  try {
+    const params = new URLSearchParams({ context_name: contextName, year: periodYear });
+    const grid = await apiFetch(`/api/uploads/periods?${params}`);
+    if (contextSelect.value !== contextName) return;  // trocou de contexto enquanto carregava
+    const clickable = usesPeriodSelector(context);
+    document.getElementById("period-grid").replaceChildren(...grid.months.map((month) => periodCell(month, clickable)));
+    document.getElementById("period-summary").textContent = periodSummary(grid);
+    if (clickable && !periodChosen && grid.year === Number(grid.current_period.slice(0, 4))) {
+      const firstMissing = grid.months.find((month) => month.state === "missing");
+      selectPeriod(firstMissing ? firstMissing.period : grid.current_period);
+    }
+    markSelectedCell();
+  } catch (err) {
+    document.getElementById("period-summary").textContent = `Não foi possível carregar os meses: ${err.message}`;
+  }
+}
+
+function changePeriodYear(delta) {
+  periodYear += delta;
+  loadPeriodGrid();
+}
+
 const contextSelect = document.getElementById("context-select");
 const destinationIcon = document.getElementById("destination-icon");
 const destinationLabel = document.getElementById("destination-label");
@@ -56,6 +205,14 @@ function initDragAndDrop() {
 
 function handleContextChange() {
   const context = contextsByName[contextSelect.value];
+  periodPanel.classList.toggle("hidden", !isMonthly(context));
+  periodSelectField.classList.toggle("hidden", !usesPeriodSelector(context));
+  periodYear = new Date().getFullYear();
+  periodChosen = false;
+  if (isMonthly(context)) {
+    document.getElementById("period-grid").replaceChildren();
+    loadPeriodGrid();
+  }
   if (!context) {
     destinationIcon.textContent = "folder_off";
     destinationLabel.textContent = "Escolha um contexto para ver o destino.";
@@ -120,7 +277,18 @@ const LOAD_STATUS_BADGES = {
   pending: ["status-badge--muted", "Banco: pendente"],
   success: ["status-badge--success", "Banco: carregado"],
   error: ["status-badge--error", "Banco: erro"],
+  superseded: ["status-badge--muted", "Banco: substituído"],
 };
+
+// Envio trocado por outro do mesmo mês: continua no histórico, mas não vale mais.
+function supersededBadge(item) {
+  return item.superseded_by ? '<span class="status-badge status-badge--muted" title="Outro envio do mesmo mês entrou no lugar deste.">Substituído</span>' : "";
+}
+
+function contextCell(item) {
+  const period = item.period ? `<div class="text-xs text-muted">${esc(periodLabel(item.period))}</div>` : "";
+  return `${esc(item.context_name)}${period}`;
+}
 
 // Situação da carga no banco, abaixo do status do envio (só para contextos que carregam no banco).
 function loadStatusLine(item) {
@@ -217,9 +385,9 @@ async function loadHistory() {
         (item) => `
         <tr>
           <td data-label="Arquivo" class="px-4 py-2 font-semibold" style="overflow-wrap: anywhere; min-width: 10rem">${esc(item.filename)}</td>
-          <td data-label="Contexto" class="px-4 py-2">${esc(item.context_name)}</td>
+          <td data-label="Contexto" class="px-4 py-2">${contextCell(item)}</td>
           <td data-label="Destino" class="px-4 py-2 hidden lg:table-cell" style="overflow-wrap: anywhere">${destinationCell(item.destination_detail)}</td>
-          <td data-label="Status" class="px-4 py-2"><div class="status-stack">${statusBadge(item.status)}${loadStatusLine(item)}</div></td>
+          <td data-label="Status" class="px-4 py-2"><div class="status-stack">${statusBadge(item.status)}${supersededBadge(item)}${loadStatusLine(item)}</div></td>
           <td data-label="Enviado por" class="px-4 py-2 hidden lg:table-cell">${esc(item.uploaded_by)}</td>
           <td data-label="Data" class="px-4 py-2 whitespace-nowrap">${formatDateTimeBR(item.created_at)}</td>
           <td data-label="" class="px-4 py-2 text-right whitespace-nowrap sticky-action">${viewTableAction(item)}</td>
@@ -244,10 +412,16 @@ async function handleSubmit(event) {
     showToast("Selecione um contexto e um arquivo antes de enviar.", "warning");
     return;
   }
+  const context = contextsByName[contextName];
+  if (usesPeriodSelector(context) && !periodSelect.value) {
+    showToast("Escolha o mês de competência do arquivo.", "warning");
+    return;
+  }
   const buildFormData = (extra) => {
     const formData = new FormData();
     formData.append("file", file);
     formData.append("context_name", contextName);
+    if (usesPeriodSelector(context)) formData.append("period", periodSelect.value);
     Object.entries(extra || {}).forEach(([key, value]) => formData.append(key, value));
     return formData;
   };
@@ -258,45 +432,81 @@ async function handleSubmit(event) {
   if (submitButtonLabel) submitButtonLabel.textContent = "Enviando e validando dados...";
 
   try {
+    // Cada confirmação (colunas diferentes, mês já enviado) reenvia o arquivo com a flag correspondente.
+    const flags = {};
     let result;
-    try {
-      result = await submitUpload(buildFormData());
-    } catch (error) {
-      if (error.status === 422 && error.data?.detail?.violations) {
-        showViolationModal(file.name, error.data.detail.violations);
-        fileInput.value = "";
-        await loadHistory();
-        return;
-      }
-      if (error.status === 409 && error.data?.detail) {
-        const mismatch = error.data.detail;
-        const confirmed = await confirmModal({
-          title: "Colunas diferentes do último envio",
-          body: `
-            <p>Este arquivo tem colunas diferentes das do último arquivo aceito para este contexto.</p>
-            ${mismatch.extra_columns?.length ? `<p class="mt-2">Novas: ${mismatch.extra_columns.map(esc).join(", ")}</p>` : ""}
-            ${mismatch.missing_columns?.length ? `<p>Faltando: ${mismatch.missing_columns.map(esc).join(", ")}</p>` : ""}
-            <p class="mt-2">Deseja enviar mesmo assim?</p>
-          `,
-          confirmLabel: "Enviar mesmo assim",
-          cancelLabel: "Cancelar",
-          variant: "warning",
-        });
-        result = await submitUpload(buildFormData(confirmed ? { confirm_mismatch: "true" } : { cancelled: "true" }));
-        if (!confirmed) {
-          showToast("Envio cancelado.", "warning");
+    while (!result) {
+      try {
+        result = await submitUpload(buildFormData(flags));
+      } catch (error) {
+        const detail = error.data?.detail;
+        if (error.status === 422 && detail?.violations) {
+          showViolationModal(file.name, detail.violations);
           fileInput.value = "";
           await loadHistory();
           return;
         }
-      } else {
+        if (error.status === 422 && detail?.kind === "period_error") {
+          alertModal({ title: "Mês de competência", body: `<p>${esc(detail.message)}</p>` });
+          await loadHistory();
+          return;
+        }
+        if (error.status === 409 && detail?.kind === "period_blocked") {
+          alertModal({ title: "Mês já enviado", body: `<p>${esc(detail.message)}</p>` });
+          await loadHistory();
+          return;
+        }
+        if (error.status === 409 && detail?.kind === "period_exists") {
+          const confirmed = await confirmModal({
+            title: `Substituir ${detail.period_label}?`,
+            body: `
+              <p><strong>${esc(detail.period_label)}</strong> já foi enviado por <strong>${esc(detail.uploaded_by)}</strong>
+              em ${formatDateTimeBR(detail.created_at)} (${detail.row_count ?? 0} linha(s)).</p>
+              <p class="mt-2">Se continuar, as linhas desse mês serão trocadas pelas deste arquivo. O envio anterior fica no histórico.</p>
+            `,
+            confirmLabel: "Substituir",
+            cancelLabel: "Cancelar",
+            variant: "warning",
+          });
+          if (!confirmed) {
+            showToast("Envio cancelado.", "warning");
+            return;
+          }
+          flags.confirm_replace_period = "true";
+          continue;
+        }
+        if (error.status === 409 && detail) {
+          const mismatch = detail;
+          const confirmed = await confirmModal({
+            title: "Colunas diferentes do último envio",
+            body: `
+              <p>Este arquivo tem colunas diferentes das do último arquivo aceito para este contexto.</p>
+              ${mismatch.extra_columns?.length ? `<p class="mt-2">Novas: ${mismatch.extra_columns.map(esc).join(", ")}</p>` : ""}
+              ${mismatch.missing_columns?.length ? `<p>Faltando: ${mismatch.missing_columns.map(esc).join(", ")}</p>` : ""}
+              <p class="mt-2">Deseja enviar mesmo assim?</p>
+            `,
+            confirmLabel: "Enviar mesmo assim",
+            cancelLabel: "Cancelar",
+            variant: "warning",
+          });
+          if (!confirmed) {
+            await submitUpload(buildFormData({ cancelled: "true" }));
+            showToast("Envio cancelado.", "warning");
+            fileInput.value = "";
+            await loadHistory();
+            return;
+          }
+          flags.confirm_mismatch = "true";
+          continue;
+        }
         throw error;
       }
     }
 
     const viewLastUploadLink = document.getElementById("view-last-upload-link");
     if (result && result.status === "success") {
-      showToast(`Arquivo enviado com sucesso para ${result.destination_detail || "destino"}.`, "positive");
+      const periodText = result.period ? ` (${periodLabel(result.period)})` : "";
+      showToast(`Arquivo enviado com sucesso para ${result.destination_detail || "destino"}${periodText}.`, "positive");
       if (result.artifact_kind === "parquet" && viewLastUploadLink) {
         viewLastUploadLink.href = `/uploads/${result.id}/preview`;
         viewLastUploadLink.classList.remove("hidden");
@@ -306,7 +516,8 @@ async function handleSubmit(event) {
     }
     fileInput.value = "";
     document.getElementById("selected-file-badge")?.classList.add("hidden");
-    await loadHistory();
+    periodChosen = false;
+    await Promise.all([loadHistory(), loadPeriodGrid()]);
   } catch (error) {
     showToast(`Falha ao processar o arquivo: ${error.message || error}`, "negative");
   } finally {
@@ -318,6 +529,13 @@ async function handleSubmit(event) {
 document.addEventListener("DOMContentLoaded", async () => {
   fileInput?.addEventListener("change", () => onFileSelected(fileInput));
   initDragAndDrop();
+  fillPeriodSelect();
+  periodSelect.addEventListener("change", () => {
+    periodChosen = true;
+    markSelectedCell();
+  });
+  document.getElementById("period-prev").addEventListener("click", () => changePeriodYear(-1));
+  document.getElementById("period-next").addEventListener("click", () => changePeriodYear(1));
   await loadContexts();
   await loadHistory();
   contextSelect?.addEventListener("change", handleContextChange);

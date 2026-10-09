@@ -7,14 +7,16 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import pandas as pd
-from sqlalchemy import MetaData, Table, create_engine, delete, inspect, text
+from sqlalchemy import Column, MetaData, Table, create_engine, delete, exists, inspect, or_, select, text
 from sqlalchemy.dialects import mssql
 from sqlalchemy.engine import URL, Connection, Engine, make_url
 from sqlalchemy.pool import NullPool
 from sqlalchemy.types import BigInteger, Boolean, Date, DateTime, Float, TypeEngine, UnicodeText
 
 from input_arquivos.backend.destinations.key_builder import slugify
-from input_arquivos.backend.models.context import Context, LoadMode
+from input_arquivos.backend.models.context import Context, DuplicatePolicy, LoadMode
+from input_arquivos.backend.services.column_check import PERIOD_COLUMN
+from input_arquivos.backend.services.period import period_to_date
 
 UPLOAD_ID_COLUMN = "id_envio"
 # Tempo máximo (s) para abrir a conexão com o SQL Server — o padrão do pymssql (60s)
@@ -58,10 +60,13 @@ class LoadResult:
     Attributes:
         table: Tabela de destino, como `schema.tabela` (ou só `tabela`, no schema padrão).
         row_count: Quantidade de linhas inseridas.
+        skipped: `True` quando nada foi carregado porque um envio mais novo do
+            mesmo mês já está na tabela (ver `DatabaseLoader.load`).
     """
 
     table: str
     row_count: int
+    skipped: bool = False
 
 
 def target_table_name(context: Context) -> str:
@@ -158,6 +163,11 @@ class DatabaseLoader:
     REPLACE, todo o conteúdo da tabela é apagado antes (via `DELETE`, não
     `DROP`: permissões e índices criados na tabela pelo time de banco são
     preservados).
+
+    Num context mensal (`period` informado), cada linha também ganha
+    `competencia_envio` (dia 1 do mês) e a carga substitui as linhas daquele
+    mês, de qualquer envio — salvo com a política "permitir", que acumula
+    como o APPEND.
     """
 
     def __init__(self, url_provider: Callable[[], URL | str | None]) -> None:
@@ -212,16 +222,23 @@ class DatabaseLoader:
         if connection.dialect.name == "mssql":
             connection.execute(_CREATE_SCHEMA_IF_MISSING, {"schema": schema})
 
-    def load(self, parquet_bytes: bytes, context: Context, upload_id: int) -> LoadResult:
+    def load(self, parquet_bytes: bytes, context: Context, upload_id: int, period: str | None = None) -> LoadResult:
         """Carrega o Parquet de um upload na tabela do contexto.
+
+        Com `period`, a tabela ganha a coluna `competencia_envio` se ainda não
+        tiver (tabelas criadas antes do controle por mês) e as linhas do mês
+        são substituídas. Se a tabela já tiver linhas desse mês vindas de um
+        envio mais novo (id maior), nada é carregado: duas cargas do mesmo mês
+        rodando fora de ordem não deixam a versão antiga por cima.
 
         Args:
             parquet_bytes: Conteúdo do Parquet gravado no MinIO/pasta local.
             context: Contexto do upload (tabela, schema e modo de carga).
             upload_id: Id do `UploadHistory`, gravado na coluna `id_envio`.
+            period: Mês de competência do envio (`AAAA-MM`), em contexts mensais.
 
         Returns:
-            Tabela de destino e quantidade de linhas inseridas.
+            Tabela de destino e quantidade de linhas inseridas (ou `skipped`).
 
         Raises:
             DatabaseNotConfiguredError: Se a conexão global não estiver configurada.
@@ -232,6 +249,10 @@ class DatabaseLoader:
 
         dataframe = pd.read_parquet(io.BytesIO(parquet_bytes))
         dataframe.insert(0, UPLOAD_ID_COLUMN, upload_id)
+        if period:
+            # O mês do histórico manda: o Parquet pode nem ter a coluna (envio de antes do campo).
+            dataframe = dataframe.drop(columns=[PERIOD_COLUMN], errors="ignore")
+            dataframe.insert(1, PERIOD_COLUMN, period_to_date(period))
         dataframe = self._normalize_columns(self._to_naive_utc(dataframe))
         table_name = target_table_name(context)
         schema = context.db_schema or None
@@ -243,13 +264,23 @@ class DatabaseLoader:
                     self._ensure_schema(connection, schema)
                 if inspect(connection).has_table(table_name, schema=schema):
                     table = Table(table_name, MetaData(), schema=schema, autoload_with=connection)
+                    if period and self._find_column(table, PERIOD_COLUMN) is None:
+                        self._add_period_column(connection, table)
+                        table = Table(table_name, MetaData(), schema=schema, autoload_with=connection)
                     self._check_columns(table, dataframe, describe_target_table(context))
-                    if (context.load_mode or LoadMode.APPEND) == LoadMode.REPLACE:
+                    upload_id_column = self._find_column(table, UPLOAD_ID_COLUMN)
+                    if period and (context.duplicate_policy or DuplicatePolicy.REPLACE) != DuplicatePolicy.ALLOW:
+                        period_column = self._find_column(table, PERIOD_COLUMN)
+                        same_period = period_column == period_to_date(period)
+                        newer = connection.execute(
+                            select(exists().where(same_period, upload_id_column > upload_id))
+                        ).scalar()
+                        if newer:
+                            return LoadResult(table=describe_target_table(context), row_count=0, skipped=True)
+                        connection.execute(delete(table).where(or_(same_period, upload_id_column == upload_id)))
+                    elif not period and (context.load_mode or LoadMode.APPEND) == LoadMode.REPLACE:
                         connection.execute(delete(table))
                     else:
-                        upload_id_column = next(
-                            column for column in table.columns if column.name.casefold() == UPLOAD_ID_COLUMN
-                        )
                         connection.execute(delete(table).where(upload_id_column == upload_id))
                 dataframe.to_sql(
                     table_name,
@@ -264,6 +295,24 @@ class DatabaseLoader:
             engine.dispose()
 
         return LoadResult(table=describe_target_table(context), row_count=len(dataframe))
+
+    @staticmethod
+    def _find_column(table: Table, name: str) -> Column | None:
+        """Busca uma coluna da tabela pelo nome, sem diferenciar maiúsculas (como o SQL Server)."""
+        return next((column for column in table.columns if column.name.casefold() == name), None)
+
+    def _add_period_column(self, connection: Connection, table: Table) -> None:
+        """Acrescenta `competencia_envio` (DATE, anulável) a uma tabela criada antes do controle por mês.
+
+        É coluna do sistema, como `id_envio`: as linhas antigas ficam com nulo
+        e nunca são apagadas pela substituição de um mês.
+        """
+        preparer = connection.dialect.identifier_preparer
+        column_type = _DATE_TYPE.compile(dialect=connection.dialect)
+        keyword = "ADD" if connection.dialect.name == "mssql" else "ADD COLUMN"
+        connection.execute(
+            text(f"ALTER TABLE {preparer.format_table(table)} {keyword} {preparer.quote(PERIOD_COLUMN)} {column_type} NULL")
+        )
 
     def _check_columns(self, table: Table, dataframe: pd.DataFrame, table_label: str) -> None:
         """Confere se a tabela existente comporta todas as colunas do arquivo.

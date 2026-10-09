@@ -41,6 +41,28 @@ class LoadMode(str, enum.Enum):
     REPLACE = "replace"
 
 
+class PeriodMode(str, enum.Enum):
+    """Se os envios de um contexto são controlados por mês de competência."""
+
+    NONE = "none"
+    MONTHLY = "monthly"
+
+
+class PeriodSource(str, enum.Enum):
+    """De onde vem o mês de competência de um envio, num contexto mensal."""
+
+    COLUMN = "column"
+    SELECTOR = "selector"
+
+
+class DuplicatePolicy(str, enum.Enum):
+    """O que fazer quando chega um envio de um mês que já tem envio vigente."""
+
+    REPLACE = "replace"
+    BLOCK = "block"
+    ALLOW = "allow"
+
+
 class ColumnRuleType(str, enum.Enum):
     """Tipo de dado esperado para uma coluna, usado em `Context.column_rules`."""
 
@@ -88,7 +110,18 @@ class Context(Base):
         load_mode: `APPEND` acumula as linhas de todos os uploads (cada linha
             leva `id_envio`, e recarregar um upload não duplica); `REPLACE`
             apaga todo o conteúdo da tabela antes de inserir o upload.
-            `None` equivale a `APPEND`.
+            `None` equivale a `APPEND`. Num contexto mensal não se aplica: a
+            carga substitui só as linhas do mês do envio.
+        period_mode: `MONTHLY` controla os envios por mês de competência (grade
+            de meses enviados/faltantes e substituição de mês repetido).
+            `None` equivale a `NONE`.
+        period_source: Num contexto mensal, se o mês sai de uma coluna de data
+            do arquivo (`COLUMN`) ou é informado pelo usuário no envio (`SELECTOR`).
+        period_column: Nome da coluna de data, quando `period_source` é `COLUMN`.
+        period_start: Primeiro mês esperado (`AAAA-MM`). Meses anteriores não
+            aparecem como "faltando" na grade. Vazio usa o mês de criação do contexto.
+        duplicate_policy: O que fazer quando o mês já tem envio: substituir
+            (com confirmação), bloquear ou permitir os dois. `None` equivale a `REPLACE`.
         active: Indica se o contexto aparece como opção na tela de upload.
         created_at: Data de criação do registro.
         updated_at: Data da última atualização do registro.
@@ -110,6 +143,13 @@ class Context(Base):
     db_schema: Mapped[str | None] = mapped_column(String(128), default=None)
     db_table: Mapped[str | None] = mapped_column(String(128), default=None)
     load_mode: Mapped[LoadMode | None] = mapped_column(SqlEnum(LoadMode), default=LoadMode.APPEND)
+    period_mode: Mapped[PeriodMode | None] = mapped_column(SqlEnum(PeriodMode), default=PeriodMode.NONE)
+    period_source: Mapped[PeriodSource | None] = mapped_column(SqlEnum(PeriodSource), default=None)
+    period_column: Mapped[str | None] = mapped_column(String(255), default=None)
+    period_start: Mapped[str | None] = mapped_column(String(7), default=None)
+    duplicate_policy: Mapped[DuplicatePolicy | None] = mapped_column(
+        SqlEnum(DuplicatePolicy), default=DuplicatePolicy.REPLACE
+    )
     active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(

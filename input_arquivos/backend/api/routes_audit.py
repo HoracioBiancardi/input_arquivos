@@ -19,6 +19,7 @@ def list_audit_log(
     status: UploadStatus | None = None,
     start_date: date | None = None,
     end_date: date | None = None,
+    period: str | None = None,
     limit: int = 200,
 ) -> list[UploadHistoryResponse]:
     """Lista o audit log de uploads, com filtros opcionais.
@@ -28,6 +29,7 @@ def list_audit_log(
         status: Filtra por status (sucesso/erro).
         start_date: Data inicial (inclusive) do período.
         end_date: Data final (inclusive) do período.
+        period: Filtra pelo mês de competência (`AAAA-MM`).
         limit: Quantidade máxima de registros a retornar.
 
     Returns:
@@ -35,7 +37,7 @@ def list_audit_log(
     """
     upload_service = get_container().upload_service
     history = upload_service.list_filtered(
-        context_name=context_name, status=status, start_date=start_date, end_date=end_date, limit=limit
+        context_name=context_name, status=status, start_date=start_date, end_date=end_date, limit=limit, period=period
     )
     return [UploadHistoryResponse.model_validate(item) for item in history]
 
@@ -47,6 +49,7 @@ def reload_to_database(upload_id: int) -> UploadHistoryResponse:
     Usado para refazer uma carga que falhou (banco fora do ar, tabela sem uma
     coluna nova) ou que ficou pendente (servidor reiniciado no meio). No modo
     append, as linhas anteriores deste upload são substituídas — nunca duplicadas.
+    Um envio já substituído por outro do mesmo mês não volta para a tabela.
 
     Args:
         upload_id: Identificador do upload.
