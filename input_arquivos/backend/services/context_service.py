@@ -9,7 +9,16 @@ from sqlalchemy import select
 from input_arquivos.backend.db.session import DatabaseSessionFactory
 from input_arquivos.backend.destinations.minio_client import build_minio_client
 from input_arquivos.backend.loaders.database_loader import DatabaseLoader
-from input_arquivos.backend.models.context import Context, DestinationType, ImageMode, LoadMode, PdfMode
+from input_arquivos.backend.models.context import (
+    Context,
+    DestinationType,
+    DuplicatePolicy,
+    ImageMode,
+    LoadMode,
+    PdfMode,
+    PeriodMode,
+    PeriodSource,
+)
 
 
 class DuplicateNameError(ValueError):
@@ -112,6 +121,11 @@ class ContextService:
         db_schema: str | None = None,
         db_table: str | None = None,
         load_mode: LoadMode = LoadMode.APPEND,
+        period_mode: PeriodMode = PeriodMode.NONE,
+        period_source: PeriodSource | None = None,
+        period_column: str | None = None,
+        period_start: str | None = None,
+        duplicate_policy: DuplicatePolicy = DuplicatePolicy.REPLACE,
     ) -> Context:
         """Cria um novo context.
 
@@ -130,6 +144,11 @@ class ContextService:
             db_schema: Schema da tabela de destino (`None` = padrão da conexão).
             db_table: Tabela de destino (`None` = slug do nome do context).
             load_mode: Modo de carga na tabela (append ou replace).
+            period_mode: Se os envios são controlados por mês de competência.
+            period_source: De onde vem o mês (coluna do arquivo ou informado no envio).
+            period_column: Coluna de data do arquivo, quando o mês sai dela.
+            period_start: Primeiro mês esperado (`AAAA-MM`).
+            duplicate_policy: O que fazer com um envio de mês que já tem envio.
 
         Returns:
             O context recém-criado.
@@ -158,6 +177,11 @@ class ContextService:
             db_schema=db_schema,
             db_table=db_table,
             load_mode=load_mode,
+            period_mode=period_mode,
+            period_source=period_source,
+            period_column=period_column,
+            period_start=period_start,
+            duplicate_policy=duplicate_policy,
         )
         with self._session_factory.session() as db_session:
             db_session.add(context)

@@ -8,7 +8,7 @@ from input_arquivos.backend.auth.dependencies import require_admin, require_logi
 from input_arquivos.backend.auth.session import SessionUser
 from input_arquivos.backend.ingestion.file_types import FileTypeRegistry
 from input_arquivos.backend.loaders.database_loader import describe_target_table
-from input_arquivos.backend.models.context import Context, DestinationType
+from input_arquivos.backend.models.context import Context, DestinationType, PeriodMode
 from input_arquivos.backend.schemas.context import (
     AccessibleContextResponse,
     AccessibleContextsResponse,
@@ -19,6 +19,7 @@ from input_arquivos.backend.schemas.context import (
     ContextUpdateRequest,
     LocalConnectionTestRequest,
     MinioConnectionTestRequest,
+    PeriodFields,
 )
 from input_arquivos.backend.services.container import get_container
 from input_arquivos.backend.services.context_service import DatabaseSchemaError, DuplicateNameError, MinioBucketError
@@ -38,6 +39,11 @@ def _serialize_column_rules(rules: list[ColumnRule]) -> str | None:
     if not rules:
         return None
     return json.dumps([rule.model_dump(mode="json") for rule in rules])
+
+
+def _period_fields(payload: PeriodFields) -> dict[str, object]:
+    """Campos de mês de competência do payload, para repassar ao `ContextService`."""
+    return payload.model_dump(include=set(PeriodFields.model_fields))
 
 
 def _describe_destination(context: Context) -> str:
@@ -122,6 +128,8 @@ def list_accessible_contexts(user: SessionUser = Depends(require_login)) -> Acce
                 allowed_extensions=file_type_registry.extensions_for_types(
                     file_type_registry.deserialize(context.allowed_file_types)
                 ),
+                period_mode=context.period_mode or PeriodMode.NONE,
+                period_source=context.period_source if context.period_mode == PeriodMode.MONTHLY else None,
             )
             for context in contexts
         ],
@@ -176,6 +184,7 @@ def create_context(payload: ContextCreateRequest) -> ContextResponse:
             db_schema=payload.db_schema,
             db_table=payload.db_table,
             load_mode=payload.load_mode,
+            **_period_fields(payload),
         )
     except DuplicateNameError as error:
         raise HTTPException(
@@ -224,6 +233,7 @@ def update_context(context_id: int, payload: ContextUpdateRequest) -> ContextRes
             db_table=payload.db_table,
             load_mode=payload.load_mode,
             active=payload.active,
+            **_period_fields(payload),
         )
     except DuplicateNameError as error:
         raise HTTPException(

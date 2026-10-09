@@ -1,21 +1,40 @@
 """Rotas da API REST de upload: envio programático (headless) e o fluxo interativo da tela de upload."""
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, HTTPException, Query, UploadFile
 from fastapi.concurrency import run_in_threadpool
 
 from input_arquivos.backend.auth.dependencies import require_login
 from input_arquivos.backend.auth.session import SessionUser
 from input_arquivos.backend.config import get_settings
+from input_arquivos.backend.models.context import DuplicatePolicy, PeriodSource
 from input_arquivos.backend.models.upload_history import LoadStatus, UploadHistory
 from input_arquivos.backend.models.user import UserRole
-from input_arquivos.backend.schemas.upload import UploadHistoryResponse, UploadPreviewResponse
+from input_arquivos.backend.schemas.upload import (
+    PeriodGridResponse,
+    PeriodMonthResponse,
+    PeriodUploadSummary,
+    UploadHistoryResponse,
+    UploadPreviewResponse,
+)
 from input_arquivos.backend.services.container import ServiceContainer, get_container
 from input_arquivos.backend.services.preview_service import (
     PreviewNotAvailableError,
     UploadAccessDeniedError,
     UploadNotFoundError,
 )
-from input_arquivos.backend.services.upload_service import ContextNotFoundError
+from input_arquivos.backend.services.period import (
+    PeriodError,
+    build_year_grid,
+    current_period,
+    is_monthly,
+    period_label,
+    start_period,
+)
+from input_arquivos.backend.services.upload_service import (
+    ContextNotFoundError,
+    PeriodAlreadySentError,
+    describe_current_upload,
+)
 
 router = APIRouter(prefix="/api", tags=["upload"], dependencies=[Depends(require_login)])
 
@@ -102,6 +121,8 @@ def _reject_if_too_large(file: UploadFile) -> None:
 async def upload_file(
     file: UploadFile,
     context_name: str = Form(...),
+    period: str | None = Form(default=None),
+    replace_period: bool = Form(default=False),
     user: SessionUser = Depends(require_login),
 ) -> UploadHistoryResponse:
     """Processa um arquivo enviado via API, usando o mesmo pipeline da tela de upload.
@@ -109,10 +130,14 @@ async def upload_file(
     Não pede confirmação em caso de divergência de colunas: usado para envio
     programático, onde não há um humano para decidir. A carga no banco (se o
     context pedir) roda antes da resposta, que já traz o `load_status` final.
+    Num context mensal que substitui meses repetidos, reenviar um mês exige
+    `replace_period=true` — sem ele, a resposta é 409 e nada é gravado.
 
     Args:
         file: Arquivo enviado (Excel, CSV ou PDF).
         context_name: Nome do context de destino.
+        period: Mês de competência (`AAAA-MM`), quando o context pede o mês no envio.
+        replace_period: Confirma a substituição de um mês que já tem envio.
         user: Usuário autenticado na sessão atual — `uploaded_by` é sempre o
             username da sessão, nunca um valor enviado pelo cliente (evita
             que um upload seja atribuído a outra pessoa no audit log).
@@ -122,7 +147,8 @@ async def upload_file(
 
     Raises:
         HTTPException: 404 se o context informado não existir, estiver
-            inativo ou não estiver liberado para o usuário; 413 se o arquivo
+            inativo ou não estiver liberado para o usuário; 409 se o mês já
+            tiver envio e `replace_period` não foi enviado; 413 se o arquivo
             exceder o tamanho máximo permitido.
     """
     _reject_if_too_large(file)
@@ -137,10 +163,27 @@ async def upload_file(
             filename=file.filename or "arquivo_sem_nome",
             context_name=context_name,
             uploaded_by=user.username,
+            period=period,
+            replace_period=replace_period,
         )
     except ContextNotFoundError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+    except PeriodAlreadySentError as error:
+        raise HTTPException(status_code=409, detail=_period_exists_detail(error.current)) from error
     return _response_for(history, user)
+
+
+def _period_exists_detail(current: UploadHistory) -> dict[str, object]:
+    """Corpo do 409 de mês já enviado: quem enviou e quando, para a tela pedir confirmação."""
+    return {
+        "kind": "period_exists",
+        "message": f"{describe_current_upload(current)}. Deseja substituir?",
+        "period": current.period,
+        "period_label": period_label(current.period),
+        "uploaded_by": current.uploaded_by,
+        "created_at": UploadHistoryResponse.model_validate(current).created_at.isoformat(),
+        "row_count": current.row_count,
+    }
 
 
 @router.post("/uploads", response_model=UploadHistoryResponse)
@@ -150,6 +193,8 @@ async def upload_interactive(
     context_name: str = Form(...),
     confirm_mismatch: bool = Form(default=False),
     cancelled: bool = Form(default=False),
+    period: str | None = Form(default=None),
+    confirm_replace_period: bool = Form(default=False),
     user: SessionUser = Depends(require_login),
 ) -> UploadHistoryResponse:
     """Processa um arquivo enviado pela tela de upload, com confirmação de divergência de colunas.
@@ -161,6 +206,11 @@ async def upload_interactive(
     ou com `cancelled=true` (usuário cancelou, registra o cancelamento como
     erro no audit log).
 
+    Num context mensal, o mês sai da coluna de data do arquivo ou do campo
+    `period`. Se o mês já tiver envio vigente, a requisição falha com 409
+    (`kind=period_exists`) até ser reenviada com `confirm_replace_period=true`;
+    com a política "bloquear", o envio é recusado (`kind=period_blocked`).
+
     Se o context carrega no banco, a carga roda em background depois da
     resposta (o registro volta com `load_status=pending`), para a tela não
     ficar presa esperando o banco.
@@ -171,6 +221,8 @@ async def upload_interactive(
         context_name: Nome do context de destino.
         confirm_mismatch: Se o usuário já confirmou o envio apesar da divergência de colunas.
         cancelled: Se o usuário cancelou o envio após ver a divergência de colunas.
+        period: Mês de competência (`AAAA-MM`), quando o context pede o mês no envio.
+        confirm_replace_period: Se o usuário confirmou substituir o mês que já tem envio.
         user: Usuário autenticado na sessão atual.
 
     Returns:
@@ -182,8 +234,9 @@ async def upload_interactive(
             algum dado violar uma regra de validação de `column_rules`
             (inclui coluna obrigatória ausente — nesse caso, também é
             registrado um `UploadHistory` de erro antes de levantar a
-            exceção); ou 409 se houver divergência de colunas ainda não
-            confirmada pelo usuário.
+            exceção) ou se o mês de competência não puder ser determinado;
+            ou 409 se houver divergência de colunas ou mês repetido ainda não
+            confirmados pelo usuário, ou mês repetido num context que bloqueia.
     """
     _reject_if_too_large(file)
     container = get_container()
@@ -240,24 +293,98 @@ async def upload_interactive(
             },
         )
 
+    try:
+        artifact, resolved_period = await run_in_threadpool(
+            container.upload_service.apply_period, context, artifact, period
+        )
+    except PeriodError as error:
+        container.upload_service.record_error(context, filename, username, str(error))
+        raise HTTPException(status_code=422, detail={"kind": "period_error", "message": str(error)}) from error
+
     if not confirm_mismatch:
         mismatch = container.upload_service.check_column_mismatch(context, artifact)
         if mismatch is not None:
             raise HTTPException(
                 status_code=409,
                 detail={
+                    "kind": "column_mismatch",
                     "message": "Este arquivo tem colunas diferentes das do último arquivo aceito para este contexto.",
                     "missing_columns": mismatch.missing_columns,
                     "extra_columns": mismatch.extra_columns,
                 },
             )
 
-    history = await run_in_threadpool(container.upload_service.finalize, artifact, context, filename, username)
+    current = container.upload_service.find_current_upload(context, resolved_period)
+    if current is not None:
+        if context.duplicate_policy == DuplicatePolicy.BLOCK:
+            message = container.upload_service.describe_blocked_period(current)
+            container.upload_service.record_error(context, filename, username, message)
+            raise HTTPException(status_code=409, detail={"kind": "period_blocked", "message": message})
+        if not confirm_replace_period:
+            raise HTTPException(status_code=409, detail=_period_exists_detail(current))
+
+    history = await run_in_threadpool(
+        container.upload_service.finalize, artifact, context, filename, username, resolved_period
+    )
     if history.status.value == "success":
         container.user_service.set_last_context(user.user_id, context.name)
     if history.load_status == LoadStatus.PENDING:
         background_tasks.add_task(container.upload_service.run_database_load, history.id, artifact.artifact_bytes)
     return _response_for(history, user)
+
+
+@router.get("/uploads/periods", response_model=PeriodGridResponse)
+def get_period_grid(
+    context_name: str,
+    year: int = Query(ge=2000, le=2100),
+    user: SessionUser = Depends(require_login),
+) -> PeriodGridResponse:
+    """Grade de 12 meses de um context mensal: quais competências já foram enviadas, por quem, e quais faltam.
+
+    Vale para qualquer usuário com acesso ao context, não só para quem enviou:
+    a ideia é a equipe ver o que outra pessoa já carregou.
+
+    Args:
+        context_name: Nome do context.
+        year: Ano da grade.
+        user: Usuário autenticado na sessão atual.
+
+    Returns:
+        Os 12 meses do ano com o envio vigente de cada um.
+
+    Raises:
+        HTTPException: 404 se o context não existir, estiver inativo ou não
+            estiver liberado para o usuário; 400 se o context não for mensal.
+    """
+    container = get_container()
+    _require_context_access(container, user, context_name)
+    try:
+        context = container.upload_service.resolve_context(context_name)
+    except ContextNotFoundError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    if not is_monthly(context):
+        raise HTTPException(status_code=400, detail=f"O contexto '{context_name}' não controla envios por mês.")
+
+    uploads = container.upload_service.list_period_uploads(context.name, year)
+    months = build_year_grid(context, uploads, year, current_period())
+    return PeriodGridResponse(
+        context_name=context.name,
+        year=year,
+        current_period=current_period(),
+        start_period=start_period(context),
+        period_source=context.period_source or PeriodSource.SELECTOR,
+        period_column=context.period_column,
+        duplicate_policy=context.duplicate_policy or DuplicatePolicy.REPLACE,
+        months=[
+            PeriodMonthResponse(
+                period=month.period,
+                state=month.state,
+                uploads=[PeriodUploadSummary.model_validate(upload) for upload in month.current],
+                version_count=month.version_count,
+            )
+            for month in months
+        ],
+    )
 
 
 @router.get("/uploads/recent", response_model=list[UploadHistoryResponse])

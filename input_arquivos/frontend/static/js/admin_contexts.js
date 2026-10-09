@@ -108,6 +108,12 @@ const LOAD_MODE_HELP = {
   replace: "Cada envio apaga todo o conteúdo da tabela antes de inserir as suas linhas — a tabela sempre reflete o último arquivo enviado.",
 };
 
+const DUPLICATE_POLICY_HELP = {
+  replace: "Quem reenviar um mês vê quem enviou antes e confirma. Só as linhas daquele mês são trocadas; a versão anterior fica no histórico.",
+  block: "Um mês já enviado não aceita outro arquivo. Para corrigir, mude temporariamente para \"Substituir\" e reenvie.",
+  allow: "Cada envio do mês soma suas linhas às anteriores (ex.: um arquivo por filial). Reenviar o mesmo arquivo duplica.",
+};
+
 const modal = document.getElementById("context-modal");
 const form = document.getElementById("context-form");
 const destinationSelect = document.getElementById("context-destination");
@@ -115,6 +121,9 @@ const pdfModeSelect = document.getElementById("context-pdf-mode");
 const imageModeSelect = document.getElementById("context-image-mode");
 const loadToDatabaseCheckbox = document.getElementById("context-load-to-database");
 const loadModeSelect = document.getElementById("context-load-mode");
+const periodMonthlyCheckbox = document.getElementById("context-period-monthly");
+const periodSourceSelect = document.getElementById("context-period_source");
+const duplicatePolicySelect = document.getElementById("context-duplicate_policy");
 
 // `column_rules` não é editado neste modal (ver rules-modal), mas o PUT de
 // context é um replace completo — guardamos o valor buscado do servidor
@@ -134,7 +143,7 @@ async function loadContexts() {
     .map(
       (context) => `
       <tr class="border-b border-slate-700/30 last:border-0 cursor-pointer" data-id="${context.id}">
-        <td class="px-4 py-2 font-medium">${esc(context.name)}</td>
+        <td class="px-4 py-2 font-medium">${esc(context.name)}${context.period_mode === "monthly" ? ' <span class="status-badge status-badge--muted">mensal</span>' : ""}</td>
         <td class="px-4 py-2">${esc(context.destination_summary)}</td>
         <td class="px-4 py-2">${context.load_to_database ? `${esc(context.load_summary)} <span style="color: var(--text-muted)">(${LOAD_MODE_LABELS[context.load_mode] || esc(context.load_mode)})</span>` : "—"}</td>
         <td class="px-4 py-2">${context.allowed_file_types.split(",").map((t) => FILE_TYPE_LABELS[t] || esc(t)).join(", ")}</td>
@@ -166,16 +175,58 @@ function toggleDestinationFields() {
 
 function toggleLoadFields() {
   document.getElementById("load-fields").classList.toggle("hidden", !loadToDatabaseCheckbox.checked);
-  document.getElementById("load-mode-help").textContent = LOAD_MODE_HELP[loadModeSelect.value] || "";
+  if (!periodMonthlyCheckbox.checked) {
+    document.getElementById("load-mode-help").textContent = LOAD_MODE_HELP[loadModeSelect.value] || "";
+  }
 }
 
-// Campos de carga no banco reenviados sem alteração pelo modal de regras (PUT é replace completo).
+function togglePeriodFields() {
+  const monthly = periodMonthlyCheckbox.checked;
+  document.getElementById("period-fields").classList.toggle("hidden", !monthly);
+  document.getElementById("period-column-field").classList.toggle("hidden", periodSourceSelect.value !== "column");
+  document.getElementById("duplicate-policy-help").textContent = DUPLICATE_POLICY_HELP[duplicatePolicySelect.value] || "";
+  // Num contexto mensal a carga sempre troca só o mês do envio: o modo de carga não se aplica.
+  loadModeSelect.disabled = monthly;
+  document.getElementById("load-mode-help").textContent = monthly
+    ? "Contexto mensal: cada envio substitui só as linhas do seu mês (coluna competencia_envio)."
+    : LOAD_MODE_HELP[loadModeSelect.value] || "";
+}
+
+function populatePeriodColumnOptions(expectedColumns) {
+  const datalist = document.getElementById("period-column-options");
+  const columns = (expectedColumns || "").split(",").map((name) => name.trim()).filter(Boolean);
+  // Nomes de coluna vêm de arquivos de usuário: criados como elementos, nunca como HTML.
+  datalist.replaceChildren(
+    ...columns.map((name) => {
+      const option = document.createElement("option");
+      option.value = name;
+      return option;
+    })
+  );
+}
+
+function periodFieldsFromForm() {
+  return {
+    period_mode: periodMonthlyCheckbox.checked ? "monthly" : "none",
+    period_source: periodSourceSelect.value,
+    period_column: document.getElementById("context-period_column").value.trim() || null,
+    period_start: document.getElementById("context-period_start").value.trim() || null,
+    duplicate_policy: duplicatePolicySelect.value,
+  };
+}
+
+// Campos de carga no banco e de mês reenviados sem alteração pelo modal de regras (PUT é replace completo).
 function loadFieldsOf(context) {
   return {
     load_to_database: context.load_to_database,
     db_schema: context.db_schema,
     db_table: context.db_table,
     load_mode: context.load_mode,
+    period_mode: context.period_mode,
+    period_source: context.period_source,
+    period_column: context.period_column,
+    period_start: context.period_start,
+    duplicate_policy: context.duplicate_policy,
   };
 }
 
@@ -209,8 +260,12 @@ function resetForm() {
   currentEditContext = null;
   clearTestResults();
   clearFieldErrors("context");
+  periodSourceSelect.value = "column";
+  duplicatePolicySelect.value = "replace";
+  populatePeriodColumnOptions("");
   toggleDestinationFields();
   toggleLoadFields();
+  togglePeriodFields();
   updatePdfHelp();
   updateImageHelp();
 }
@@ -243,8 +298,15 @@ async function openEditModal(contextId) {
   document.getElementById("context-db_schema").value = context.db_schema || "";
   document.getElementById("context-db_table").value = context.db_table || "";
   loadModeSelect.value = context.load_mode;
+  periodMonthlyCheckbox.checked = context.period_mode === "monthly";
+  periodSourceSelect.value = context.period_mode === "monthly" ? context.period_source : "column";
+  document.getElementById("context-period_column").value = context.period_column || "";
+  document.getElementById("context-period_start").value = context.period_start || "";
+  duplicatePolicySelect.value = context.duplicate_policy;
+  populatePeriodColumnOptions(context.expected_columns);
   toggleDestinationFields();
   toggleLoadFields();
+  togglePeriodFields();
   updatePdfHelp();
   updateImageHelp();
   modal.classList.remove("hidden");
@@ -280,6 +342,7 @@ async function saveContext(event) {
     db_schema: document.getElementById("context-db_schema").value.trim() || null,
     db_table: document.getElementById("context-db_table").value.trim() || null,
     load_mode: loadModeSelect.value,
+    ...periodFieldsFromForm(),
   };
 
   const contextId = document.getElementById("context-id").value;
@@ -356,6 +419,9 @@ document.addEventListener("DOMContentLoaded", () => {
   imageModeSelect.addEventListener("change", updateImageHelp);
   loadToDatabaseCheckbox.addEventListener("change", toggleLoadFields);
   loadModeSelect.addEventListener("change", toggleLoadFields);
+  [periodMonthlyCheckbox, periodSourceSelect, duplicatePolicySelect].forEach((el) =>
+    el.addEventListener("change", togglePeriodFields)
+  );
   document.getElementById("context-add-rule-button").addEventListener("click", () => addRuleRow());
   document.getElementById("rules-cancel-button").addEventListener("click", closeRulesModal);
   document.getElementById("rules-save-button").addEventListener("click", saveRules);

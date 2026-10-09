@@ -7,7 +7,11 @@ import pandas as pd
 
 from input_arquivos.backend.models.context import Context
 
-_TRACKING_COLUMNS = {"data_envio", "contexto", "enviado_por"}
+# Mês de competência do envio (dia 1 do mês), posto pelo sistema em contextos mensais.
+PERIOD_COLUMN = "competencia_envio"
+# Colunas que o sistema põe no Parquet (não vêm do arquivo do usuário): ficam fora da
+# comparação de colunas e de `expected_columns`.
+_TRACKING_COLUMNS = {"data_envio", "contexto", "enviado_por", PERIOD_COLUMN}
 _VALID_RULE_TYPES = {"text", "integer", "decimal", "date", "boolean"}
 _BOOLEAN_TRUE_TOKENS = {"sim", "s", "true", "verdadeiro", "1", "yes", "y"}
 _BOOLEAN_FALSE_TOKENS = {"não", "nao", "n", "false", "falso", "0", "no"}
@@ -17,7 +21,7 @@ _EXCEL_EPOCH = "1899-12-30"
 _EXCEL_MAX_SERIAL = 2958465
 
 
-def _parse_dates(values: pd.Series) -> pd.Series:
+def parse_dates(values: pd.Series) -> pd.Series:
     """Converte uma coluna de datas "de planilha" em `datetime64`, com `NaT` onde não der.
 
     Uma célula numérica (int/float) é tratada como número de série do Excel —
@@ -296,7 +300,7 @@ class ColumnDataValidator:
                 ok = ok & numeric.apply(lambda v: bool(pd.notna(v)) and float(v).is_integer())
             return ok
         if rule_type == "date":
-            return _parse_dates(values).notna()
+            return parse_dates(values).notna()
         if rule_type == "boolean":
             return values.apply(self._is_boolean_like)
         return pd.Series(False, index=values.index)  # inalcançável: rule_type já validado em _parse_column_rules
@@ -379,7 +383,7 @@ class ColumnTypeCaster:
         if rule_type == "decimal":
             return pd.to_numeric(values, errors="coerce").astype("Float64")
         if rule_type == "date":
-            parsed = _parse_dates(values.dropna()).reindex(values.index)
+            parsed = parse_dates(values.dropna()).reindex(values.index)
             return parsed.dt.date.astype(object).where(parsed.notna(), None)
         return values.map(self._to_boolean, na_action="ignore").astype("boolean")
 

@@ -120,6 +120,43 @@
         </div>
       </div>
 
+      <div class="flex flex-col gap-2 p-3 rounded-lg" style="background: var(--surface-alt); border: 1px solid var(--border);">
+        <label class="flex items-center gap-2 text-xs cursor-pointer" style="color: var(--text);">
+          <input type="checkbox" id="context-period-monthly" class="accent-indigo-500"> Controlar envios por mês (competência)
+        </label>
+        <p class="form-hint">A tela de envio mostra os meses já enviados e os que faltam, e um mês enviado de novo não duplica na tabela.</p>
+        <div id="period-fields" class="flex flex-col gap-2">
+          <div class="form-group" style="margin-bottom:0">
+            <label class="form-label" for="context-period_source">De onde vem o mês</label>
+            <select id="context-period_source" class="form-input">
+              <option value="column">De uma coluna de data do arquivo</option>
+              <option value="selector">Informado pelo usuário no envio</option>
+            </select>
+          </div>
+          <div id="period-column-field" class="form-group" style="margin-bottom:0">
+            <label class="form-label" for="context-period_column">Coluna de data</label>
+            <input id="context-period_column" class="form-input" list="period-column-options" placeholder="nome da coluna no arquivo">
+            <datalist id="period-column-options"></datalist>
+            <p class="form-hint">Todas as linhas do arquivo precisam ter data e ser do mesmo mês; senão o envio é recusado.</p>
+          </div>
+          <div class="flex gap-2">
+            <div class="form-group" style="margin-bottom:0; flex: 1">
+              <label class="form-label" for="context-period_start">Primeiro mês esperado</label>
+              <input id="context-period_start" type="month" class="form-input" placeholder="AAAA-MM">
+            </div>
+            <div class="form-group" style="margin-bottom:0; flex: 1">
+              <label class="form-label" for="context-duplicate_policy">Mês enviado de novo</label>
+              <select id="context-duplicate_policy" class="form-input">
+                <option value="replace">Substituir (pede confirmação)</option>
+                <option value="block">Bloquear</option>
+                <option value="allow">Somar aos anteriores</option>
+              </select>
+            </div>
+          </div>
+          <p id="duplicate-policy-help" class="form-hint"></p>
+        </div>
+      </div>
+
       <div class="form-group" style="margin-bottom:0">
         <label class="form-label" for="context-pdf-mode">Modo de tratamento de PDF</label>
         <select id="context-pdf-mode" class="form-input">

@@ -25,6 +25,24 @@
       <span id="destination-label" class="text-xs font-medium" style="color: var(--text-muted);">Escolha um contexto para ver o destino.</span>
     </div>
 
+    <div id="period-panel" class="period-panel hidden">
+      <div class="period-head">
+        <h4><span class="ms" aria-hidden="true">calendar_month</span>Meses enviados</h4>
+        <div class="period-year-nav">
+          <button type="button" id="period-prev" class="btn btn-ghost btn-sm" aria-label="Ano anterior"><span class="ms" aria-hidden="true">chevron_left</span></button>
+          <span id="period-year"></span>
+          <button type="button" id="period-next" class="btn btn-ghost btn-sm" aria-label="Próximo ano"><span class="ms" aria-hidden="true">chevron_right</span></button>
+        </div>
+      </div>
+      <div id="period-grid" class="period-grid" aria-live="polite"></div>
+      <p id="period-summary" class="form-hint" style="margin:0"></p>
+    </div>
+
+    <div id="period-select-field" class="form-group hidden" style="margin-bottom:0">
+      <label class="form-label" for="period-select">Mês de competência</label>
+      <select id="period-select" class="form-input"></select>
+    </div>
+
     <div class="form-group" style="margin-bottom:0">
       <label class="form-label" for="file-input">Selecione ou Arraste o Arquivo</label>
       <div id="drop-zone" class="drop-zone" data-click="pick-file">
