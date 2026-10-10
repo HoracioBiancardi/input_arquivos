@@ -120,3 +120,11 @@ def test_create_request_rejects_non_identifier_table_name(table: str) -> None:
     """Tabela precisa ser um identificador SQL simples (sem ponto, espaço ou pontuação)."""
     with pytest.raises(ValidationError):
         ContextCreateRequest(**_base_create_kwargs(), load_to_database=True, db_table=table)
+
+
+@pytest.mark.parametrize(("value", "expected"), [(None, None), ("", None), ("   ", None), (" Dados ", "Dados")])
+def test_create_request_normalizes_sheet_name(value: str | None, expected: str | None) -> None:
+    """Aba vazia vira `None` (primeira aba); espaços nas pontas são removidos."""
+    request = ContextCreateRequest(**_base_create_kwargs(), sheet_name=value)
+
+    assert request.sheet_name == expected

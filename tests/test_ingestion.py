@@ -13,6 +13,7 @@ não está disponível (ver `_OCR_AVAILABLE` abaixo).
 
 import io
 import json
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -34,6 +35,7 @@ def _make_context(
     name: str = "vendas",
     allowed_file_types: str | None = None,
     image_mode: ImageMode = ImageMode.RAW_ARCHIVE,
+    sheet_name: str | None = None,
 ) -> Context:
     """Cria um `Context` em memória (sem persistir no banco) para uso nos testes."""
     return Context(
@@ -44,6 +46,7 @@ def _make_context(
         pdf_mode=PdfMode.METADATA_ONLY,
         image_mode=image_mode,
         allowed_file_types=allowed_file_types,
+        sheet_name=sheet_name,
         active=True,
     )
 
@@ -107,6 +110,54 @@ def test_process_reads_excel_file() -> None:
 
     assert result.row_count == 2
     assert "produto" in result.dataframe.columns
+
+
+def _two_sheet_workbook(engine: str) -> bytes:
+    """Planilha com uma aba de capa na frente e os dados na segunda aba ("Dados")."""
+    buffer = io.BytesIO()
+    with pd.ExcelWriter(buffer, engine=engine) as writer:
+        pd.DataFrame({"titulo": ["Relatório"]}).to_excel(writer, sheet_name="Capa", index=False)
+        pd.DataFrame({"produto": ["A", "B"], "valor": [1, 2]}).to_excel(writer, sheet_name="Dados", index=False)
+    return buffer.getvalue()
+
+
+def test_process_reads_first_sheet_when_no_sheet_configured() -> None:
+    """Sem aba configurada no contexto, vale a primeira aba do arquivo."""
+    result = IngestionPipeline().process(_two_sheet_workbook("openpyxl"), "vendas.xlsx", _make_context(), uploaded_by="joao")
+
+    assert "titulo" in result.dataframe.columns
+    assert result.row_count == 1
+
+
+@pytest.mark.parametrize(("engine", "filename"), [("openpyxl", "vendas.xlsx"), ("odf", "vendas.ods")])
+def test_process_reads_configured_sheet(engine: str, filename: str) -> None:
+    """Com `sheet_name` no contexto, Excel e ODS leem essa aba (tolerando maiúscula/espaço)."""
+    context = _make_context(sheet_name=" dados ")
+
+    result = IngestionPipeline().process(_two_sheet_workbook(engine), filename, context, uploaded_by="joao")
+
+    assert "produto" in result.dataframe.columns
+    assert result.row_count == 2
+
+
+def test_process_rejects_missing_sheet_listing_available_ones() -> None:
+    """Aba configurada que não existe no arquivo recusa o envio e lista as abas existentes."""
+    context = _make_context(sheet_name="Vendas")
+
+    with pytest.raises(ValueError, match="Aba 'Vendas' não encontrada.*Capa, Dados"):
+        IngestionPipeline().process(_two_sheet_workbook("openpyxl"), "vendas.xlsx", context, uploaded_by="joao")
+
+
+def test_process_reads_legacy_xls_file() -> None:
+    """O .xls antigo (binário, não ZIP) é lido com xlrd, inclusive escolhendo a aba."""
+    xls_bytes = (Path(__file__).parent / "fixtures" / "vendas_duas_abas.xls").read_bytes()
+
+    first = IngestionPipeline().process(xls_bytes, "vendas.xls", _make_context(), uploaded_by="joao")
+    chosen = IngestionPipeline().process(xls_bytes, "vendas.xls", _make_context(sheet_name="Dados"), uploaded_by="joao")
+
+    assert first.row_count == 0  # a capa só tem o cabeçalho "Relatorio"
+    assert "produto" in chosen.dataframe.columns
+    assert chosen.row_count == 2
 
 
 def test_process_raises_for_unsupported_extension() -> None:

@@ -122,6 +122,8 @@ class Context(Base):
             aparecem como "faltando" na grade. Vazio usa o mês de criação do contexto.
         duplicate_policy: O que fazer quando o mês já tem envio: substituir
             (com confirmação), bloquear ou permitir os dois. `None` equivale a `REPLACE`.
+        sheet_name: Aba lida de planilhas com várias abas (Excel/ODS). `None`
+            lê a primeira aba do arquivo.
         active: Indica se o contexto aparece como opção na tela de upload.
         created_at: Data de criação do registro.
         updated_at: Data da última atualização do registro.
@@ -150,6 +152,7 @@ class Context(Base):
     duplicate_policy: Mapped[DuplicatePolicy | None] = mapped_column(
         SqlEnum(DuplicatePolicy), default=DuplicatePolicy.REPLACE
     )
+    sheet_name: Mapped[str | None] = mapped_column(String(255), default=None)
     active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
