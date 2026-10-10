@@ -180,6 +180,12 @@ function toggleLoadFields() {
   }
 }
 
+// A aba só vale para planilhas: o campo aparece com Excel ou ODS marcado.
+function toggleSheetNameField() {
+  const spreadsheet = document.querySelector('.context-file-type[value="excel"]:checked, .context-file-type[value="ods"]:checked');
+  document.getElementById("sheet-name-field").classList.toggle("hidden", !spreadsheet);
+}
+
 function togglePeriodFields() {
   const monthly = periodMonthlyCheckbox.checked;
   document.getElementById("period-fields").classList.toggle("hidden", !monthly);
@@ -227,6 +233,7 @@ function loadFieldsOf(context) {
     period_column: context.period_column,
     period_start: context.period_start,
     duplicate_policy: context.duplicate_policy,
+    sheet_name: context.sheet_name,
   };
 }
 
@@ -266,6 +273,7 @@ function resetForm() {
   toggleDestinationFields();
   toggleLoadFields();
   togglePeriodFields();
+  toggleSheetNameField();
   updatePdfHelp();
   updateImageHelp();
 }
@@ -293,6 +301,7 @@ async function openEditModal(contextId) {
   document.getElementById("context-local-path").value = context.local_path || "";
   pdfModeSelect.value = context.pdf_mode;
   imageModeSelect.value = context.image_mode;
+  document.getElementById("context-sheet_name").value = context.sheet_name || "";
   document.getElementById("context-active").checked = context.active;
   loadToDatabaseCheckbox.checked = context.load_to_database;
   document.getElementById("context-db_schema").value = context.db_schema || "";
@@ -307,6 +316,7 @@ async function openEditModal(contextId) {
   toggleDestinationFields();
   toggleLoadFields();
   togglePeriodFields();
+  toggleSheetNameField();
   updatePdfHelp();
   updateImageHelp();
   modal.classList.remove("hidden");
@@ -336,6 +346,7 @@ async function saveContext(event) {
     minio_bucket: document.getElementById("context-minio-bucket").value || null,
     local_path: document.getElementById("context-local-path").value || null,
     allowed_file_types: fileTypes.join(","),
+    sheet_name: document.getElementById("context-sheet_name").value.trim() || null,
     column_rules: currentEditContext ? currentEditContext.column_rules : [],
     active: document.getElementById("context-active").checked,
     load_to_database: loadToDatabaseCheckbox.checked,
@@ -419,6 +430,9 @@ document.addEventListener("DOMContentLoaded", () => {
   imageModeSelect.addEventListener("change", updateImageHelp);
   loadToDatabaseCheckbox.addEventListener("change", toggleLoadFields);
   loadModeSelect.addEventListener("change", toggleLoadFields);
+  document.querySelectorAll(".context-file-type").forEach((checkbox) =>
+    checkbox.addEventListener("change", toggleSheetNameField)
+  );
   [periodMonthlyCheckbox, periodSourceSelect, duplicatePolicySelect].forEach((el) =>
     el.addEventListener("change", togglePeriodFields)
   );

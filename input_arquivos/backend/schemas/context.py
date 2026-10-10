@@ -170,6 +170,7 @@ class ContextCreateRequest(DatabaseLoadFields, PeriodFields):
             (ex. "excel,csv"). Vazio equivale a aceitar todos os tipos.
         column_rules: Regras de validação de tipo/obrigatoriedade por coluna.
             Vazio equivale a não validar o conteúdo de nenhuma coluna.
+        sheet_name: Aba lida de planilhas Excel/ODS; vazio lê a primeira.
 
     Os campos de carga no banco vêm de `DatabaseLoadFields`; os de mês, de `PeriodFields`.
     """
@@ -182,6 +183,13 @@ class ContextCreateRequest(DatabaseLoadFields, PeriodFields):
     local_path: str | None = None
     allowed_file_types: str = "excel,csv,pdf"
     column_rules: list[ColumnRule] = []
+    sheet_name: str | None = None
+
+    @field_validator("sheet_name")
+    @classmethod
+    def _validate_sheet_name(cls, value: str | None) -> str | None:
+        """Vazio vira `None` (lê a primeira aba)."""
+        return (value or "").strip() or None
 
     @model_validator(mode="after")
     def _validate_column_rules(self) -> Self:
@@ -204,6 +212,7 @@ class ContextUpdateRequest(DatabaseLoadFields, PeriodFields):
             (ex. "excel,csv"). Vazio equivale a aceitar todos os tipos.
         column_rules: Regras de validação de tipo/obrigatoriedade por coluna.
             Vazio equivale a não validar o conteúdo de nenhuma coluna.
+        sheet_name: Aba lida de planilhas Excel/ODS; vazio lê a primeira.
         active: Se o context deve ficar ativo (visível na tela de upload).
 
     Os campos de carga no banco vêm de `DatabaseLoadFields`; os de mês, de `PeriodFields`.
@@ -217,7 +226,14 @@ class ContextUpdateRequest(DatabaseLoadFields, PeriodFields):
     local_path: str | None = None
     allowed_file_types: str = "excel,csv,pdf"
     column_rules: list[ColumnRule] = []
+    sheet_name: str | None = None
     active: bool = True
+
+    @field_validator("sheet_name")
+    @classmethod
+    def _validate_sheet_name(cls, value: str | None) -> str | None:
+        """Vazio vira `None` (lê a primeira aba)."""
+        return (value or "").strip() or None
 
     @model_validator(mode="after")
     def _validate_column_rules(self) -> Self:
@@ -275,6 +291,7 @@ class ContextResponse(BaseModel):
             já convertidas de JSON (armazenado no banco) para uma lista.
         pdf_mode: Modo de tratamento de PDFs configurado.
         image_mode: Modo de tratamento de imagens configurado.
+        sheet_name: Aba lida de planilhas Excel/ODS (`None` = primeira aba).
         active: Se o context está ativo.
         created_at: Data de criação do context.
         destination_summary: Descrição curta e pronta para exibição do destino
@@ -302,6 +319,7 @@ class ContextResponse(BaseModel):
     column_rules: list[ColumnRule] = []
     pdf_mode: PdfMode
     image_mode: ImageMode
+    sheet_name: str | None = None
     active: bool
     created_at: UtcDatetime
     destination_summary: str = ""

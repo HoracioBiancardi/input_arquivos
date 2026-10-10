@@ -92,29 +92,82 @@ class FileReader(Protocol):
         ...
 
 
+def _resolve_sheet(available: list[str], sheet_name: str | None) -> str | int:
+    """Escolhe a aba a ler de uma planilha com várias abas.
+
+    Args:
+        available: Nomes das abas do arquivo, na ordem em que aparecem.
+        sheet_name: Aba configurada no contexto; `None`/vazio lê a primeira.
+
+    Returns:
+        O nome da aba encontrada, ou `0` (primeira aba) quando nada foi configurado.
+
+    Raises:
+        ValueError: Se a aba configurada não existir no arquivo.
+    """
+    wanted = (sheet_name or "").strip()
+    if not wanted:
+        return 0
+    if wanted in available:
+        return wanted
+    # Tolera diferença só de maiúscula/minúscula ou espaço nas pontas ("dados " vs "Dados").
+    by_folded = {name.strip().casefold(): name for name in available}
+    if wanted.casefold() in by_folded:
+        return by_folded[wanted.casefold()]
+    raise ValueError(
+        f"Aba '{wanted}' não encontrada neste arquivo. Abas disponíveis: {', '.join(available)}."
+    )
+
+
+def _read_spreadsheet(file_bytes: bytes, engine: str, sheet_name: str | None) -> pd.DataFrame:
+    """Lê uma aba de uma planilha (Excel/ODS), aplicando o teto de `MAX_ROWS`.
+
+    Args:
+        file_bytes: Conteúdo bruto do arquivo.
+        engine: Engine do pandas (`openpyxl`, `xlrd` ou `odf`).
+        sheet_name: Aba configurada no contexto; `None` lê a primeira.
+
+    Returns:
+        DataFrame com os dados da aba escolhida.
+
+    Raises:
+        ValueError: Se a aba configurada não existir no arquivo.
+        UploadTooLargeError: Se a aba tiver mais de `MAX_ROWS` linhas.
+    """
+    with pd.ExcelFile(io.BytesIO(file_bytes), engine=engine) as workbook:
+        sheet = _resolve_sheet([str(name) for name in workbook.sheet_names], sheet_name)
+        # `nrows` para a leitura logo depois do teto, em vez de carregar a planilha inteira.
+        dataframe = workbook.parse(sheet, nrows=MAX_ROWS + 1)
+    if len(dataframe) > MAX_ROWS:
+        raise UploadTooLargeError(
+            f"Esta planilha tem mais de {MAX_ROWS} linhas, o limite por arquivo."
+        )
+    return dataframe
+
+
 class ExcelReader:
     """Lê arquivos Excel (.xlsx/.xls) e retorna seu conteúdo como DataFrame."""
 
-    def read(self, file_bytes: bytes) -> pd.DataFrame:
-        """Lê a primeira planilha de um arquivo Excel.
+    def read(self, file_bytes: bytes, sheet_name: str | None = None) -> pd.DataFrame:
+        """Lê uma aba de um arquivo Excel.
+
+        O engine sai do conteúdo, não da extensão: .xlsx é um ZIP (openpyxl) e
+        o .xls antigo é um arquivo binário OLE (xlrd).
 
         Args:
             file_bytes: Conteúdo bruto do arquivo .xlsx/.xls.
+            sheet_name: Aba a ler (nome, configurado no contexto); `None` lê a primeira.
 
         Returns:
-            DataFrame com os dados da primeira planilha do arquivo.
+            DataFrame com os dados da aba escolhida.
 
         Raises:
+            ValueError: Se a aba configurada não existir no arquivo.
             UploadTooLargeError: Se a planilha tiver mais de `MAX_ROWS` linhas.
         """
         _reject_zip_bomb(file_bytes)
-        # `nrows` para a leitura logo depois do teto, em vez de carregar a planilha inteira.
-        dataframe = pd.read_excel(io.BytesIO(file_bytes), engine="openpyxl", nrows=MAX_ROWS + 1)
-        if len(dataframe) > MAX_ROWS:
-            raise UploadTooLargeError(
-                f"Esta planilha tem mais de {MAX_ROWS} linhas, o limite por arquivo."
-            )
-        return dataframe
+        engine = "openpyxl" if zipfile.is_zipfile(io.BytesIO(file_bytes)) else "xlrd"
+        return _read_spreadsheet(file_bytes, engine, sheet_name)
 
 
 class CsvReader:
@@ -531,31 +584,28 @@ class XmlReader:
 class OdsReader:
     """Lê planilhas OpenDocument (.ods, LibreOffice/OpenOffice Calc) e retorna como DataFrame."""
 
-    def read(self, file_bytes: bytes) -> pd.DataFrame:
-        """Lê a primeira planilha de um arquivo .ods.
+    def read(self, file_bytes: bytes, sheet_name: str | None = None) -> pd.DataFrame:
+        """Lê uma aba de um arquivo .ods.
 
         Args:
             file_bytes: Conteúdo bruto do arquivo .ods.
+            sheet_name: Aba a ler (nome, configurado no contexto); `None` lê a primeira.
 
         Returns:
-            DataFrame com os dados da primeira planilha do arquivo.
+            DataFrame com os dados da aba escolhida.
 
         Raises:
-            ValueError: Se o pacote `odfpy` não estiver instalado no servidor.
+            ValueError: Se a aba configurada não existir no arquivo, ou se o
+                pacote `odfpy` não estiver instalado no servidor.
             UploadTooLargeError: Se a planilha tiver mais de `MAX_ROWS` linhas.
         """
+        _reject_zip_bomb(file_bytes)
         try:
-            _reject_zip_bomb(file_bytes)
-            dataframe = pd.read_excel(io.BytesIO(file_bytes), engine="odf", nrows=MAX_ROWS + 1)
+            return _read_spreadsheet(file_bytes, "odf", sheet_name)
         except ImportError as error:
             raise ValueError(
                 "Leitura de .ods indisponível: verifique se o pacote 'odfpy' está instalado no servidor."
             ) from error
-        if len(dataframe) > MAX_ROWS:
-            raise UploadTooLargeError(
-                f"Esta planilha tem mais de {MAX_ROWS} linhas, o limite por arquivo."
-            )
-        return dataframe
 
 
 class HtmlReader:

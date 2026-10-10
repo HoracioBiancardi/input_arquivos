@@ -126,6 +126,7 @@ class ContextService:
         period_column: str | None = None,
         period_start: str | None = None,
         duplicate_policy: DuplicatePolicy = DuplicatePolicy.REPLACE,
+        sheet_name: str | None = None,
     ) -> Context:
         """Cria um novo context.
 
@@ -149,6 +150,7 @@ class ContextService:
             period_column: Coluna de data do arquivo, quando o mês sai dela.
             period_start: Primeiro mês esperado (`AAAA-MM`).
             duplicate_policy: O que fazer com um envio de mês que já tem envio.
+            sheet_name: Aba lida de planilhas Excel/ODS (`None` = primeira aba).
 
         Returns:
             O context recém-criado.
@@ -182,6 +184,7 @@ class ContextService:
             period_column=period_column,
             period_start=period_start,
             duplicate_policy=duplicate_policy,
+            sheet_name=sheet_name,
         )
         with self._session_factory.session() as db_session:
             db_session.add(context)

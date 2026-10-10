@@ -184,7 +184,7 @@ class IngestionPipeline:
             DataFrame com os dados extraídos do arquivo.
         """
         if file_type == FileType.EXCEL:
-            return self._excel_reader.read(file_bytes)
+            return self._excel_reader.read(file_bytes, sheet_name=context.sheet_name)
         if file_type in (FileType.CSV, FileType.TXT):
             return self._csv_reader.read(file_bytes, text_columns=text_rule_columns(context))
         if file_type == FileType.IMAGE:
@@ -197,7 +197,7 @@ class IngestionPipeline:
         if file_type == FileType.YAML:
             return self._yaml_reader.read(file_bytes)
         if file_type == FileType.ODS:
-            return self._ods_reader.read(file_bytes)
+            return self._ods_reader.read(file_bytes, sheet_name=context.sheet_name)
         if file_type == FileType.HTML:
             return self._html_reader.read(file_bytes)
         if context.pdf_mode == PdfMode.OCR_STOCK_LOTS:
