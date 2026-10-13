@@ -12,6 +12,13 @@ const LOAD_STATUS_BADGES = {
 
 const MONTH_NAMES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 
+function messageCell(item) {
+  // Aviso de linhas fora do mês escolhido: o envio deu certo, mas alguém confirmou ou a API registrou.
+  if (item.period_warning) return `<span style="color: var(--warn)">Aviso: ${esc(item.period_warning)}</span>`;
+  const detail = item.error_detail ? `<br><span class="font-mono" style="color: var(--text-muted)">${esc(item.error_detail)}</span>` : "";
+  return `${esc(item.error_message) || "-"}${detail}`;
+}
+
 function periodCell(item) {
   if (!item.period) return "-";
   const [year, month] = item.period.split("-");
@@ -89,7 +96,7 @@ async function applyFilters() {
         <td data-label="Banco" class="px-4 py-2">${loadCell(item)}</td>
         <td data-label="Enviado por" class="px-4 py-2">${esc(item.uploaded_by)}</td>
         <td data-label="Data" class="px-4 py-2 whitespace-nowrap">${formatDateTimeBR(item.created_at)}</td>
-        <td data-label="Erro" class="px-4 py-2" style="overflow-wrap: anywhere">${esc(item.error_message) || "-"}${item.error_detail ? `<br><span class="font-mono" style="color: var(--text-muted)">${esc(item.error_detail)}</span>` : ""}</td>
+        <td data-label="Detalhes de erro ou aviso" class="px-4 py-2" style="overflow-wrap: anywhere">${messageCell(item)}</td>
       </tr>`
     )
     .join("");

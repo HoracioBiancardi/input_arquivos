@@ -9,7 +9,12 @@ import pandas as pd
 
 from input_arquivos.backend.models.context import Context, PeriodMode, PeriodSource
 from input_arquivos.backend.models.upload_history import UploadHistory
-from input_arquivos.backend.services.column_check import PERIOD_COLUMN, parse_dates
+from input_arquivos.backend.services.column_check import (
+    PERIOD_COLUMN,
+    TRACKING_COLUMNS,
+    date_rule_columns,
+    parse_dates,
+)
 
 _PERIOD_PATTERN = re.compile(r"^(\d{4})-(0[1-9]|1[0-2])$")
 _MONTH_NAMES = (
@@ -18,6 +23,11 @@ _MONTH_NAMES = (
 )
 # Quantos meses diferentes citar na mensagem de arquivo com vários meses.
 _MONTHS_IN_MESSAGE = 6
+# Fração mínima das células preenchidas que precisam parecer data para uma coluna sem
+# regra "Data" contar como coluna de data na conferência do mês escolhido no seletor.
+_DATE_COLUMN_MIN_SHARE = 0.9
+# Texto com cara de data: DD/MM/AAAA (ou com - e .) ou AAAA-MM-DD, com hora opcional.
+_DATE_TEXT = r"^\s*(?:\d{1,2}[/.-]\d{1,2}[/.-]\d{4}|\d{4}-\d{1,2}-\d{1,2})(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?\s*$"
 
 try:
     _LOCAL_TZ = ZoneInfo("America/Sao_Paulo")
@@ -143,6 +153,99 @@ def with_period_column(dataframe: pd.DataFrame, period: str) -> pd.DataFrame:
     position = min(3, len(tracked.columns))  # depois de data_envio, contexto e enviado_por
     tracked.insert(position, PERIOD_COLUMN, period_to_date(period))
     return tracked
+
+
+@dataclass
+class OtherMonths:
+    """Coluna de data com linhas fora do mês escolhido no seletor.
+
+    Attributes:
+        column: Nome da coluna no arquivo.
+        months: Meses (`AAAA-MM`) dessas linhas, sem o mês escolhido, em ordem.
+        row_count: Quantidade de linhas fora do mês escolhido.
+    """
+
+    column: str
+    months: list[str]
+    row_count: int
+
+
+def find_other_months(context: Context, dataframe: pd.DataFrame | None, period: str | None) -> list[OtherMonths]:
+    """Procura colunas de data com linhas fora do mês escolhido no seletor.
+
+    Só vale para contexto mensal com o mês informado no envio: no modo coluna o
+    arquivo de vários meses já é recusado por `resolve_period`. Ninguém precisa
+    configurar nada: contam as colunas com regra "Data" no contexto e as que têm
+    quase todas as células com cara de data (`_DATE_COLUMN_MIN_SHARE`). Número
+    puro só conta em coluna com regra "Data" — fora dela, uma quantidade ou um
+    código viraria data de série do Excel. O resultado é um aviso, não um
+    bloqueio: um arquivo de outubro pode ter, com razão, vencimentos em novembro.
+
+    Args:
+        context: Contexto do envio.
+        dataframe: Tabela do arquivo (`None` para PDF/imagem arquivados).
+        period: Mês escolhido (`AAAA-MM`).
+
+    Returns:
+        As colunas com linhas de outro mês (lista vazia se não houver ou se não se aplica).
+    """
+    if (
+        not is_monthly(context)
+        or context.period_source == PeriodSource.COLUMN
+        or dataframe is None
+        or not is_valid_period(period)
+    ):
+        return []
+    declared = set(date_rule_columns(context))
+    found: list[OtherMonths] = []
+    for column in dataframe.columns:
+        if column in TRACKING_COLUMNS:
+            continue
+        dates = _column_dates(dataframe[column], column in declared)
+        if dates is None:
+            continue
+        months = dates.dt.strftime("%Y-%m")
+        outside = months[months != period]
+        if not outside.empty:
+            found.append(OtherMonths(column=str(column), months=sorted(outside.unique()), row_count=int(outside.size)))
+    return found
+
+
+def _column_dates(values: pd.Series, declared: bool) -> pd.Series | None:
+    """Datas válidas de uma coluna, ou `None` se ela não for uma coluna de data."""
+    filled = values[~(values.isna() | values.astype(str).str.strip().eq(""))]
+    if filled.empty:
+        return None
+    if declared:
+        return parse_dates(filled).dropna()
+    if pd.api.types.is_datetime64_any_dtype(filled):
+        return pd.to_datetime(filled, errors="coerce").dropna()
+    if pd.api.types.is_numeric_dtype(filled) or pd.api.types.is_bool_dtype(filled):
+        return None
+    looks_like_date = filled.map(lambda value: isinstance(value, (date, pd.Timestamp))) | filled.astype(
+        str
+    ).str.match(_DATE_TEXT)
+    if looks_like_date.mean() < _DATE_COLUMN_MIN_SHARE:
+        return None
+    return parse_dates(filled[looks_like_date]).dropna()
+
+
+def describe_other_months(period: str, other_months: list[OtherMonths]) -> str:
+    """Texto do aviso de linhas fora do mês escolhido, para a auditoria e para a API.
+
+    Args:
+        period: Mês escolhido (`AAAA-MM`).
+        other_months: Colunas encontradas por `find_other_months`.
+
+    Returns:
+        Ex.: `Mês escolhido: outubro/2026, mas a coluna 'Data' tem 12 linha(s) de novembro/2026.`
+    """
+    parts = []
+    for item in other_months:
+        listed = ", ".join(period_label(month) for month in item.months[:_MONTHS_IN_MESSAGE])
+        more = f" e mais {len(item.months) - _MONTHS_IN_MESSAGE}" if len(item.months) > _MONTHS_IN_MESSAGE else ""
+        parts.append(f"a coluna '{item.column}' tem {item.row_count} linha(s) de {listed}{more}")
+    return f"Mês escolhido: {period_label(period)}, mas " + "; ".join(parts) + "."
 
 
 @dataclass

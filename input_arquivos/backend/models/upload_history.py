@@ -60,6 +60,9 @@ class UploadHistory(Base):
         superseded_by: Id do envio do mesmo mês que substituiu este. Um envio
             substituído continua no histórico (e o Parquet no MinIO), mas suas
             linhas saem da tabela do banco; `None` = envio vigente.
+        period_warning: Aviso de linhas fora do mês escolhido no seletor, que
+            o usuário confirmou na tela (ou que a API registrou sem bloquear).
+            Ver `find_other_months`. `None` = sem aviso.
         uploaded_by: Nome de usuário de quem realizou o upload (sempre
             preenchido, pois o login é obrigatório para qualquer usuário).
         created_at: Data/hora do upload.
@@ -83,5 +86,6 @@ class UploadHistory(Base):
     loaded_at: Mapped[datetime | None] = mapped_column(default=None)
     period: Mapped[str | None] = mapped_column(String(7), default=None, index=True)
     superseded_by: Mapped[int | None] = mapped_column(default=None)
+    period_warning: Mapped[str | None] = mapped_column(Text, default=None)
     uploaded_by: Mapped[str] = mapped_column(String(150), index=True)
     created_at: Mapped[datetime] = mapped_column(default=lambda: datetime.now(timezone.utc), index=True)

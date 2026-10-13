@@ -31,6 +31,7 @@ class UploadHistoryResponse(BaseModel):
         loaded_at: Data/hora da última carga bem-sucedida.
         period: Mês de competência (`AAAA-MM`), em contextos mensais.
         superseded_by: Id do envio do mesmo mês que substituiu este (`None` = vigente).
+        period_warning: Aviso de linhas fora do mês escolhido no seletor (`None` = sem aviso).
         uploaded_by: Nome do usuário que realizou o upload.
         created_at: Data/hora do upload.
     """
@@ -53,6 +54,7 @@ class UploadHistoryResponse(BaseModel):
     loaded_at: UtcDatetime | None = None
     period: str | None = None
     superseded_by: int | None = None
+    period_warning: str | None = None
     uploaded_by: str
     created_at: UtcDatetime
 

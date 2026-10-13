@@ -432,7 +432,7 @@ async function handleSubmit(event) {
   if (submitButtonLabel) submitButtonLabel.textContent = "Enviando e validando dados...";
 
   try {
-    // Cada confirmação (colunas diferentes, mês já enviado) reenvia o arquivo com a flag correspondente.
+    // Cada confirmação (colunas diferentes, linhas de outro mês, mês já enviado) reenvia o arquivo com a flag correspondente.
     const flags = {};
     let result;
     while (!result) {
@@ -455,6 +455,31 @@ async function handleSubmit(event) {
           alertModal({ title: "Mês já enviado", body: `<p>${esc(detail.message)}</p>` });
           await loadHistory();
           return;
+        }
+        if (error.status === 409 && detail?.kind === "period_other_months") {
+          const columns = (detail.columns || [])
+            .map(
+              (item) =>
+                `<li><strong>${esc(item.column)}</strong>: ${item.row_count} linha(s) de ${item.months.map(esc).join(", ")}</li>`,
+            )
+            .join("");
+          const confirmed = await confirmModal({
+            title: "Linhas de outro mês",
+            body: `
+              <p>Você escolheu <strong>${esc(detail.period_label)}</strong>, mas o arquivo tem datas de outro mês:</p>
+              <ul class="mt-2">${columns}</ul>
+              <p class="mt-2">Todas as linhas serão gravadas como ${esc(detail.period_label)}. Pode ser normal (vencimento, pagamento), mas confira se o arquivo e o mês estão certos.</p>
+            `,
+            confirmLabel: "Enviar mesmo assim",
+            cancelLabel: "Cancelar",
+            variant: "warning",
+          });
+          if (!confirmed) {
+            showToast("Envio cancelado.", "warning");
+            return;
+          }
+          flags.confirm_other_months = "true";
+          continue;
         }
         if (error.status === 409 && detail?.kind === "period_exists") {
           const confirmed = await confirmModal({

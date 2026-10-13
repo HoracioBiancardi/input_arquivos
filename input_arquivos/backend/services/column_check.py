@@ -11,7 +11,7 @@ from input_arquivos.backend.models.context import Context
 PERIOD_COLUMN = "competencia_envio"
 # Colunas que o sistema põe no Parquet (não vêm do arquivo do usuário): ficam fora da
 # comparação de colunas e de `expected_columns`.
-_TRACKING_COLUMNS = {"data_envio", "contexto", "enviado_por", PERIOD_COLUMN}
+TRACKING_COLUMNS = {"data_envio", "contexto", "enviado_por", PERIOD_COLUMN}
 _VALID_RULE_TYPES = {"text", "integer", "decimal", "date", "boolean"}
 _BOOLEAN_TRUE_TOKENS = {"sim", "s", "true", "verdadeiro", "1", "yes", "y"}
 _BOOLEAN_FALSE_TOKENS = {"não", "nao", "n", "false", "falso", "0", "no"}
@@ -19,6 +19,8 @@ _SAMPLE_LIMIT = 5
 # Datas no Excel são números de dias desde 30/12/1899 (1 = 01/01/1900, 2958465 = 31/12/9999).
 _EXCEL_EPOCH = "1899-12-30"
 _EXCEL_MAX_SERIAL = 2958465
+# Texto de data no formato ISO (`AAAA-MM-DD`, com hora opcional), lido sem o "dia primeiro".
+_ISO_DATE_TEXT = r"^\s*\d{4}-\d{1,2}-\d{1,2}(?:[ T]|\s*$)"
 
 
 def parse_dates(values: pd.Series) -> pd.Series:
@@ -29,7 +31,8 @@ def parse_dates(values: pd.Series) -> pd.Series:
     = 15/03/2023). Sem isso, `pd.to_datetime(45000)` interpreta o número como
     nanossegundos desde 1970 e a data chega errada ao destino sem nenhum
     aviso. Texto e objetos de data seguem o parse normal, com o dia primeiro
-    (DD/MM/AAAA).
+    (DD/MM/AAAA) — menos texto ISO (`AAAA-MM-DD`), lido à parte: com o dia
+    primeiro, o pandas trocava dia e mês (`2026-10-01` virava 10/01/2026).
 
     Args:
         values: Coluna com as células a converter (sem vazios).
@@ -43,8 +46,12 @@ def parse_dates(values: pd.Series) -> pd.Series:
         serials = pd.to_numeric(values[is_number], errors="coerce")
         serials = serials.where((serials >= 1) & (serials <= _EXCEL_MAX_SERIAL))
         parsed[is_number] = pd.to_datetime(serials, unit="D", origin=_EXCEL_EPOCH, errors="coerce")
-    if not is_number.all():
-        parsed[~is_number] = pd.to_datetime(values[~is_number], errors="coerce", dayfirst=True)
+    is_iso = ~is_number & values.astype(str).str.match(_ISO_DATE_TEXT)
+    if is_iso.any():
+        parsed[is_iso] = pd.to_datetime(values[is_iso].astype(str).str.strip(), errors="coerce", format="ISO8601")
+    others = ~is_number & ~is_iso
+    if others.any():
+        parsed[others] = pd.to_datetime(values[others], errors="coerce", dayfirst=True)
     return parsed
 
 
@@ -88,7 +95,7 @@ class ColumnMismatchChecker:
             return None
 
         expected = [name for name in context.expected_columns.split(",") if name]
-        incoming = [name for name in dataframe.columns if name not in _TRACKING_COLUMNS]
+        incoming = [name for name in dataframe.columns if name not in TRACKING_COLUMNS]
 
         expected_set = set(expected)
         incoming_set = set(incoming)
@@ -111,7 +118,7 @@ class ColumnMismatchChecker:
         Returns:
             Lista de colunas (excluindo as de rastreabilidade) separadas por vírgula.
         """
-        return ",".join(name for name in dataframe.columns if name not in _TRACKING_COLUMNS)
+        return ",".join(name for name in dataframe.columns if name not in TRACKING_COLUMNS)
 
 
 @dataclass(frozen=True)
@@ -168,6 +175,20 @@ def text_rule_columns(context: Context) -> list[str]:
     if not context.column_rules:
         return []
     return [rule.column for rule in _parse_column_rules(context.column_rules) if rule.rule_type == "text"]
+
+
+def date_rule_columns(context: Context) -> list[str]:
+    """Lista as colunas que o contexto declara como `date`.
+
+    Args:
+        context: Contexto do upload.
+
+    Returns:
+        Nomes das colunas com regra do tipo `date` (lista vazia se não houver regras).
+    """
+    if not context.column_rules:
+        return []
+    return [rule.column for rule in _parse_column_rules(context.column_rules) if rule.rule_type == "date"]
 
 
 @dataclass
