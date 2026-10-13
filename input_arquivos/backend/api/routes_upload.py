@@ -26,6 +26,8 @@ from input_arquivos.backend.services.period import (
     PeriodError,
     build_year_grid,
     current_period,
+    describe_other_months,
+    find_other_months,
     is_monthly,
     period_label,
     start_period,
@@ -132,6 +134,8 @@ async def upload_file(
     context pedir) roda antes da resposta, que já traz o `load_status` final.
     Num context mensal que substitui meses repetidos, reenviar um mês exige
     `replace_period=true` — sem ele, a resposta é 409 e nada é gravado.
+    Linhas fora do mês escolhido no seletor não bloqueiam aqui: o envio segue
+    e o aviso volta em `period_warning`.
 
     Args:
         file: Arquivo enviado (Excel, CSV ou PDF).
@@ -195,6 +199,7 @@ async def upload_interactive(
     cancelled: bool = Form(default=False),
     period: str | None = Form(default=None),
     confirm_replace_period: bool = Form(default=False),
+    confirm_other_months: bool = Form(default=False),
     user: SessionUser = Depends(require_login),
 ) -> UploadHistoryResponse:
     """Processa um arquivo enviado pela tela de upload, com confirmação de divergência de colunas.
@@ -210,6 +215,9 @@ async def upload_interactive(
     `period`. Se o mês já tiver envio vigente, a requisição falha com 409
     (`kind=period_exists`) até ser reenviada com `confirm_replace_period=true`;
     com a política "bloquear", o envio é recusado (`kind=period_blocked`).
+    Com o mês escolhido no seletor, se alguma coluna de data do arquivo tiver
+    linhas de outro mês, a requisição falha com 409 (`kind=period_other_months`)
+    até ser reenviada com `confirm_other_months=true`; o aviso fica no registro.
 
     Se o context carrega no banco, a carga roda em background depois da
     resposta (o registro volta com `load_status=pending`), para a tela não
@@ -223,6 +231,7 @@ async def upload_interactive(
         cancelled: Se o usuário cancelou o envio após ver a divergência de colunas.
         period: Mês de competência (`AAAA-MM`), quando o context pede o mês no envio.
         confirm_replace_period: Se o usuário confirmou substituir o mês que já tem envio.
+        confirm_other_months: Se o usuário confirmou enviar mesmo com linhas fora do mês escolhido.
         user: Usuário autenticado na sessão atual.
 
     Returns:
@@ -235,8 +244,8 @@ async def upload_interactive(
             (inclui coluna obrigatória ausente — nesse caso, também é
             registrado um `UploadHistory` de erro antes de levantar a
             exceção) ou se o mês de competência não puder ser determinado;
-            ou 409 se houver divergência de colunas ou mês repetido ainda não
-            confirmados pelo usuário, ou mês repetido num context que bloqueia.
+            ou 409 se houver divergência de colunas, linhas fora do mês
+            escolhido ou mês repetido ainda não confirmados pelo usuário, ou mês repetido num context que bloqueia.
     """
     _reject_if_too_large(file)
     container = get_container()
@@ -314,6 +323,26 @@ async def upload_interactive(
                 },
             )
 
+    other_months = await run_in_threadpool(find_other_months, context, artifact.dataframe, resolved_period)
+    period_warning = describe_other_months(resolved_period, other_months) if other_months else None
+    if other_months and not confirm_other_months:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "kind": "period_other_months",
+                "message": period_warning,
+                "period_label": period_label(resolved_period),
+                "columns": [
+                    {
+                        "column": item.column,
+                        "months": [period_label(month) for month in item.months],
+                        "row_count": item.row_count,
+                    }
+                    for item in other_months
+                ],
+            },
+        )
+
     current = container.upload_service.find_current_upload(context, resolved_period)
     if current is not None:
         if context.duplicate_policy == DuplicatePolicy.BLOCK:
@@ -324,7 +353,7 @@ async def upload_interactive(
             raise HTTPException(status_code=409, detail=_period_exists_detail(current))
 
     history = await run_in_threadpool(
-        container.upload_service.finalize, artifact, context, filename, username, resolved_period
+        container.upload_service.finalize, artifact, context, filename, username, resolved_period, period_warning
     )
     if history.status.value == "success":
         container.user_service.set_last_context(user.user_id, context.name)

@@ -18,7 +18,15 @@ from input_arquivos.backend.services.column_check import (
     ColumnMismatchChecker,
 )
 from input_arquivos.backend.services.context_service import ContextService
-from input_arquivos.backend.services.period import PeriodError, format_date_br, is_monthly, period_label, resolve_period
+from input_arquivos.backend.services.period import (
+    PeriodError,
+    describe_other_months,
+    find_other_months,
+    format_date_br,
+    is_monthly,
+    period_label,
+    resolve_period,
+)
 
 
 class ContextNotFoundError(ValueError):
@@ -228,6 +236,7 @@ class UploadService:
         filename: str,
         uploaded_by: str,
         period: str | None = None,
+        period_warning: str | None = None,
     ) -> UploadHistory:
         """Grava o artefato no destino do contexto e registra o resultado no audit log.
 
@@ -248,6 +257,8 @@ class UploadService:
             filename: Nome original do arquivo, para o registro de auditoria.
             uploaded_by: Nome do usuário autenticado que realizou o upload.
             period: Mês de competência (`AAAA-MM`), em contextos mensais.
+            period_warning: Aviso de linhas fora do mês escolhido (ver
+                `describe_other_months`), guardado no registro de sucesso.
 
         Returns:
             O registro de `UploadHistory` criado, já persistido.
@@ -266,6 +277,7 @@ class UploadService:
                 error_message=None,
                 load_status=LoadStatus.PENDING if self._should_load(context, artifact) else None,
                 period=period,
+                period_warning=period_warning,
                 uploaded_by=uploaded_by,
             )
             if artifact.dataframe is not None:
@@ -373,10 +385,17 @@ class UploadService:
             if not replace_period:
                 raise PeriodAlreadySentError(f"{describe_current_upload(current)}. Confirme a substituição.", current)
 
-        history = self.finalize(artifact, context, filename, uploaded_by, resolved_period)
+        # Sem um humano para confirmar, linhas fora do mês escolhido não bloqueiam: ficam como aviso no registro.
+        period_warning = self.describe_other_months(context, artifact, resolved_period)
+        history = self.finalize(artifact, context, filename, uploaded_by, resolved_period, period_warning)
         if history.load_status == LoadStatus.PENDING:
             history = self.run_database_load(history.id, artifact.artifact_bytes)
         return history
+
+    def describe_other_months(self, context: Context, artifact: IngestResult, period: str | None) -> str | None:
+        """Aviso de linhas fora do mês escolhido no seletor, ou `None` se todas caem nele (ver `find_other_months`)."""
+        other_months = find_other_months(context, artifact.dataframe, period)
+        return describe_other_months(period, other_months) if other_months else None
 
     def describe_blocked_period(self, current: UploadHistory) -> str:
         """Mensagem de envio recusado porque o mês já foi enviado e o contexto não aceita reenvio."""

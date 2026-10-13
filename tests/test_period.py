@@ -26,6 +26,8 @@ from input_arquivos.backend.services.period import (
     PeriodError,
     build_year_grid,
     current_period,
+    describe_other_months,
+    find_other_months,
     period_label,
     resolve_period,
 )
@@ -65,6 +67,13 @@ def test_column_month_comes_from_the_dates_in_the_file() -> None:
     assert resolve_period(context, dataframe, "2020-01") == "2026-10"
 
 
+def test_column_month_reads_iso_dates_without_swapping_day_and_month() -> None:
+    context = _context(period_source=PeriodSource.COLUMN, period_column="Data")
+    dataframe = pd.DataFrame({"Data": ["2026-10-01", "2026-10-31"]})  # com o dia primeiro, virava janeiro/NaT
+
+    assert resolve_period(context, dataframe, None) == "2026-10"
+
+
 @pytest.mark.parametrize(
     ("dataframe", "message"),
     [
@@ -79,6 +88,48 @@ def test_column_mode_rejects_files_without_a_single_month(dataframe: pd.DataFram
     context = _context(period_source=PeriodSource.COLUMN, period_column="Data")
     with pytest.raises(PeriodError, match=message):
         resolve_period(context, dataframe, None)
+
+
+def test_selector_finds_date_columns_with_rows_of_other_months() -> None:
+    context = _context()
+    dataframe = pd.DataFrame(
+        {
+            "data_envio": [datetime(2026, 12, 1)] * 3,  # rastreabilidade do sistema: fica de fora
+            "Data": ["01/10/2026", "15/10/2026", "03/11/2026"],
+            "Vencimento": pd.to_datetime(["2026-11-10", "2026-11-10", "2026-12-10"]),  # célula de data do Excel
+            "Pedido": ["2026-10-01", "2026-10-31", ""],  # tudo no mês escolhido (vazio ignorado)
+            "codigo": [46296, 46327, 46357],  # número sem regra "Data": não vira data de série
+            "obs": ["01/11/2026", "texto", "outro"],  # poucas células com cara de data
+        }
+    )
+
+    found = find_other_months(context, dataframe, "2026-10")
+
+    assert [(item.column, item.months, item.row_count) for item in found] == [
+        ("Data", ["2026-11"], 1),
+        ("Vencimento", ["2026-11", "2026-12"], 3),
+    ]
+    assert describe_other_months("2026-10", found) == (
+        "Mês escolhido: outubro/2026, mas a coluna 'Data' tem 1 linha(s) de novembro/2026; "
+        "a coluna 'Vencimento' tem 3 linha(s) de novembro/2026, dezembro/2026."
+    )
+
+
+def test_selector_checks_numeric_dates_only_in_columns_with_a_date_rule() -> None:
+    context = _context(column_rules='[{"column": "codigo", "type": "date", "required": false}]')
+    dataframe = pd.DataFrame({"codigo": [46296, 46327]})  # 01/10/2026 e 01/11/2026 como série do Excel
+
+    found = find_other_months(context, dataframe, "2026-10")
+
+    assert [(item.column, item.months) for item in found] == [("codigo", ["2026-11"])]
+
+
+def test_other_months_check_does_not_apply_outside_the_selector() -> None:
+    dataframe = pd.DataFrame({"Data": ["01/10/2026", "01/11/2026"]})
+    assert find_other_months(_context(period_mode=PeriodMode.NONE), dataframe, "2026-10") == []
+    assert find_other_months(_context(period_source=PeriodSource.COLUMN, period_column="Data"), dataframe, "2026-10") == []
+    assert find_other_months(_context(), None, "2026-10") == []
+    assert find_other_months(_context(), pd.DataFrame({"Data": ["01/10/2026"]}), "2026-10") == []
 
 
 def test_period_label_and_current_period_in_brasilia() -> None:
@@ -197,6 +248,18 @@ def test_allow_policy_accumulates_uploads_of_the_same_month(monthly) -> None:
 
     assert sorted(_table(url)["meta"].tolist()) == [10, 20]
     assert service._get_history(first.id).superseded_by is None
+
+
+def test_api_upload_with_rows_of_other_months_is_saved_with_a_warning(monthly) -> None:
+    service, _, url = monthly
+    csv = b"vendedor,meta,Data\nA,10,01/10/2026\nB,20,05/11/2026\n"
+
+    history = service.process_upload(csv, "out.csv", "metas", "maria", period="2026-10")
+
+    assert history.status == UploadStatus.SUCCESS
+    assert history.period_warning == "Mês escolhido: outubro/2026, mas a coluna 'Data' tem 1 linha(s) de novembro/2026."
+    assert len(_table(url)) == 2
+    assert service.process_upload(_csv(5), "nov.csv", "metas", "maria", period="2026-11").period_warning is None
 
 
 def test_missing_month_becomes_an_error_in_the_audit_log(monthly) -> None:
@@ -343,6 +406,28 @@ def test_api_upload_needs_replace_flag_for_a_sent_month(client: TestClient, tmp_
 
     assert conflict.status_code == 409
     assert replaced.status_code == 200 and replaced.json()["status"] == "success"
+
+
+def test_interactive_upload_asks_before_saving_rows_of_other_months(client: TestClient, tmp_path) -> None:
+    _login(client, "admin", "admin123")
+    _create_monthly_context(client, tmp_path)
+    files = {"file": ("metas.csv", b"vendedor,meta,Data\nA,1,01/10/2026\nB,2,05/11/2026\n", "text/csv")}
+
+    warned = client.post("/api/uploads", data={"context_name": "metas", "period": "2026-10"}, files=files)
+    assert warned.status_code == 409
+    detail = warned.json()["detail"]
+    assert (detail["kind"], detail["period_label"]) == ("period_other_months", "outubro/2026")
+    assert detail["columns"] == [{"column": "Data", "months": ["novembro/2026"], "row_count": 1}]
+    assert client.get("/api/audit").json() == []  # nada gravado antes de confirmar
+
+    confirmed = client.post(
+        "/api/uploads",
+        data={"context_name": "metas", "period": "2026-10", "confirm_other_months": "true"},
+        files=files,
+    )
+    assert confirmed.status_code == 200
+    assert confirmed.json()["status"] == "success"
+    assert client.get("/api/audit").json()[0]["period_warning"] == detail["message"]
 
 
 def test_period_grid_is_shared_with_users_of_the_context_only(client: TestClient, tmp_path) -> None:
